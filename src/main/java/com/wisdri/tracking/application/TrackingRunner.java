@@ -5,7 +5,7 @@ import com.wisdri.tracking.application.tracking.TrackingWorkerManager;
 import com.wisdri.tracking.common.config.TrackingProperties;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
-import com.wisdri.tracking.domain.port.config.TrackingConfigRepository;
+import com.wisdri.tracking.domain.repository.config.TrackingConfigRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;

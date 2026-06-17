@@ -1,7 +1,7 @@
 package com.wisdri.tracking.integration.rocketmq;
 
 import com.wisdri.tracking.domain.model.tracking.TrackingTask;
-import com.wisdri.tracking.domain.port.message.TrackingTaskPublisher;
+import com.wisdri.tracking.domain.repository.tracking.TrackingTaskPublisher;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;

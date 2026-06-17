@@ -1,7 +1,7 @@
 package com.wisdri.tracking.integration.storage;
 
 import com.wisdri.tracking.domain.model.abnormal.AbnormalData;
-import com.wisdri.tracking.domain.port.storage.AbnormalDataStorage;
+import com.wisdri.tracking.domain.repository.abnormal.AbnormalDataStorage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 

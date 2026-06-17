@@ -1,14 +1,12 @@
 package com.wisdri.tracking.domain.model.tracking.process;
 
-import com.wisdri.tracking.domain.model.tracking.TrackingType;
-
-import lombok.AllArgsConstructor;
-import lombok.Builder;
+import com.wisdri.tracking.domain.model.tracking.TrackingResult;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.Map;
 
 /**
@@ -17,20 +15,10 @@ import java.util.Map;
  * <p>一次算法运行会按 segments 生成多条该对象，每条对象对应一个工艺段。</p>
  */
 @Data
-@Builder
+@SuperBuilder
 @NoArgsConstructor
-@AllArgsConstructor
-public class ProcessResult {
-    /**
-     * 机组代码，例如 CP1、ZRM1。
-     */
-    private String unitCode;
-
-    /**
-     * 跟踪类型。
-     */
-    private TrackingType trackingType;
-
+@EqualsAndHashCode(callSuper = true)
+public class ProcessResult extends TrackingResult {
     /**
      * 工艺段名称。
      */
@@ -60,9 +48,4 @@ public class ProcessResult {
      * 动态工艺参数，key 为参数点位短名，value 为参数值。
      */
     private Map<String, Object> parameters;
-
-    /**
-     * 跟踪结果生成时间。
-     */
-    private Instant generatedAt;
 }

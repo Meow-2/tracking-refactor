@@ -3,7 +3,7 @@ package com.wisdri.tracking.integration.storage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
-import com.wisdri.tracking.domain.port.storage.ProcessResultStorage;
+import com.wisdri.tracking.domain.repository.tracking.ProcessResultStorage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 

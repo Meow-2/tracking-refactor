@@ -2,11 +2,9 @@ package com.wisdri.tracking.domain.model.config;
 
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
-import java.util.List;
+import lombok.experimental.SuperBuilder;
 
 /**
  * 单个机组、单个跟踪类型的完整业务配置。
@@ -14,10 +12,10 @@ import java.util.List;
  * <p>该对象是领域层使用的配置模型，不直接绑定 Redis JSON 字段或存储结构。</p>
  */
 @Data
-@Builder
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TrackingConfig {
+public abstract class TrackingConfig {
     /**
      * 机组代码，例如 CP1、ZRM1。
      */
@@ -37,14 +35,4 @@ public class TrackingConfig {
      * 当前跟踪功能订阅的 MQTT 主题。
      */
     private String mqttTopic;
-
-    /**
-     * 跟踪算法主配置。
-     */
-    private TrackingSection tracking;
-
-    /**
-     * 工艺段配置列表，每个元素会生成一条跟踪结果。
-     */
-    private List<SegmentConfig> segments;
 }

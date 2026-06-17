@@ -1,6 +1,5 @@
 package com.wisdri.tracking.domain.model.tracking;
 
-import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -10,7 +9,7 @@ import lombok.NoArgsConstructor;
 /**
  * 跟踪算法输入。
  *
- * <p>算法只依赖最新快照、上一条快照和业务配置，不直接依赖 MQTT、Redis 或 RocketMQ。</p>
+ * <p>算法只依赖任务标识和点位快照，执行时自行读取当前有效配置。</p>
  */
 @Data
 @Builder
@@ -18,9 +17,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TrackingInput {
     /**
-     * 本次算法使用的跟踪配置。
+     * 机组代码。
      */
-    private TrackingConfig config;
+    private String unitCode;
+
+    /**
+     * 跟踪类型。
+     */
+    private TrackingType trackingType;
 
     /**
      * 最新点位快照。
@@ -35,9 +39,10 @@ public class TrackingInput {
     /**
      * 从跟踪任务转换为算法输入。
      */
-    public static TrackingInput of(TrackingTask task, TrackingConfig config) {
+    public static TrackingInput of(TrackingTask task) {
         return TrackingInput.builder()
-                .config(config)
+                .unitCode(task.getUnitCode())
+                .trackingType(task.getTrackingType())
                 .latestSnapshot(task.getLatestSnapshot())
                 .previousSnapshot(task.getPreviousSnapshot())
                 .build();

@@ -8,10 +8,10 @@ import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingTask;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
-import com.wisdri.tracking.domain.port.storage.AbnormalDataStorage;
-import com.wisdri.tracking.domain.port.storage.ProcessResultStorage;
+import com.wisdri.tracking.domain.repository.abnormal.AbnormalDataStorage;
+import com.wisdri.tracking.domain.repository.tracking.ProcessResultStorage;
 import com.wisdri.tracking.domain.service.abnormal.AbnormalDataDetector;
-import com.wisdri.tracking.domain.service.process.ProcessTrackingAlgorithm;
+import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -47,7 +47,7 @@ public class TrackingTaskServiceImpl implements TrackingTaskService {
      * 过程跟踪算法。
      */
     @Resource
-    private ProcessTrackingAlgorithm processTrackingAlgorithm;
+    private TrackingAlgorithm<ProcessResult> processTrackingAlgorithm;
 
     /**
      * 过程跟踪结果存储端口。
@@ -71,7 +71,7 @@ public class TrackingTaskServiceImpl implements TrackingTaskService {
             abnormalDataStorage.save(abnormalData);
         }
         if (TrackingType.PROCESS == task.getTrackingType()) {
-            List<ProcessResult> results = processTrackingAlgorithm.calculate(TrackingInput.of(task, config));
+            List<ProcessResult> results = processTrackingAlgorithm.calculate(TrackingInput.of(task));
             if (!results.isEmpty()) {
                 processResultStorage.save(results);
             }

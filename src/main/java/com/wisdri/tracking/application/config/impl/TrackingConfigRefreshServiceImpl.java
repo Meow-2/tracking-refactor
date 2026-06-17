@@ -4,7 +4,7 @@ import com.wisdri.tracking.application.config.TrackingConfigCacheService;
 import com.wisdri.tracking.application.config.TrackingConfigRefreshService;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
-import com.wisdri.tracking.domain.port.config.TrackingConfigRepository;
+import com.wisdri.tracking.domain.repository.config.TrackingConfigRepository;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;

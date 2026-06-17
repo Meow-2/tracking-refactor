@@ -3,13 +3,13 @@ package com.wisdri.tracking.application.tracking.impl;
 import com.wisdri.tracking.application.config.TrackingConfigCacheService;
 import com.wisdri.tracking.application.tracking.MqttPointMessageService;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
-import com.wisdri.tracking.domain.model.event.TrackingEvent;
+import com.wisdri.tracking.domain.model.point.PointEvent;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.tracking.TrackingTask;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
-import com.wisdri.tracking.domain.port.message.TrackingTaskPublisher;
-import com.wisdri.tracking.domain.port.point.LastPointSnapshotRepository;
-import com.wisdri.tracking.domain.service.event.TrackingEventDetector;
+import com.wisdri.tracking.domain.repository.tracking.TrackingTaskPublisher;
+import com.wisdri.tracking.domain.repository.point.LastPointSnapshotRepository;
+import com.wisdri.tracking.domain.service.point.PointEventDetector;
 import com.wisdri.tracking.domain.service.point.PointExtractor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -48,7 +48,7 @@ public class MqttPointMessageServiceImpl implements MqttPointMessageService {
      * 跟踪事件检测服务。
      */
     @Resource
-    private TrackingEventDetector eventDetector;
+    private PointEventDetector eventDetector;
 
     /**
      * 跟踪任务发布端口。
@@ -73,7 +73,7 @@ public class MqttPointMessageServiceImpl implements MqttPointMessageService {
         }
         PointSnapshot latest = pointExtractor.extract(rawValues, config);
         PointSnapshot previous = lastPointSnapshotRepository.find(unitCode, trackingType).orElse(null);
-        List<TrackingEvent> events = eventDetector.detect(latest, previous, config);
+        List<PointEvent> events = eventDetector.detect(latest, previous, config);
         if (!events.isEmpty()) {
             log.info("检测到跟踪事件，unitCode={}, trackingType={}, events={}", unitCode, trackingType, events);
         }

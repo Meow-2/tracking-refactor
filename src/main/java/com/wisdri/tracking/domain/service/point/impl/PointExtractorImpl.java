@@ -1,11 +1,12 @@
 package com.wisdri.tracking.domain.service.point.impl;
 
-import com.wisdri.tracking.domain.model.config.RollingConfig;
-import com.wisdri.tracking.domain.model.config.SegmentConfig;
-import com.wisdri.tracking.domain.model.config.StartCondition;
+import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
+import com.wisdri.tracking.domain.model.config.process.RollingConfig;
+import com.wisdri.tracking.domain.model.config.process.SegmentConfig;
+import com.wisdri.tracking.domain.model.config.process.StartCondition;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
-import com.wisdri.tracking.domain.model.config.TrackingPointGroup;
-import com.wisdri.tracking.domain.model.config.TrackingSection;
+import com.wisdri.tracking.domain.model.config.process.TrackingPointGroup;
+import com.wisdri.tracking.domain.model.config.process.TrackingSection;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.point.PointValue;
 import com.wisdri.tracking.domain.service.point.PointExtractor;
@@ -27,7 +28,14 @@ public class PointExtractorImpl implements PointExtractor {
     @Override
     public PointSnapshot extract(Map<String, Object> rawValues, TrackingConfig config) {
         Map<String, PointValue> values = new LinkedHashMap<>();
-        TrackingSection tracking = config.getTracking();
+        if (!(config instanceof ProcessTrackingConfig)) {
+            return PointSnapshot.builder()
+                    .values(values)
+                    .receivedAt(Instant.now())
+                    .build();
+        }
+        ProcessTrackingConfig processConfig = (ProcessTrackingConfig) config;
+        TrackingSection tracking = processConfig.getTracking();
         if (tracking != null) {
             putTrackingPoint(values, rawValues, tracking.getPointPrefix(), tracking.getSpeedPoint(), false);
             StartCondition startCondition = tracking.getStartCondition();
@@ -50,8 +58,8 @@ public class PointExtractorImpl implements PointExtractor {
                 }
             }
         }
-        if (config.getSegments() != null) {
-            for (SegmentConfig segment : config.getSegments()) {
+        if (processConfig.getSegments() != null) {
+            for (SegmentConfig segment : processConfig.getSegments()) {
                 if (segment.getPoints() != null) {
                     for (String point : segment.getPoints()) {
                         putTrackingPoint(values, rawValues, segment.getPointPrefix(), point, false);

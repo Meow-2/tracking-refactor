@@ -2,13 +2,14 @@ package com.wisdri.tracking.integration.redis;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wisdri.tracking.domain.model.config.LengthMode;
-import com.wisdri.tracking.domain.model.config.RollingConfig;
-import com.wisdri.tracking.domain.model.config.SegmentConfig;
-import com.wisdri.tracking.domain.model.config.StartCondition;
+import com.wisdri.tracking.domain.model.config.process.LengthMode;
+import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
+import com.wisdri.tracking.domain.model.config.process.RollingConfig;
+import com.wisdri.tracking.domain.model.config.process.SegmentConfig;
+import com.wisdri.tracking.domain.model.config.process.StartCondition;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
-import com.wisdri.tracking.domain.model.config.TrackingPointGroup;
-import com.wisdri.tracking.domain.model.config.TrackingSection;
+import com.wisdri.tracking.domain.model.config.process.TrackingPointGroup;
+import com.wisdri.tracking.domain.model.config.process.TrackingSection;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import org.springframework.stereotype.Component;
 
@@ -38,14 +39,17 @@ public class RedisTrackingConfigMapper {
     public TrackingConfig fromJson(String unitCode, TrackingType trackingType, String json) {
         try {
             JsonNode root = objectMapper.readTree(json);
-            return TrackingConfig.builder()
-                    .unitCode(unitCode)
-                    .trackingType(trackingType)
-                    .enable(booleanValue(root.get("enable")))
-                    .mqttTopic(text(root.get("mqtt_topic")))
-                    .tracking(toTrackingSection(root.get("tracking")))
-                    .segments(toSegments(root.get("segments")))
-                    .build();
+            if (TrackingType.PROCESS == trackingType) {
+                return ProcessTrackingConfig.builder()
+                        .unitCode(unitCode)
+                        .trackingType(trackingType)
+                        .enable(booleanValue(root.get("enable")))
+                        .mqttTopic(text(root.get("mqtt_topic")))
+                        .tracking(toTrackingSection(root.get("tracking")))
+                        .segments(toSegments(root.get("segments")))
+                        .build();
+            }
+            throw new IllegalArgumentException("暂不支持该跟踪类型配置映射: " + trackingType);
         } catch (IOException e) {
             throw new IllegalArgumentException("Redis 跟踪配置 JSON 解析失败", e);
         }

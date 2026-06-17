@@ -3,6 +3,7 @@ package com.wisdri.tracking.application.config.impl;
 import com.wisdri.tracking.application.config.TrackingConfigCacheService;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
+import lombok.Data;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -56,6 +57,7 @@ public class TrackingConfigCacheServiceImpl implements TrackingConfigCacheServic
     /**
      * 配置缓存 key。
      */
+    @Data
     private static class CacheKey {
         /**
          * 机组代码。
@@ -66,30 +68,5 @@ public class TrackingConfigCacheServiceImpl implements TrackingConfigCacheServic
          * 跟踪类型。
          */
         private final TrackingType trackingType;
-
-        /**
-         * 创建缓存 key。
-         */
-        private CacheKey(String unitCode, TrackingType trackingType) {
-            this.unitCode = unitCode;
-            this.trackingType = trackingType;
-        }
-
-        @Override
-        public boolean equals(Object other) {
-            if (this == other) {
-                return true;
-            }
-            if (!(other instanceof CacheKey)) {
-                return false;
-            }
-            CacheKey cacheKey = (CacheKey) other;
-            return java.util.Objects.equals(unitCode, cacheKey.unitCode) && trackingType == cacheKey.trackingType;
-        }
-
-        @Override
-        public int hashCode() {
-            return java.util.Objects.hash(unitCode, trackingType);
-        }
     }
 }

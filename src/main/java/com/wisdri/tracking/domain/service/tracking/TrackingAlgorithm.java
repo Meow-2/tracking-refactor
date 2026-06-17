@@ -1,0 +1,18 @@
+package com.wisdri.tracking.domain.service.tracking;
+
+import com.wisdri.tracking.domain.model.tracking.TrackingInput;
+import com.wisdri.tracking.domain.model.tracking.TrackingResult;
+
+import java.util.List;
+
+/**
+ * 跟踪算法接口。
+ *
+ * <p>不同跟踪类型通过不同实现输出对应的跟踪结果子类。</p>
+ */
+public interface TrackingAlgorithm<R extends TrackingResult> {
+    /**
+     * 执行跟踪计算。
+     */
+    List<R> calculate(TrackingInput input);
+}
