@@ -1,6 +1,6 @@
 package com.wisdri.tracking.integration.rocketmq;
 
-import com.wisdri.tracking.application.tracking.TrackingTaskApplicationService;
+import com.wisdri.tracking.application.tracking.TrackingTaskService;
 import com.wisdri.tracking.domain.model.tracking.TrackingTask;
 import org.springframework.stereotype.Component;
 
@@ -21,7 +21,7 @@ public class RocketMqTrackingTaskConsumer {
      * 跟踪任务应用服务。
      */
     @Resource
-    private TrackingTaskApplicationService applicationService;
+    private TrackingTaskService applicationService;
 
     /**
      * 消费 RocketMQ 消息体。

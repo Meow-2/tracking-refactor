@@ -1,6 +1,6 @@
 package com.wisdri.tracking.application.retracking.impl;
 
-import com.wisdri.tracking.application.retracking.ReTrackingApplicationService;
+import com.wisdri.tracking.application.retracking.ReTrackingService;
 import com.wisdri.tracking.application.retracking.command.ReTrackingCommand;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-public class ReTrackingApplicationServiceImpl implements ReTrackingApplicationService {
+public class ReTrackingServiceImpl implements ReTrackingService {
     /**
      * 接收重跟踪请求。
      */

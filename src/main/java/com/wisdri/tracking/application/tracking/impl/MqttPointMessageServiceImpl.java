@@ -1,7 +1,7 @@
 package com.wisdri.tracking.application.tracking.impl;
 
 import com.wisdri.tracking.application.config.TrackingConfigCacheService;
-import com.wisdri.tracking.application.tracking.MqttPointMessageApplicationService;
+import com.wisdri.tracking.application.tracking.MqttPointMessageService;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.event.TrackingEvent;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
@@ -25,7 +25,7 @@ import java.util.Optional;
  */
 @Slf4j
 @Service
-public class MqttPointMessageApplicationServiceImpl implements MqttPointMessageApplicationService {
+public class MqttPointMessageServiceImpl implements MqttPointMessageService {
     /**
      * 跟踪配置缓存。
      */

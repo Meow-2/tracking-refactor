@@ -1,7 +1,7 @@
 package com.wisdri.tracking.application.tracking.impl;
 
 import com.wisdri.tracking.application.config.TrackingConfigCacheService;
-import com.wisdri.tracking.application.tracking.TrackingTaskApplicationService;
+import com.wisdri.tracking.application.tracking.TrackingTaskService;
 import com.wisdri.tracking.domain.model.abnormal.AbnormalData;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
@@ -24,7 +24,7 @@ import java.util.Optional;
  */
 @Slf4j
 @Service
-public class TrackingTaskApplicationServiceImpl implements TrackingTaskApplicationService {
+public class TrackingTaskServiceImpl implements TrackingTaskService {
     /**
      * 跟踪配置缓存。
      */

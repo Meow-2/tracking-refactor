@@ -7,7 +7,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingTask;
  *
  * <p>负责消费已派发的跟踪任务，编排异常检测、算法计算和结果存储。</p>
  */
-public interface TrackingTaskApplicationService {
+public interface TrackingTaskService {
     /**
      * 处理一次跟踪任务。
      */

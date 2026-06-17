@@ -9,7 +9,7 @@ import java.util.Map;
  *
  * <p>负责处理 MQTT 接收侧传入的原始点位数据，并编排配置读取、点位提取、任务发布和快照更新。</p>
  */
-public interface MqttPointMessageApplicationService {
+public interface MqttPointMessageService {
     /**
      * 处理一条 MQTT 点位消息。
      *

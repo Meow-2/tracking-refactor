@@ -1,10 +1,10 @@
 package com.wisdri.tracking.application;
 
 import com.wisdri.tracking.application.config.TrackingConfigRefreshService;
-import com.wisdri.tracking.application.retracking.ReTrackingApplicationService;
+import com.wisdri.tracking.application.retracking.ReTrackingService;
 import com.wisdri.tracking.application.retracking.command.ReTrackingCommand;
-import com.wisdri.tracking.application.tracking.MqttPointMessageApplicationService;
-import com.wisdri.tracking.application.tracking.TrackingTaskApplicationService;
+import com.wisdri.tracking.application.tracking.MqttPointMessageService;
+import com.wisdri.tracking.application.tracking.TrackingTaskService;
 import com.wisdri.tracking.application.tracking.TrackingWorkerManager;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingTask;
@@ -22,8 +22,8 @@ class ApplicationContractTest {
 
     @Test
     void applicationServicesExposeWorkflowBoundaries() {
-        RecordingMqttPointMessageApplicationService mqttService = new RecordingMqttPointMessageApplicationService();
-        RecordingTrackingTaskApplicationService taskService = new RecordingTrackingTaskApplicationService();
+        RecordingMqttPointMessageService mqttService = new RecordingMqttPointMessageService();
+        RecordingTrackingTaskService taskService = new RecordingTrackingTaskService();
         RecordingTrackingWorkerManager workerManager = new RecordingTrackingWorkerManager();
 
         Map<String, Object> rawValues = Collections.singletonMap("speed", 1.2);
@@ -46,7 +46,7 @@ class ApplicationContractTest {
     @Test
     void configRefreshAndRetrackingContractsUseDomainTypes() {
         RecordingConfigRefreshService configRefreshService = new RecordingConfigRefreshService();
-        RecordingReTrackingApplicationService reTrackingService = new RecordingReTrackingApplicationService();
+        RecordingReTrackingService reTrackingService = new RecordingReTrackingService();
         ReTrackingCommand command = ReTrackingCommand.builder()
                 .unitCode("CP1")
                 .trackingType(TrackingType.PROCESS)
@@ -61,7 +61,7 @@ class ApplicationContractTest {
         assertThat(reTrackingService.command).isSameAs(command);
     }
 
-    private static class RecordingMqttPointMessageApplicationService implements MqttPointMessageApplicationService {
+    private static class RecordingMqttPointMessageService implements MqttPointMessageService {
         private Map<String, Object> rawValues;
 
         @Override
@@ -70,7 +70,7 @@ class ApplicationContractTest {
         }
     }
 
-    private static class RecordingTrackingTaskApplicationService implements TrackingTaskApplicationService {
+    private static class RecordingTrackingTaskService implements TrackingTaskService {
         private TrackingTask task;
 
         @Override
@@ -106,7 +106,7 @@ class ApplicationContractTest {
         }
     }
 
-    private static class RecordingReTrackingApplicationService implements ReTrackingApplicationService {
+    private static class RecordingReTrackingService implements ReTrackingService {
         private ReTrackingCommand command;
 
         @Override

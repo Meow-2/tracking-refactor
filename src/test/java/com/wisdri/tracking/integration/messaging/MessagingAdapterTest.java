@@ -1,8 +1,8 @@
 package com.wisdri.tracking.integration.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wisdri.tracking.application.tracking.MqttPointMessageApplicationService;
-import com.wisdri.tracking.application.tracking.TrackingTaskApplicationService;
+import com.wisdri.tracking.application.tracking.MqttPointMessageService;
+import com.wisdri.tracking.application.tracking.TrackingTaskService;
 import com.wisdri.tracking.domain.model.tracking.TrackingTask;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.integration.mqtt.MqttRawMessageMapper;
@@ -33,7 +33,7 @@ class MessagingAdapterTest {
 
     @Test
     void mqttTrackingMessageHandlerDelegatesRawValuesToApplicationService() {
-        RecordingMqttPointMessageApplicationService applicationService = new RecordingMqttPointMessageApplicationService();
+        RecordingMqttPointMessageService applicationService = new RecordingMqttPointMessageService();
         MqttTrackingMessageHandler handler = new MqttTrackingMessageHandler();
         ReflectionTestUtils.setField(handler, "mapper", mqttRawMessageMapper());
         ReflectionTestUtils.setField(handler, "applicationService", applicationService);
@@ -69,7 +69,7 @@ class MessagingAdapterTest {
         RocketMqTrackingTaskPublisher publisher = new RocketMqTrackingTaskPublisher();
         ReflectionTestUtils.setField(publisher, "gateway", gateway);
         ReflectionTestUtils.setField(publisher, "mapper", mapper);
-        RecordingTrackingTaskApplicationService applicationService = new RecordingTrackingTaskApplicationService();
+        RecordingTrackingTaskService applicationService = new RecordingTrackingTaskService();
         RocketMqTrackingTaskConsumer consumer = new RocketMqTrackingTaskConsumer();
         ReflectionTestUtils.setField(consumer, "mapper", mapper);
         ReflectionTestUtils.setField(consumer, "applicationService", applicationService);
@@ -103,7 +103,7 @@ class MessagingAdapterTest {
         return mapper;
     }
 
-    private static class RecordingMqttPointMessageApplicationService implements MqttPointMessageApplicationService {
+    private static class RecordingMqttPointMessageService implements MqttPointMessageService {
         private String unitCode;
         private TrackingType trackingType;
         private Map<String, Object> rawValues;
@@ -125,7 +125,7 @@ class MessagingAdapterTest {
         }
     }
 
-    private static class RecordingTrackingTaskApplicationService implements TrackingTaskApplicationService {
+    private static class RecordingTrackingTaskService implements TrackingTaskService {
         private TrackingTask task;
 
         @Override

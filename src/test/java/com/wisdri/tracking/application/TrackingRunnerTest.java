@@ -1,7 +1,7 @@
 package com.wisdri.tracking.application;
 
 import com.wisdri.tracking.application.config.TrackingConfigCacheService;
-import com.wisdri.tracking.application.runner.TrackingApplicationRunner;
+import com.wisdri.tracking.application.runner.TrackingRunner;
 import com.wisdri.tracking.application.tracking.TrackingWorkerManager;
 import com.wisdri.tracking.common.config.TrackingProperties;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
@@ -16,7 +16,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class TrackingApplicationRunnerTest {
+class TrackingRunnerTest {
 
     @Test
     void runnerStartsEnabledTrackingWorkersForCurrentUnit() throws Exception {
@@ -24,7 +24,7 @@ class TrackingApplicationRunnerTest {
         properties.setUnit("CP1");
         RecordingTrackingConfigCacheService configCache = new RecordingTrackingConfigCacheService();
         RecordingWorkerManager workerManager = new RecordingWorkerManager();
-        TrackingApplicationRunner runner = new TrackingApplicationRunner();
+        TrackingRunner runner = new TrackingRunner();
         ReflectionTestUtils.setField(runner, "trackingProperties", properties);
         ReflectionTestUtils.setField(runner, "configRepository", new RecordingConfigRepository());
         ReflectionTestUtils.setField(runner, "configCache", configCache);

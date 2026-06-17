@@ -1,8 +1,8 @@
 package com.wisdri.tracking.application;
 
 import com.wisdri.tracking.application.config.TrackingConfigCacheService;
-import com.wisdri.tracking.application.tracking.impl.MqttPointMessageApplicationServiceImpl;
-import com.wisdri.tracking.application.tracking.impl.TrackingTaskApplicationServiceImpl;
+import com.wisdri.tracking.application.tracking.impl.MqttPointMessageServiceImpl;
+import com.wisdri.tracking.application.tracking.impl.TrackingTaskServiceImpl;
 import com.wisdri.tracking.domain.model.abnormal.AbnormalData;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
@@ -38,7 +38,7 @@ class ApplicationServiceBehaviorTest {
         RecordingLastPointSnapshotRepository snapshotRepository = new RecordingLastPointSnapshotRepository();
         RecordingPointExtractor pointExtractor = new RecordingPointExtractor();
         RecordingTrackingTaskPublisher publisher = new RecordingTrackingTaskPublisher();
-        MqttPointMessageApplicationServiceImpl service = new MqttPointMessageApplicationServiceImpl();
+        MqttPointMessageServiceImpl service = new MqttPointMessageServiceImpl();
         ReflectionTestUtils.setField(service, "configCache", configCache);
         ReflectionTestUtils.setField(service, "lastPointSnapshotRepository", snapshotRepository);
         ReflectionTestUtils.setField(service, "pointExtractor", pointExtractor);
@@ -56,7 +56,7 @@ class ApplicationServiceBehaviorTest {
     void trackingTaskApplicationServiceStoresAbnormalDataAndProcessResults() {
         RecordingAbnormalDataStorage abnormalStorage = new RecordingAbnormalDataStorage();
         RecordingProcessResultStorage processStorage = new RecordingProcessResultStorage();
-        TrackingTaskApplicationServiceImpl service = new TrackingTaskApplicationServiceImpl();
+        TrackingTaskServiceImpl service = new TrackingTaskServiceImpl();
         ReflectionTestUtils.setField(service, "configCache", new RecordingTrackingConfigCacheService());
         ReflectionTestUtils.setField(service, "abnormalDataDetector",
                 (AbnormalDataDetector) (latest, previous, config) -> Collections.singletonList(AbnormalData.builder().pointCode("speed").build()));

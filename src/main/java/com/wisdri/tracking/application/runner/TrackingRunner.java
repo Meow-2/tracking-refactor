@@ -21,7 +21,7 @@ import java.util.Optional;
  */
 @Slf4j
 @Component
-public class TrackingApplicationRunner implements ApplicationRunner {
+public class TrackingRunner implements ApplicationRunner {
     /**
      * 当前服务实例配置。
      */

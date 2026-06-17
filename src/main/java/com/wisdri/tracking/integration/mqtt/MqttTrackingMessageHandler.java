@@ -1,6 +1,6 @@
 package com.wisdri.tracking.integration.mqtt;
 
-import com.wisdri.tracking.application.tracking.MqttPointMessageApplicationService;
+import com.wisdri.tracking.application.tracking.MqttPointMessageService;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import org.springframework.stereotype.Component;
 
@@ -24,7 +24,7 @@ public class MqttTrackingMessageHandler {
      * MQTT 点位消息应用服务。
      */
     @Resource
-    private MqttPointMessageApplicationService applicationService;
+    private MqttPointMessageService applicationService;
 
     /**
      * 处理指定机组和跟踪类型的一条 MQTT 消息。

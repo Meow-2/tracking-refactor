@@ -7,7 +7,7 @@ import com.wisdri.tracking.application.retracking.command.ReTrackingCommand;
  *
  * <p>负责按时间范围读取历史点位数据，并复用在线跟踪流程重新生成跟踪结果。</p>
  */
-public interface ReTrackingApplicationService {
+public interface ReTrackingService {
     /**
      * 执行一次重跟踪。
      */
