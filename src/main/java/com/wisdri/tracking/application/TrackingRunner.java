@@ -1,4 +1,4 @@
-package com.wisdri.tracking.application.runner;
+package com.wisdri.tracking.application;
 
 import com.wisdri.tracking.application.config.TrackingConfigCacheService;
 import com.wisdri.tracking.application.tracking.TrackingWorkerManager;

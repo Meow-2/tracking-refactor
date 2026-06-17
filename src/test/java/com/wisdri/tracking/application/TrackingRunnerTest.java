@@ -1,7 +1,6 @@
 package com.wisdri.tracking.application;
 
 import com.wisdri.tracking.application.config.TrackingConfigCacheService;
-import com.wisdri.tracking.application.runner.TrackingRunner;
 import com.wisdri.tracking.application.tracking.TrackingWorkerManager;
 import com.wisdri.tracking.common.config.TrackingProperties;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
