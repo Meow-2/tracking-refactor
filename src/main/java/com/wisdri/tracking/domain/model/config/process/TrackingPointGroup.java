@@ -20,15 +20,15 @@ public class TrackingPointGroup {
     /**
      * 长度点位短名列表；焊缝模式下通常包含多个检测仪长度点位。
      */
-    private List<String> lengthPoints;
+    private List<String> length;
 
     /**
      * 钢卷号点位短名。
      */
-    private String coilNoPoint;
+    private String coilNo;
 
     /**
      * 轧机模式下用于区分卷取机侧和开卷机侧。
      */
-    private Boolean rollingCoiler;
+    private Boolean isRollingCoiler;
 }

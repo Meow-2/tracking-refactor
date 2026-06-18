@@ -49,11 +49,7 @@ public class ProcessPointEventHandler implements PointEventHandler<ProcessTracki
         if (!event.isPresent()) {
             return;
         }
-        configRepository.refreshAs(
-                input.getUnitCode(),
-                input.getTrackingType(),
-                ProcessTrackingConfig.class
-        );
+        configRepository.refresh();
     }
 
     /**
@@ -93,7 +89,7 @@ public class ProcessPointEventHandler implements PointEventHandler<ProcessTracki
             return coils;
         }
         for (TrackingPointGroup group : processConfig.getTracking().getPoints()) {
-            String coilNo = PointReader.stringValue(snapshot, trackingPointPath(processConfig, group.getCoilNoPoint()));
+            String coilNo = PointReader.stringValue(snapshot, trackingPointPath(processConfig, group.getCoilNo()));
             if (coilNo != null && !coilNo.trim().isEmpty()) {
                 coils.add(coilNo.trim());
             }

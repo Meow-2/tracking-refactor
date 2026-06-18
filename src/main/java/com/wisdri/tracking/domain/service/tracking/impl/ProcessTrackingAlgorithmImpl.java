@@ -15,7 +15,8 @@ import com.wisdri.tracking.domain.service.abnormal.AbnormalDataHandler;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.point.impl.ProcessPointEventHandler;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
-import lombok.Data;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -93,7 +94,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                     .unitCode(config.getUnitCode())
                     .trackingType(config.getTrackingType())
                     .segmentName(segment.getName())
-                    .coilNo(PointReader.stringValue(latest, trackingPointPath(config.getTracking(), selected.group.getCoilNoPoint())))
+                    .coilNo(PointReader.stringValue(latest, trackingPointPath(config.getTracking(), selected.group.getCoilNo())))
                     .headLength(selected.headLength)
                     .speed(PointReader.decimalValue(latest, trackingPointPath(config.getTracking(), config.getTracking().getSpeedPoint())))
                     .passNo(passNo(latest, config.getTracking()))
@@ -125,7 +126,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
             return result;
         }
         for (TrackingPointGroup group : tracking.getPoints()) {
-            String coilNo = PointReader.stringValue(latest, trackingPointPath(tracking, group.getCoilNoPoint()));
+            String coilNo = PointReader.stringValue(latest, trackingPointPath(tracking, group.getCoilNo()));
             if (coilNo != null && !coilNo.trim().isEmpty()) {
                 result.add(group);
             }
@@ -161,10 +162,10 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
         SelectedGroup selected = null;
         int index = Optional.ofNullable(segment.getLengthArrayIndex()).orElse(0);
         for (TrackingPointGroup group : groups) {
-            if (group.getLengthPoints() == null || group.getLengthPoints().size() <= index) {
+            if (group.getLength() == null || group.getLength().size() <= index) {
                 continue;
             }
-            BigDecimal headLength = correctedLength(latest, tracking, group.getLengthPoints().get(index), segment);
+            BigDecimal headLength = correctedLength(latest, tracking, group.getLength().get(index), segment);
             if (headLength == null || headLength.compareTo(BigDecimal.ZERO) < 0) {
                 continue;
             }
@@ -184,10 +185,10 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                                        List<TrackingPointGroup> groups) {
         SelectedGroup selected = null;
         for (TrackingPointGroup group : groups) {
-            if (group.getLengthPoints() == null || group.getLengthPoints().isEmpty()) {
+            if (group.getLength() == null || group.getLength().isEmpty()) {
                 continue;
             }
-            BigDecimal headLength = correctedLength(latest, tracking, group.getLengthPoints().get(0), segment);
+            BigDecimal headLength = correctedLength(latest, tracking, group.getLength().get(0), segment);
             if (headLength == null || headLength.compareTo(Optional.ofNullable(segment.getLengthCorrect()).orElse(BigDecimal.ZERO)) < 0) {
                 continue;
             }
@@ -208,7 +209,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
         boolean targetCoiler = direct ^ reverse;
         List<TrackingPointGroup> result = new ArrayList<>();
         for (TrackingPointGroup group : groups) {
-            if (Boolean.TRUE.equals(group.getRollingCoiler()) == targetCoiler) {
+            if (Boolean.TRUE.equals(group.getIsRollingCoiler()) == targetCoiler) {
                 result.add(group);
             }
         }
@@ -271,7 +272,8 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
         return PointReader.pathResolve(segment == null ? null : segment.getPointPrefix(), point);
     }
 
-    @Data
+    @Getter
+    @AllArgsConstructor
     private static class SelectedGroup {
         /**
          * 被选中的跟踪点位组。

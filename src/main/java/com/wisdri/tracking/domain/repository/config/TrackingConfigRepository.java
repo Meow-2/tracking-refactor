@@ -28,16 +28,8 @@ public interface TrackingConfigRepository {
     }
 
     /**
-     * 刷新缓存对象本身并返回刷新后的当前配置对象引用。
+     * 刷新全部缓存配置对象本身。
      */
-    Optional<TrackingConfig> refresh(String unitCode, TrackingType trackingType);
+    void refresh();
 
-    /**
-     * 按指定配置类型刷新缓存对象本身并返回刷新后的当前配置对象引用。
-     */
-    default <T extends TrackingConfig> Optional<T> refreshAs(String unitCode, TrackingType trackingType, Class<T> configType) {
-        return refresh(unitCode, trackingType)
-                .filter(configType::isInstance)
-                .map(configType::cast);
-    }
 }
