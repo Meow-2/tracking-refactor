@@ -8,7 +8,6 @@ import com.wisdri.tracking.domain.model.point.PointValue;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.abnormal.AbnormalDataRepository;
-import com.wisdri.tracking.domain.repository.config.TrackingConfigRepository;
 import com.wisdri.tracking.domain.service.abnormal.AbnormalDataHandler;
 import org.springframework.stereotype.Component;
 
@@ -30,12 +29,6 @@ public class AbnormalDataHandlerImpl implements AbnormalDataHandler {
     private AbnormalDataRepository abnormalDataRepository;
 
     /**
-     * 跟踪配置仓储。
-     */
-    @Resource
-    private TrackingConfigRepository configRepository;
-
-    /**
      * 默认支持全部跟踪类型。
      */
     @Override
@@ -47,8 +40,8 @@ public class AbnormalDataHandlerImpl implements AbnormalDataHandler {
      * 检测并保存异常数据。
      */
     @Override
-    public void handle(TrackingInput input) {
-        List<AbnormalData> abnormalData = detect(input);
+    public void handle(TrackingInput input, TrackingConfig config) {
+        List<AbnormalData> abnormalData = detect(input, config);
         if (abnormalData.isEmpty()) {
             return;
         }
@@ -58,9 +51,8 @@ public class AbnormalDataHandlerImpl implements AbnormalDataHandler {
     /**
      * 检测最新快照中的空点位数据。
      */
-    private List<AbnormalData> detect(TrackingInput input) {
+    private List<AbnormalData> detect(TrackingInput input, TrackingConfig config) {
         List<AbnormalData> result = new ArrayList<>();
-        TrackingConfig config = configRepository.refresh(input.getUnitCode(), input.getTrackingType()).orElse(null);
         if (config == null) {
             return result;
         }

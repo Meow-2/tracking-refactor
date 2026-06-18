@@ -1,5 +1,6 @@
 package com.wisdri.tracking.domain.service.abnormal;
 
+import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 
@@ -17,5 +18,5 @@ public interface AbnormalDataHandler {
     /**
      * 处理最新快照中的异常点位数据。
      */
-    void handle(TrackingInput input);
+    void handle(TrackingInput input, TrackingConfig config);
 }

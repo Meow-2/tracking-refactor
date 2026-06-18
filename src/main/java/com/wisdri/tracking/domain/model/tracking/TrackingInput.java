@@ -35,7 +35,6 @@ public class TrackingInput {
      * 上一条点位快照。
      */
     private PointSnapshot previousSnapshot;
-
     /**
      * 从跟踪任务转换为算法输入。
      */

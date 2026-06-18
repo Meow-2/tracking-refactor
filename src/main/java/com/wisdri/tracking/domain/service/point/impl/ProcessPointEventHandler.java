@@ -14,9 +14,7 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -24,18 +22,12 @@ import java.util.Set;
  * 过程跟踪点位事件处理服务。
  */
 @Component
-public class ProcessPointEventHandler implements PointEventHandler {
+public class ProcessPointEventHandler implements PointEventHandler<ProcessTrackingConfig> {
     /**
      * 跟踪配置仓储。
      */
     @Resource
     private TrackingConfigRepository configRepository;
-
-    /**
-     * 点位读取服务。
-     */
-    @Resource
-    private PointReader pointReader;
 
     /**
      * 仅支持过程跟踪。
@@ -49,43 +41,44 @@ public class ProcessPointEventHandler implements PointEventHandler {
      * 处理过程跟踪点位事件。
      */
     @Override
-    public void handle(TrackingInput input) {
-        List<PointEvent> events = detect(input);
-        if (events.isEmpty()) {
+    public void handle(TrackingInput input, ProcessTrackingConfig config) {
+        if (config == null) {
             return;
         }
-        configRepository.refresh(input.getUnitCode(), input.getTrackingType());
+        Optional<PointEvent> event = detect(input, config);
+        if (!event.isPresent()) {
+            return;
+        }
+        configRepository.refreshAs(
+                input.getUnitCode(),
+                input.getTrackingType(),
+                ProcessTrackingConfig.class
+        );
     }
 
     /**
      * 检测过程跟踪最新快照和上一条快照之间的业务事件。
      */
-    private List<PointEvent> detect(TrackingInput input) {
-        Optional<ProcessTrackingConfig> configOptional = configRepository.refreshAs(
-                input.getUnitCode(),
-                input.getTrackingType(),
-                ProcessTrackingConfig.class
-        );
-        if (!configOptional.isPresent()) {
-            return Collections.emptyList();
+    private Optional<PointEvent> detect(TrackingInput input, ProcessTrackingConfig processConfig) {
+        if (processConfig == null) {
+            return Optional.empty();
         }
-        ProcessTrackingConfig processConfig = configOptional.get();
         PointSnapshot latest = input.getLatestSnapshot();
         PointSnapshot previous = input.getPreviousSnapshot();
         if (previous == null) {
-            return Collections.emptyList();
+            return Optional.empty();
         }
         Set<String> latestCoils = coilSet(latest, processConfig);
         Set<String> previousCoils = coilSet(previous, processConfig);
         if (!latestCoils.equals(previousCoils)) {
-            return Collections.singletonList(PointEvent.builder()
+            return Optional.of(PointEvent.builder()
                     .unitCode(processConfig.getUnitCode())
                     .trackingType(processConfig.getTrackingType())
                     .eventType(PointEventType.COIL_SET_CHANGED)
                     .occurredAt(Instant.now())
                     .build());
         }
-        return Collections.emptyList();
+        return Optional.empty();
     }
 
     /**
@@ -100,7 +93,7 @@ public class ProcessPointEventHandler implements PointEventHandler {
             return coils;
         }
         for (TrackingPointGroup group : processConfig.getTracking().getPoints()) {
-            String coilNo = pointReader.stringValue(snapshot, trackingPointPath(processConfig, group.getCoilNoPoint()));
+            String coilNo = PointReader.stringValue(snapshot, trackingPointPath(processConfig, group.getCoilNoPoint()));
             if (coilNo != null && !coilNo.trim().isEmpty()) {
                 coils.add(coilNo.trim());
             }
@@ -113,12 +106,7 @@ public class ProcessPointEventHandler implements PointEventHandler {
      */
     private String trackingPointPath(ProcessTrackingConfig processConfig, String point) {
         String prefix = processConfig.getTracking() == null ? null : processConfig.getTracking().getPointPrefix();
-        if (point == null || point.isEmpty()) {
-            return point;
-        }
-        if (point.startsWith("/") || prefix == null || prefix.isEmpty() || point.startsWith(prefix)) {
-            return point;
-        }
-        return prefix + point;
+        return PointReader.pathResolve(prefix, point);
     }
+
 }
