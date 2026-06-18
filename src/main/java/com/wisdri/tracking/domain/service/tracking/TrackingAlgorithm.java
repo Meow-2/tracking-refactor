@@ -2,6 +2,7 @@ package com.wisdri.tracking.domain.service.tracking;
 
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingResult;
+import com.wisdri.tracking.domain.model.tracking.TrackingType;
 
 import java.util.List;
 
@@ -11,6 +12,11 @@ import java.util.List;
  * <p>不同跟踪类型通过不同实现输出对应的跟踪结果子类。</p>
  */
 public interface TrackingAlgorithm<R extends TrackingResult> {
+    /**
+     * 是否支持指定跟踪类型。
+     */
+    boolean support(TrackingType trackingType);
+
     /**
      * 执行跟踪计算。
      */

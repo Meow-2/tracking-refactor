@@ -9,11 +9,12 @@ import com.wisdri.tracking.domain.model.config.process.TrackingPointGroup;
 import com.wisdri.tracking.domain.model.config.process.TrackingSection;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
+import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
 import com.wisdri.tracking.domain.repository.config.TrackingConfigRepository;
 import com.wisdri.tracking.domain.service.abnormal.AbnormalDataHandler;
+import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
-import com.wisdri.tracking.domain.service.point.impl.ProcessPointEventHandler;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -46,10 +47,18 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
     private AbnormalDataHandler abnormalDataHandler;
 
     /**
-     * 过程跟踪点位事件处理服务。
+     * 点位事件处理分发器。
      */
     @Resource
-    private ProcessPointEventHandler pointEventHandler;
+    private PointEventHandlerDispatcher pointEventHandlerDispatcher;
+
+    /**
+     * 支持过程跟踪。
+     */
+    @Override
+    public boolean support(TrackingType trackingType) {
+        return TrackingType.PROCESS == trackingType;
+    }
 
     /**
      * 执行过程跟踪计算。
@@ -69,7 +78,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
 
         // 先处理异常点，再处理可能影响配置版本的点位事件。
         abnormalDataHandler.handle(input, config);
-        pointEventHandler.handle(input, config);
+        pointEventHandlerDispatcher.handle(input, config);
 
         // 校验最新快照和启动条件，未达到计算条件时不生成结果。
         PointSnapshot latest = input.getLatestSnapshot();
