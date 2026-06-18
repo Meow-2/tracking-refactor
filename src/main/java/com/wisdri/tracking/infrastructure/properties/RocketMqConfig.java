@@ -1,4 +1,4 @@
-package com.wisdri.tracking.infrastructure.config;
+package com.wisdri.tracking.infrastructure.properties;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

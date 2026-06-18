@@ -46,6 +46,6 @@ cube-api:
   connectTimeout: 3000
   readTimeout: 5000
 
-data-storage:
+time-series-storage:
   connectTimeout: 3000
   readTimeout: 5000
