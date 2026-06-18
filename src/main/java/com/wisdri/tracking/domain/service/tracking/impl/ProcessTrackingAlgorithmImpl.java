@@ -5,14 +5,13 @@ import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.RollingConfig;
 import com.wisdri.tracking.domain.model.config.process.SegmentConfig;
 import com.wisdri.tracking.domain.model.config.process.StartCondition;
-import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.TrackingPointGroup;
 import com.wisdri.tracking.domain.model.config.process.TrackingSection;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
-import com.wisdri.tracking.domain.model.point.PointValue;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
 import com.wisdri.tracking.domain.repository.config.TrackingConfigRepository;
+import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
 import lombok.Data;
 import org.springframework.stereotype.Component;
@@ -38,17 +37,27 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
     private TrackingConfigRepository configRepository;
 
     /**
+     * 点位读取服务。
+     */
+    @Resource
+    private PointReader pointReader;
+
+    /**
      * 执行过程跟踪计算。
      */
     @Override
     public List<ProcessResult> calculate(TrackingInput input) {
-        TrackingConfig trackingConfig = configRepository.refresh(input.getUnitCode(), input.getTrackingType()).orElse(null);
-        if (!(trackingConfig instanceof ProcessTrackingConfig)) {
+        Optional<ProcessTrackingConfig> configOptional = configRepository.findAs(
+                input.getUnitCode(),
+                input.getTrackingType(),
+                ProcessTrackingConfig.class
+        );
+        if (!configOptional.isPresent()) {
             return new ArrayList<>();
         }
-        ProcessTrackingConfig config = (ProcessTrackingConfig) trackingConfig;
+        ProcessTrackingConfig config = configOptional.get();
         PointSnapshot latest = input.getLatestSnapshot();
-        if (config == null || latest == null || config.getTracking() == null || !startConditionReached(latest, config.getTracking())) {
+        if (latest == null || config.getTracking() == null || !startConditionReached(latest, config.getTracking())) {
             return new ArrayList<>();
         }
         List<TrackingPointGroup> groups = validGroups(latest, config.getTracking());
@@ -65,9 +74,9 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                     .unitCode(config.getUnitCode())
                     .trackingType(config.getTrackingType())
                     .segmentName(segment.getName())
-                    .coilNo(stringValue(latest, selected.group.getCoilNoPoint()))
+                    .coilNo(pointReader.stringValue(latest, trackingPointPath(config.getTracking(), selected.group.getCoilNoPoint())))
                     .headLength(selected.headLength)
-                    .speed(decimalValue(latest, config.getTracking().getSpeedPoint()))
+                    .speed(pointReader.decimalValue(latest, trackingPointPath(config.getTracking(), config.getTracking().getSpeedPoint())))
                     .passNo(passNo(latest, config.getTracking()))
                     .parameters(parameters(latest, segment))
                     .generatedAt(Instant.now())
@@ -84,7 +93,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
         if (condition == null) {
             return true;
         }
-        BigDecimal value = decimalValue(latest, condition.getPoint());
+        BigDecimal value = pointReader.decimalValue(latest, trackingPointPath(tracking, condition.getPoint()));
         return value != null && value.compareTo(condition.getThreshold()) >= 0;
     }
 
@@ -97,7 +106,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
             return result;
         }
         for (TrackingPointGroup group : tracking.getPoints()) {
-            String coilNo = stringValue(latest, group.getCoilNoPoint());
+            String coilNo = pointReader.stringValue(latest, trackingPointPath(tracking, group.getCoilNoPoint()));
             if (coilNo != null && !coilNo.trim().isEmpty()) {
                 result.add(group);
             }
@@ -114,26 +123,29 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                                       List<TrackingPointGroup> groups) {
         LengthMode lengthMode = tracking.getLengthMode();
         if (LengthMode.WELDER == lengthMode) {
-            return selectWelder(latest, segment, groups);
+            return selectWelder(latest, tracking, segment, groups);
         }
         List<TrackingPointGroup> candidates = groups;
         if (LengthMode.ROLLING == lengthMode) {
             candidates = rollingCandidates(latest, tracking, groups);
         }
-        return selectCoiler(latest, segment, candidates);
+        return selectCoiler(latest, tracking, segment, candidates);
     }
 
     /**
      * 焊缝模式：选择修正后带头长度大于等于 0 且最小的点位组。
      */
-    private SelectedGroup selectWelder(PointSnapshot latest, SegmentConfig segment, List<TrackingPointGroup> groups) {
+    private SelectedGroup selectWelder(PointSnapshot latest,
+                                       TrackingSection tracking,
+                                       SegmentConfig segment,
+                                       List<TrackingPointGroup> groups) {
         SelectedGroup selected = null;
         int index = Optional.ofNullable(segment.getLengthArrayIndex()).orElse(0);
         for (TrackingPointGroup group : groups) {
             if (group.getLengthPoints() == null || group.getLengthPoints().size() <= index) {
                 continue;
             }
-            BigDecimal headLength = correctedLength(latest, group.getLengthPoints().get(index), segment);
+            BigDecimal headLength = correctedLength(latest, tracking, group.getLengthPoints().get(index), segment);
             if (headLength == null || headLength.compareTo(BigDecimal.ZERO) < 0) {
                 continue;
             }
@@ -147,13 +159,16 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
     /**
      * 卷取机模式：选择修正后带头长度满足条件且最大的点位组。
      */
-    private SelectedGroup selectCoiler(PointSnapshot latest, SegmentConfig segment, List<TrackingPointGroup> groups) {
+    private SelectedGroup selectCoiler(PointSnapshot latest,
+                                       TrackingSection tracking,
+                                       SegmentConfig segment,
+                                       List<TrackingPointGroup> groups) {
         SelectedGroup selected = null;
         for (TrackingPointGroup group : groups) {
             if (group.getLengthPoints() == null || group.getLengthPoints().isEmpty()) {
                 continue;
             }
-            BigDecimal headLength = correctedLength(latest, group.getLengthPoints().get(0), segment);
+            BigDecimal headLength = correctedLength(latest, tracking, group.getLengthPoints().get(0), segment);
             if (headLength == null || headLength.compareTo(Optional.ofNullable(segment.getLengthCorrect()).orElse(BigDecimal.ZERO)) < 0) {
                 continue;
             }
@@ -169,7 +184,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
      */
     private List<TrackingPointGroup> rollingCandidates(PointSnapshot latest, TrackingSection tracking, List<TrackingPointGroup> groups) {
         RollingConfig rolling = tracking.getRolling();
-        boolean direct = rolling != null && Boolean.TRUE.equals(booleanValue(latest, rolling.getDirectPoint()));
+        boolean direct = rolling != null && Boolean.TRUE.equals(pointReader.booleanValue(latest, trackingPointPath(tracking, rolling.getDirectPoint())));
         boolean reverse = rolling != null && Boolean.TRUE.equals(rolling.getDirectReverse());
         boolean targetCoiler = direct ^ reverse;
         List<TrackingPointGroup> result = new ArrayList<>();
@@ -184,8 +199,11 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
     /**
      * 计算修正后的带头长度。
      */
-    private BigDecimal correctedLength(PointSnapshot latest, String lengthPoint, SegmentConfig segment) {
-        BigDecimal length = decimalValue(latest, lengthPoint);
+    private BigDecimal correctedLength(PointSnapshot latest,
+                                       TrackingSection tracking,
+                                       String lengthPoint,
+                                       SegmentConfig segment) {
+        BigDecimal length = pointReader.decimalValue(latest, trackingPointPath(tracking, lengthPoint));
         if (length == null) {
             return null;
         }
@@ -201,7 +219,10 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
             return parameters;
         }
         for (String point : segment.getPoints()) {
-            latest.value(point).ifPresent(value -> parameters.put(point, value.getRawValue()));
+            Object value = pointReader.rawValue(latest, segmentPointPath(segment, point));
+            if (value != null) {
+                parameters.put(point, value);
+            }
         }
         return parameters;
     }
@@ -213,29 +234,35 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
         if (LengthMode.ROLLING != tracking.getLengthMode() || tracking.getRolling() == null) {
             return null;
         }
-        BigDecimal passNo = decimalValue(latest, tracking.getRolling().getPassNoPoint());
+        BigDecimal passNo = pointReader.decimalValue(latest, trackingPointPath(tracking, tracking.getRolling().getPassNoPoint()));
         return passNo == null ? null : passNo.intValue();
     }
 
     /**
-     * 按字符串读取点位值。
+     * 构造跟踪段完整点位路径。
      */
-    private String stringValue(PointSnapshot snapshot, String point) {
-        return snapshot.value(point).map(PointValue::stringValue).orElse(null);
+    private String trackingPointPath(TrackingSection tracking, String point) {
+        return pointPath(tracking == null ? null : tracking.getPointPrefix(), point);
     }
 
     /**
-     * 按数字读取点位值。
+     * 构造工艺段完整点位路径。
      */
-    private BigDecimal decimalValue(PointSnapshot snapshot, String point) {
-        return snapshot.value(point).map(PointValue::decimalValue).orElse(null);
+    private String segmentPointPath(SegmentConfig segment, String point) {
+        return pointPath(segment == null ? null : segment.getPointPrefix(), point);
     }
 
     /**
-     * 按布尔值读取点位值。
+     * 构造完整点位路径。
      */
-    private Boolean booleanValue(PointSnapshot snapshot, String point) {
-        return snapshot.value(point).map(PointValue::booleanValue).orElse(null);
+    private String pointPath(String prefix, String point) {
+        if (point == null || point.isEmpty()) {
+            return point;
+        }
+        if (point.startsWith("/") || prefix == null || prefix.isEmpty() || point.startsWith(prefix)) {
+            return point;
+        }
+        return prefix + point;
     }
 
     @Data
