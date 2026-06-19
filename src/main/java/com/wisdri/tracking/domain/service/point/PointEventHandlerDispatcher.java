@@ -22,13 +22,13 @@ public class PointEventHandlerDispatcher {
      * 按跟踪类型选择处理器并处理点位事件。
      */
     @SuppressWarnings("unchecked")
-    public void handle(TrackingInput input, TrackingConfig config) {
+    public <C extends TrackingConfig> void handle(TrackingInput input, C config) {
         if (input == null || config == null || handlers == null) {
             return;
         }
         for (PointEventHandler<? extends TrackingConfig> handler : handlers) {
             if (handler.support(input.getTrackingType())) {
-                ((PointEventHandler<TrackingConfig>) handler).handle(input, config);
+                ((PointEventHandler<C>) handler).handle(input, config);
                 return;
             }
         }
