@@ -4,7 +4,6 @@ import com.wisdri.tracking.domain.model.abnormal.AbnormalData;
 import com.wisdri.tracking.domain.model.abnormal.AbnormalType;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
-import com.wisdri.tracking.domain.model.point.PointValue;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.abnormal.AbnormalDataRepository;
@@ -60,8 +59,8 @@ public class AbnormalDataHandlerImpl implements AbnormalDataHandler {
         if (latest == null || latest.getValues() == null) {
             return result;
         }
-        for (Map.Entry<String, PointValue> entry : latest.getValues().entrySet()) {
-            Object rawValue = entry.getValue() == null ? null : entry.getValue().getRawValue();
+        for (Map.Entry<String, Object> entry : latest.getValues().entrySet()) {
+            Object rawValue = entry.getValue();
             if (rawValue == null || String.valueOf(rawValue).trim().isEmpty()) {
                 result.add(AbnormalData.builder()
                         .unitCode(config.getUnitCode())

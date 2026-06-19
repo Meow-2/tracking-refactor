@@ -12,7 +12,7 @@ import java.util.Optional;
 /**
  * 一次点位数据快照。
  *
- * <p>通常由一条 MQTT 消息转换而来，包含点位值集合和接收时间。</p>
+ * <p>通常由一条 MQTT 消息转换而来，包含原始点位值集合和接收时间。</p>
  */
 @Data
 @Builder
@@ -20,9 +20,9 @@ import java.util.Optional;
 @AllArgsConstructor
 public class PointSnapshot {
     /**
-     * 点位值集合，key 通常使用点位短名，value 为统一封装后的点位值。
+     * 点位值集合，key 通常使用点位短名，value 为原始点位值。
      */
-    private Map<String, PointValue> values;
+    private Map<String, Object> values;
 
     /**
      * 快照接收时间，内部统一使用 Instant 便于写入时序数据。
@@ -32,7 +32,7 @@ public class PointSnapshot {
     /**
      * 按点位编码读取点位值。
      */
-    public Optional<PointValue> value(String pointCode) {
+    public Optional<Object> value(String pointCode) {
         if (values == null) {
             return Optional.empty();
         }
