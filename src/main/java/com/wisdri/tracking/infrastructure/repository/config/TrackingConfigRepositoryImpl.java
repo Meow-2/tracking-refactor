@@ -13,6 +13,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.config.TrackingConfigRepository;
 import com.wisdri.tracking.infrastructure.dto.config.ConvertedTrackingConfig;
 import com.wisdri.tracking.infrastructure.service.feign.gateway.CubeApiGateway;
+import com.wisdri.tracking.infrastructure.service.redis.RedisKeys;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
@@ -21,7 +22,6 @@ import javax.annotation.Resource;
 import java.io.IOException;
 import java.util.EnumMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -120,11 +120,7 @@ public class TrackingConfigRepositoryImpl implements TrackingConfigRepository {
      * 构造 Redis 配置 key。
      */
     private String configKey(String unitCode, TrackingType trackingType) {
-        return String.format(
-                "tracking:%s:%s:config",
-                unitCode.toLowerCase(Locale.ROOT),
-                trackingType.getCode().toLowerCase(Locale.ROOT)
-        );
+        return RedisKeys.trackingConfig(unitCode, trackingType);
     }
 
     /**

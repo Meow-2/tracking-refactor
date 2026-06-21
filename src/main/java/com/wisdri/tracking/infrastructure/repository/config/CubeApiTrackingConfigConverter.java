@@ -1,4 +1,4 @@
-package com.wisdri.tracking.infrastructure.converter.config;
+package com.wisdri.tracking.infrastructure.repository.config;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

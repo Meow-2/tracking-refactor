@@ -11,12 +11,12 @@ import com.wisdri.tracking.common.utils.JsonUtils;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.point.LastPointSnapshotRepository;
+import com.wisdri.tracking.infrastructure.service.redis.RedisKeys;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
 
 import javax.annotation.Resource;
 import java.io.IOException;
-import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -74,10 +74,6 @@ public class LastPointSnapshotRepositoryImpl implements LastPointSnapshotReposit
      * 构造 Redis 上一条点位快照 key。
      */
     private String snapshotKey(String unitCode, TrackingType trackingType) {
-        return String.format(
-                "tracking:%s:%s:lastdata",
-                unitCode.toLowerCase(Locale.ROOT),
-                trackingType.getCode().toLowerCase(Locale.ROOT)
-        );
+        return RedisKeys.lastPointSnapshot(unitCode, trackingType);
     }
 }

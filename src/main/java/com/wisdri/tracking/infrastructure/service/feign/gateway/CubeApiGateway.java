@@ -3,7 +3,7 @@ package com.wisdri.tracking.infrastructure.service.feign.gateway;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.wisdri.tracking.common.exception.ExternalServiceException;
 import com.wisdri.tracking.common.response.R;
-import com.wisdri.tracking.infrastructure.converter.config.CubeApiTrackingConfigConverter;
+import com.wisdri.tracking.infrastructure.repository.config.CubeApiTrackingConfigConverter;
 import com.wisdri.tracking.infrastructure.dto.config.ConvertedTrackingConfig;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeRequest;
 import com.wisdri.tracking.infrastructure.service.feign.client.CubeApiFeignClient;

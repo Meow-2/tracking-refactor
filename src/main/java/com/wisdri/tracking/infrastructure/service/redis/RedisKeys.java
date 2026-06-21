@@ -1,0 +1,34 @@
+package com.wisdri.tracking.infrastructure.service.redis;
+
+import com.wisdri.tracking.domain.model.tracking.TrackingType;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
+import java.util.Locale;
+
+/**
+ * Redis key 构造工具。
+ */
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public final class RedisKeys {
+    private static final String TRACKING_CONFIG_PATTERN = "tracking:%s:%s:config";
+    private static final String LAST_POINT_SNAPSHOT_PATTERN = "tracking:%s:%s:lastdata";
+
+    /**
+     * 跟踪配置 key。
+     */
+    public static String trackingConfig(String unitCode, TrackingType trackingType) {
+        return String.format(TRACKING_CONFIG_PATTERN, normalize(unitCode), normalize(trackingType.getCode()));
+    }
+
+    /**
+     * 上一条点位快照 key。
+     */
+    public static String lastPointSnapshot(String unitCode, TrackingType trackingType) {
+        return String.format(LAST_POINT_SNAPSHOT_PATTERN, normalize(unitCode), normalize(trackingType.getCode()));
+    }
+
+    private static String normalize(String value) {
+        return value.toLowerCase(Locale.ROOT);
+    }
+}
