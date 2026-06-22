@@ -35,13 +35,6 @@ public class MqttMessageListener {
     public void handle(Message<?> message) {
         String topic = topic(message);
         String payload = payload(message.getPayload());
-        handle(topic, payload);
-    }
-
-    /**
-     * 转发指定 topic 的 MQTT payload。
-     */
-    public void handle(String topic, String payload) {
         trackingTaskProducerUseCase.handle(topic, payload);
     }
 

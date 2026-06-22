@@ -1,8 +1,6 @@
 tracking:
   unit: cp1
   data-storage: true
-  subscription:
-    enabled: false
 
 server:
   port: 9000
@@ -32,13 +30,13 @@ mqtt:
 
 rocketmq:
   producer:
-    topic: tracking-data-topic
+    topic: tracking-data-fifo-topic
     request-timeout: 3
     max-attempts: 3
     ssl-enabled: false
   push-consumer:
     enabled: false
-    topic: tracking-data-topic
+    topic: tracking-data-fifo-topic
     tag: "*"
     consumer-group: tracking-data-consumer-group
     request-timeout: 3

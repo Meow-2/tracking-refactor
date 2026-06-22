@@ -63,16 +63,4 @@ public class MqttSubscriptionRegistry {
         }
         return Optional.ofNullable(configs.get(topic));
     }
-
-    /**
-     * 根据 topic 查找并转换为指定配置子类型。
-     * <p>
-     * 不同跟踪算法可以在明确期望配置类型时使用该方法，避免调用方自行做
-     * instanceof 和强制类型转换。
-     */
-    public <T extends TrackingConfig> Optional<T> findAs(String topic, Class<T> configType) {
-        return find(topic)
-                .filter(configType::isInstance)
-                .map(configType::cast);
-    }
 }

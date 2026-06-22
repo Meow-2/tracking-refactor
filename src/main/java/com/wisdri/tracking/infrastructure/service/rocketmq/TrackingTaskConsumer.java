@@ -12,7 +12,6 @@ import org.apache.rocketmq.client.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.client.apis.consumer.ConsumeResult;
 import org.apache.rocketmq.client.apis.message.MessageView;
 import org.apache.rocketmq.client.core.RocketMQListener;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -28,7 +27,6 @@ import java.nio.charset.StandardCharsets;
  */
 @Slf4j
 @Component
-@ConditionalOnProperty(prefix = "rocketmq.push-consumer", name = "enabled", havingValue = "true")
 @RocketMQMessageListener(
         endpoints = "${rocketmq.push-consumer.endpoints}",
         topic = "${rocketmq.push-consumer.topic}",
