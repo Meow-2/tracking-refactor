@@ -8,6 +8,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.abnormal.AbnormalDataRepository;
 import com.wisdri.tracking.domain.service.abnormal.AbnormalDataHandler;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -19,6 +20,7 @@ import java.util.Map;
 /**
  * 默认异常数据处理实现。
  */
+@Slf4j
 @Component
 public class AbnormalDataHandlerImpl implements AbnormalDataHandler {
     /**
@@ -44,7 +46,11 @@ public class AbnormalDataHandlerImpl implements AbnormalDataHandler {
         if (abnormalData.isEmpty()) {
             return;
         }
-        abnormalDataRepository.save(abnormalData);
+        try {
+            abnormalDataRepository.save(abnormalData);
+        } catch (RuntimeException e) {
+            log.error("保存异常数据失败，数量={}", abnormalData.size(), e);
+        }
     }
 
     /**

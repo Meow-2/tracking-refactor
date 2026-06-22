@@ -1,12 +1,14 @@
 package com.wisdri.tracking.infrastructure.service.postgres.abnormal;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wisdri.tracking.domain.model.abnormal.AbnormalData;
 import com.wisdri.tracking.domain.model.abnormal.AbnormalType;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.abnormal.AbnormalDataRepository;
 import com.wisdri.tracking.infrastructure.dto.postgres.abnormal.AbnormalDataEntity;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.ArrayList;
@@ -16,7 +18,8 @@ import java.util.List;
  * 基于 PostgreSQL 的异常数据仓储实现。
  */
 @Repository
-public class AbnormalDataRepositoryImpl implements AbnormalDataRepository {
+public class AbnormalDataRepositoryImpl extends ServiceImpl<AbnormalDataMapper, AbnormalDataEntity>
+        implements AbnormalDataRepository {
     /**
      * 异常数据 mapper。
      */
@@ -46,13 +49,16 @@ public class AbnormalDataRepositoryImpl implements AbnormalDataRepository {
      * 保存一批异常数据。
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void save(List<AbnormalData> abnormalData) {
         if (abnormalData == null || abnormalData.isEmpty()) {
             return;
         }
+        List<AbnormalDataEntity> entities = new ArrayList<>(abnormalData.size());
         for (AbnormalData data : abnormalData) {
-            abnormalDataMapper.insert(toEntity(data));
+            entities.add(toEntity(data));
         }
+        saveBatch(entities);
     }
 
     private AbnormalDataEntity toEntity(AbnormalData data) {
