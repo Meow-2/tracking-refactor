@@ -1,4 +1,4 @@
-package com.wisdri.tracking.infrastructure.dto.config;
+package com.wisdri.tracking.infrastructure.dto.feign.cube;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;

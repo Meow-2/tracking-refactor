@@ -1,4 +1,4 @@
-package com.wisdri.tracking.infrastructure.repository.config;
+package com.wisdri.tracking.infrastructure.service.feign.converter;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.wisdri.tracking.common.utils.JsonUtils;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
-import com.wisdri.tracking.infrastructure.dto.config.ConvertedTrackingConfig;
+import com.wisdri.tracking.infrastructure.dto.feign.cube.ConvertedTrackingConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 

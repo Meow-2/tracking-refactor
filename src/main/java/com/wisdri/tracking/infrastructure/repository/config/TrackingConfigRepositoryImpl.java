@@ -10,7 +10,7 @@ import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.config.TrackingConfigRepository;
-import com.wisdri.tracking.infrastructure.dto.config.ConvertedTrackingConfig;
+import com.wisdri.tracking.infrastructure.dto.feign.cube.ConvertedTrackingConfig;
 import com.wisdri.tracking.infrastructure.service.feign.gateway.CubeApiGateway;
 import com.wisdri.tracking.infrastructure.service.redis.RedisKeys;
 import org.springframework.beans.BeanUtils;
