@@ -3,9 +3,11 @@ package com.wisdri.tracking.common.utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.core.util.DefaultIndenter;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
@@ -26,7 +28,20 @@ public final class JsonUtils {
      */
     public static JsonMapper.Builder decimalPreservingMapperBuilder() {
         return JsonMapper.builder()
-                .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
+                .addModule(new JavaTimeModule())
+                .configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true)
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    }
+
+    /**
+     * 序列化为格式化 JSON。
+     */
+    public static String toPrettyJson(Object value) {
+        try {
+            return toPrettyJson(decimalPreservingMapper(), value);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("对象序列化为 JSON 失败", e);
+        }
     }
 
     /**
