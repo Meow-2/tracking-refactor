@@ -52,6 +52,11 @@ public class RocketMqConfig {
     @Data
     public static class PushConsumer {
         /**
+         * 是否启用 push consumer。
+         */
+        private Boolean enabled = false;
+
+        /**
          * consumer 连接 endpoints。
          */
         private String endpoints;

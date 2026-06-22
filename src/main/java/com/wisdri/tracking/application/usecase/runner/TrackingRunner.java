@@ -3,6 +3,7 @@ package com.wisdri.tracking.application.usecase.runner;
 import com.wisdri.tracking.application.usecase.tracking.PointSubscriptionUseCase;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -11,6 +12,7 @@ import javax.annotation.Resource;
  * 跟踪应用启动编排入口。
  */
 @Component
+@ConditionalOnProperty(prefix = "tracking.subscription", name = "enabled", havingValue = "true")
 public class TrackingRunner implements ApplicationRunner {
     /**
      * 点位消息订阅用例。

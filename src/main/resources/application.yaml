@@ -1,6 +1,8 @@
 tracking:
   unit: cp1
   data-storage: true
+  subscription:
+    enabled: false
 
 server:
   port: 9000
@@ -35,6 +37,7 @@ rocketmq:
     max-attempts: 3
     ssl-enabled: false
   push-consumer:
+    enabled: false
     topic: tracking-data-topic
     tag: "*"
     consumer-group: tracking-data-consumer-group
