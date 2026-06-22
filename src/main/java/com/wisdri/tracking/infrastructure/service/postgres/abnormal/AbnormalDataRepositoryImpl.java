@@ -1,0 +1,105 @@
+package com.wisdri.tracking.infrastructure.service.postgres.abnormal;
+
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.wisdri.tracking.domain.model.abnormal.AbnormalData;
+import com.wisdri.tracking.domain.model.abnormal.AbnormalType;
+import com.wisdri.tracking.domain.model.tracking.TrackingType;
+import com.wisdri.tracking.domain.repository.abnormal.AbnormalDataRepository;
+import com.wisdri.tracking.infrastructure.dto.postgres.abnormal.AbnormalDataEntity;
+import org.springframework.stereotype.Repository;
+
+import javax.annotation.Resource;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 基于 PostgreSQL 的异常数据仓储实现。
+ */
+@Repository
+public class AbnormalDataRepositoryImpl implements AbnormalDataRepository {
+    /**
+     * 异常数据 mapper。
+     */
+    @Resource
+    private AbnormalDataMapper abnormalDataMapper;
+
+    /**
+     * 按机组和跟踪类型查询异常数据。
+     */
+    @Override
+    public List<AbnormalData> find(String unitCode, TrackingType trackingType) {
+        QueryWrapper<AbnormalDataEntity> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("unit_code", unitCode)
+                .eq("tracking_type", trackingType == null ? null : trackingType.getCode());
+        List<AbnormalDataEntity> entities = abnormalDataMapper.selectList(queryWrapper);
+        List<AbnormalData> result = new ArrayList<>();
+        if (entities == null || entities.isEmpty()) {
+            return result;
+        }
+        for (AbnormalDataEntity entity : entities) {
+            result.add(toDomain(entity));
+        }
+        return result;
+    }
+
+    /**
+     * 保存一批异常数据。
+     */
+    @Override
+    public void save(List<AbnormalData> abnormalData) {
+        if (abnormalData == null || abnormalData.isEmpty()) {
+            return;
+        }
+        for (AbnormalData data : abnormalData) {
+            abnormalDataMapper.insert(toEntity(data));
+        }
+    }
+
+    private AbnormalDataEntity toEntity(AbnormalData data) {
+        AbnormalDataEntity entity = new AbnormalDataEntity();
+        entity.setUnitCode(data.getUnitCode());
+        entity.setTrackingType(data.getTrackingType() == null ? null : data.getTrackingType().getCode());
+        entity.setPointCode(data.getPointCode());
+        entity.setAbnormalType(data.getAbnormalType() == null ? null : data.getAbnormalType().getCode());
+        entity.setRawValue(data.getRawValue() == null ? null : String.valueOf(data.getRawValue()));
+        entity.setReason(data.getReason());
+        entity.setOccurredAt(data.getOccurredAt());
+        return entity;
+    }
+
+    private AbnormalData toDomain(AbnormalDataEntity entity) {
+        return AbnormalData.builder()
+                .unitCode(entity.getUnitCode())
+                .trackingType(trackingType(entity.getTrackingType()))
+                .pointCode(entity.getPointCode())
+                .abnormalType(abnormalType(entity.getAbnormalType()))
+                .rawValue(entity.getRawValue())
+                .reason(entity.getReason())
+                .occurredAt(entity.getOccurredAt())
+                .build();
+    }
+
+    private TrackingType trackingType(String code) {
+        if (code == null) {
+            return null;
+        }
+        for (TrackingType trackingType : TrackingType.values()) {
+            if (code.equals(trackingType.getCode())) {
+                return trackingType;
+            }
+        }
+        return null;
+    }
+
+    private AbnormalType abnormalType(String code) {
+        if (code == null) {
+            return null;
+        }
+        for (AbnormalType abnormalType : AbnormalType.values()) {
+            if (code.equals(abnormalType.getCode())) {
+                return abnormalType;
+            }
+        }
+        return null;
+    }
+}
