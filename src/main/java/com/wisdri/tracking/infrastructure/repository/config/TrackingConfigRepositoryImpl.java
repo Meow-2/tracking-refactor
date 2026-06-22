@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.wisdri.tracking.common.exception.TrackingException;
 import com.wisdri.tracking.common.utils.JsonUtils;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
@@ -44,7 +43,7 @@ public class TrackingConfigRepositoryImpl implements TrackingConfigRepository {
     /**
      * 配置 JSON 反序列化器。
      */
-    private final ObjectMapper objectMapper = JsonMapper.builder()
+    private final ObjectMapper objectMapper = JsonUtils.decimalPreservingMapperBuilder()
             .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
             .configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true)
             .configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS, true)

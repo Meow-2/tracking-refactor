@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.wisdri.tracking.common.utils.JsonUtils;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.infrastructure.dto.config.ConvertedTrackingConfig;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +30,7 @@ public class CubeApiTrackingConfigConverter {
     /**
      * JSON 节点构造器。
      */
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = JsonUtils.decimalPreservingMapper();
 
     /**
      * 将 Cube API 配置树转换为可写入 Redis 的跟踪配置。
