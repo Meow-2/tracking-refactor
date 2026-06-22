@@ -23,14 +23,15 @@ public class TrackingAlgorithmDispatcher {
     /**
      * 按跟踪类型选择算法并执行计算。
      */
-    public List<? extends TrackingResult> calculate(TrackingInput input) {
+    public List<TrackingResult> calculate(TrackingInput input) {
         if (input == null || algorithms == null) {
             return new ArrayList<>();
         }
         TrackingType trackingType = input.getTrackingType();
         for (TrackingAlgorithm<? extends TrackingResult> algorithm : algorithms) {
             if (algorithm.support(trackingType)) {
-                return algorithm.calculate(input);
+                List<? extends TrackingResult> results = algorithm.calculate(input);
+                return results == null ? new ArrayList<>() : new ArrayList<>(results);
             }
         }
         return new ArrayList<>();

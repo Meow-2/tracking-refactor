@@ -1,10 +1,12 @@
 package com.wisdri.tracking.application.usecase.tracking;
 
+import com.wisdri.tracking.common.utils.JsonUtils;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingResult;
 import com.wisdri.tracking.domain.model.tracking.TrackingTask;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithmDispatcher;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -17,6 +19,7 @@ import java.util.List;
  * 再通过结果仓储分发器保存。
  */
 @Service
+@Slf4j
 public class TrackingTaskConsumerUseCase {
     /**
      * 跟踪算法分发器。
@@ -37,15 +40,11 @@ public class TrackingTaskConsumerUseCase {
         if (task == null) {
             return;
         }
-        List<? extends TrackingResult> results = trackingAlgorithmDispatcher.calculate(TrackingInput.of(task));
+        List<TrackingResult> results = trackingAlgorithmDispatcher.calculate(TrackingInput.of(task));
         if (results == null || results.isEmpty()) {
             return;
         }
-        save(results);
-    }
-
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    private void save(List<? extends TrackingResult> results) {
-        trackingResultRepositoryDispatcher.save((List) results);
+        log.info("跟踪计算结果: {}", JsonUtils.toPrettyJson(results));
+        trackingResultRepositoryDispatcher.save(results);
     }
 }
