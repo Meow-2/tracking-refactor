@@ -16,15 +16,18 @@ spring:
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
   type-aliases-package: com.wisdri.tracking
+  global-config:
+    db-config:
+      id-type: assign_id
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+#    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 mqtt:
   client-id: tracking-service-client
   completion-timeout: 3000
   qos: 1
-  clean-session: false
+  clean-session: true
   connection-timeout: 10
   keep-alive-interval: 20
 
@@ -35,7 +38,6 @@ rocketmq:
     max-attempts: 3
     ssl-enabled: false
   push-consumer:
-    enabled: false
     topic: tracking-data-fifo-topic
     tag: "*"
     consumer-group: tracking-data-consumer-group

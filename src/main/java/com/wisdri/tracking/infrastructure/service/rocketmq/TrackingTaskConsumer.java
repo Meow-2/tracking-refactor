@@ -8,7 +8,6 @@ import com.wisdri.tracking.application.usecase.tracking.TrackingTaskConsumerUseC
 import com.wisdri.tracking.common.utils.JsonUtils;
 import com.wisdri.tracking.domain.model.tracking.TrackingTask;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.rocketmq.client.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.client.apis.consumer.ConsumeResult;
 import org.apache.rocketmq.client.apis.message.MessageView;
 import org.apache.rocketmq.client.core.RocketMQListener;
@@ -27,12 +26,6 @@ import java.nio.charset.StandardCharsets;
  */
 @Slf4j
 @Component
-@RocketMQMessageListener(
-        endpoints = "${rocketmq.push-consumer.endpoints}",
-        topic = "${rocketmq.push-consumer.topic}",
-        tag = "${rocketmq.push-consumer.tag:*}",
-        consumerGroup = "${rocketmq.push-consumer.consumer-group}"
-)
 public class TrackingTaskConsumer implements RocketMQListener {
     private final ObjectMapper objectMapper = JsonUtils.decimalPreservingMapperBuilder()
             .addModule(new JavaTimeModule())

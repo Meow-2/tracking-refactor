@@ -1,6 +1,5 @@
 package com.wisdri.tracking.infrastructure.dto.postgres.abnormal;
 
-import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -14,9 +13,9 @@ import java.time.Instant;
 @TableName("abnormal_data")
 public class AbnormalDataEntity {
     /**
-     * 自增主键。
+     * 主键。
      */
-    @TableId(type = IdType.AUTO)
+    @TableId
     private Long id;
 
     /**
