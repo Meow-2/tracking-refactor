@@ -12,7 +12,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
 import com.wisdri.tracking.domain.repository.config.TrackingConfigRepository;
-import com.wisdri.tracking.domain.service.abnormal.AbnormalDataHandler;
+import com.wisdri.tracking.domain.service.abnormal.AbnormalDataHandlerDispatcher;
 import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
@@ -44,7 +44,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
      * 异常数据处理服务。
      */
     @Resource
-    private AbnormalDataHandler abnormalDataHandler;
+    private AbnormalDataHandlerDispatcher abnormalDataHandlerDispatcher;
 
     /**
      * 点位事件处理分发器。
@@ -77,7 +77,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
         ProcessTrackingConfig config = configOptional.get();
 
         // 先处理异常点，再处理可能影响配置版本的点位事件。
-        abnormalDataHandler.handle(input, config);
+        abnormalDataHandlerDispatcher.handle(input, config);
         pointEventHandlerDispatcher.handle(input, config);
 
         // 校验最新快照和启动条件，未达到计算条件时不生成结果。
