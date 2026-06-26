@@ -128,7 +128,7 @@ public class TrackingConfigRepositoryImpl implements TrackingConfigRepository {
     private TrackingConfig readConfig(String unitCode, TrackingType trackingType, String json) {
         Class<? extends TrackingConfig> configType = configTypes.get(trackingType);
         if (configType == null) {
-            throw new IllegalArgumentException("不支持的跟踪配置类型: " + trackingType);
+            throw new TrackingException("不支持的跟踪配置类型: " + trackingType);
         }
         try {
             TrackingConfig config = objectMapper.readValue(json, configType);
@@ -154,7 +154,7 @@ public class TrackingConfigRepositoryImpl implements TrackingConfigRepository {
      */
     private void copyConfig(TrackingConfig refreshedConfig, TrackingConfig cachedConfig) {
         if (!cachedConfig.getClass().equals(refreshedConfig.getClass())) {
-            throw new IllegalArgumentException("缓存配置类型和刷新配置类型不一致: "
+            throw new TrackingException("缓存配置类型和刷新配置类型不一致: "
                     + cachedConfig.getClass().getName()
                     + " -> "
                     + refreshedConfig.getClass().getName());

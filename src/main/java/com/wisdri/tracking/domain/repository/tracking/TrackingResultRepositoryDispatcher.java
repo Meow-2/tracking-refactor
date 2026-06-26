@@ -1,8 +1,10 @@
 package com.wisdri.tracking.domain.repository.tracking;
 
+import com.wisdri.tracking.common.exception.TrackingException;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.tracking.TrackingResult;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -12,6 +14,7 @@ import java.util.List;
  * 跟踪结果仓储分发器。
  */
 @Component
+@Slf4j
 public class TrackingResultRepositoryDispatcher {
     /**
      * 单一跟踪结果类型仓储。
@@ -36,7 +39,7 @@ public class TrackingResultRepositoryDispatcher {
                 return;
             }
         }
-        throw new IllegalArgumentException("不支持的跟踪结果表类型: " + config.getTrackingType());
+        throw new TrackingException("不支持的跟踪结果表类型: " + config.getTrackingType());
     }
 
     /**
@@ -59,6 +62,6 @@ public class TrackingResultRepositoryDispatcher {
                 return;
             }
         }
-        throw new IllegalArgumentException("不支持的跟踪结果类型: " + results.get(0).getTrackingType());
+        throw new TrackingException("不支持的跟踪结果类型: " + results.get(0).getTrackingType());
     }
 }

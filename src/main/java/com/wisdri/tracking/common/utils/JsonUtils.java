@@ -1,6 +1,7 @@
 package com.wisdri.tracking.common.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.wisdri.tracking.common.exception.TrackingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -40,7 +41,7 @@ public final class JsonUtils {
         try {
             return toPrettyJson(decimalPreservingMapper(), value);
         } catch (JsonProcessingException e) {
-            throw new IllegalArgumentException("对象序列化为 JSON 失败", e);
+            throw new TrackingException("对象序列化为 JSON 失败", e);
         }
     }
 
