@@ -1,5 +1,5 @@
 tracking:
-  unit: cp1
+  unit: ${TRACKING_UNIT:cp1}
   data-storage: true
 
 server:
@@ -46,11 +46,11 @@ rocketmq:
     ssl-enabled: false
 
 cube-api:
-  tree-root: "/aygg_tracking"
+  tree-root: ${CUBE_API_TREE_ROOT:/aygg_tracking}
   connectTimeout: 3000
   readTimeout: 5000
 
 time-series-storage:
-  database: "digital_coil"
+  database: ${TIME_SERIES_STORAGE_DATABASE:digital_coil}
   connectTimeout: 3000
   readTimeout: 5000

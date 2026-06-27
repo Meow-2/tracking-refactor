@@ -4,30 +4,30 @@
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://172.16.203.30:5432/aygg_tracking
-    username: postgres
-    password: 123456
+    url: ${DB_URL:jdbc:postgresql://172.16.203.30:5432/aygg_tracking}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
 
   redis:
-    host: 172.16.203.18
-    port: 6379
-    password: Aygg@2026
-    database: 0
-    timeout: 5000
+    host: ${REDIS_HOST:172.16.203.18}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD}
+    database: ${REDIS_DATABASE:0}
+    timeout: ${REDIS_TIMEOUT:5000}
 
 mqtt:
-  url: tcp://172.16.203.11:1883
-  username: "admin"
-  password: "public"
+  url: ${MQTT_URL:tcp://172.16.203.11:1883}
+  username: ${MQTT_USERNAME}
+  password: ${MQTT_PASSWORD}
 
 rocketmq:
   producer:
-    endpoints: 172.16.203.11:8081
+    endpoints: ${ROCKETMQ_PRODUCER_ENDPOINTS:172.16.203.11:8081}
   push-consumer:
-    endpoints: 172.16.203.11:8081
+    endpoints: ${ROCKETMQ_CONSUMER_ENDPOINTS:172.16.203.11:8081}
 
 cube-api:
-  base-url: http://172.16.203.12:30800
+  base-url: ${CUBE_API_BASE_URL:http://172.16.203.12:30800}
 
 time-series-storage:
-  base-url: http://127.0.0.1:8886
+  base-url: ${TIME_SERIES_STORAGE_BASE_URL:http://127.0.0.1:8886}
