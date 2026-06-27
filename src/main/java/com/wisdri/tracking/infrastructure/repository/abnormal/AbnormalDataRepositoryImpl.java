@@ -1,4 +1,4 @@
-package com.wisdri.tracking.infrastructure.service.postgres.abnormal;
+package com.wisdri.tracking.infrastructure.repository.abnormal;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -7,6 +7,7 @@ import com.wisdri.tracking.domain.model.abnormal.AbnormalType;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.abnormal.AbnormalDataRepository;
 import com.wisdri.tracking.infrastructure.dto.postgres.abnormal.AbnormalDataEntity;
+import com.wisdri.tracking.infrastructure.service.postgres.abnormal.AbnormalDataMapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
