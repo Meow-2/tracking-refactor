@@ -32,7 +32,7 @@
     {
       "code": "default",
       "name": "默认段",
-      "point_prefix": "/aygg_tracking/cbl1/process/tech/default",
+      "point_prefix": "/aygg_tracking/cbl1/process/tech/default/",
       "length_correct": 0,
       "points": [
         {
