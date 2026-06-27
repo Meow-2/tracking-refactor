@@ -2,6 +2,7 @@ package com.wisdri.tracking.domain.service.abnormal.impl;
 
 import com.wisdri.tracking.domain.model.abnormal.AbnormalData;
 import com.wisdri.tracking.domain.model.abnormal.AbnormalType;
+import com.wisdri.tracking.domain.model.config.process.PointConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.SegmentConfig;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
@@ -45,8 +46,8 @@ public class ProcessAbnormalDataDetectorImpl implements AbnormalDataDetector<Pro
             if (segment == null || segment.getPoints() == null) {
                 continue;
             }
-            for (String point : segment.getPoints()) {
-                String pointPath = PointReader.pathResolve(segment.getPointPrefix(), point);
+            for (PointConfig point : segment.getPoints()) {
+                String pointPath = PointReader.pathResolve(segment.getPointPrefix(), point == null ? null : point.getName());
                 Object rawValue = PointReader.rawValue(latest, pointPath);
                 if (rawValue == null || String.valueOf(rawValue).trim().isEmpty()) {
                     result.add(AbnormalData.builder()

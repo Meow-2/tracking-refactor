@@ -16,14 +16,14 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class RollingConfig {
     /**
-     * 轧制方向点位短名。
+     * 轧制方向点位配置。
      */
-    private String directPoint;
+    private PointConfig directPoint;
 
     /**
-     * 道次号点位短名。
+     * 道次号点位配置。
      */
-    private String passNoPoint;
+    private PointConfig passNoPoint;
 
     /**
      * 是否反转轧制方向判断结果。

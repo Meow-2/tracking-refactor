@@ -17,6 +17,7 @@ mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
   type-aliases-package: com.wisdri.tracking
   global-config:
+    banner: false
     db-config:
       id-type: assign_id
   configuration:
@@ -50,5 +51,6 @@ cube-api:
   readTimeout: 5000
 
 time-series-storage:
+  database: "digital_coil"
   connectTimeout: 3000
   readTimeout: 5000

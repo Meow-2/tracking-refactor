@@ -18,9 +18,9 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class StartCondition {
     /**
-     * 用于判断启动条件的点位短名。
+     * 用于判断启动条件的点位配置。
      */
-    private String point;
+    private PointConfig point;
 
     /**
      * 启动阈值，点位值大于等于该值时允许继续跟踪。

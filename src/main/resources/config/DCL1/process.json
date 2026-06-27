@@ -11,87 +11,92 @@
     "length_mode": "welder",
     "points": [
       {
-        "length":[
+        "length": [
           "group1_head_to_weld_seam_detector1_length",
           "group1_head_to_weld_seam_detector2_length",
           "group1_head_to_weld_seam_detector3_length"
         ],
-        "coil_no":"group1_coil_no"
+        "coil_no": "group1_coil_no"
       },
       {
-        "length":[
+        "length": [
           "group2_head_to_weld_seam_detector1_length",
           "group2_head_to_weld_seam_detector2_length",
           "group2_head_to_weld_seam_detector3_length"
         ],
-        "coil_no":"group2_coil_no"
+        "coil_no": "group2_coil_no"
       },
       {
-        "length":[
+        "length": [
           "group3_head_to_weld_seam_detector1_length",
           "group3_head_to_weld_seam_detector2_length",
           "group3_head_to_weld_seam_detector3_length"
         ],
-        "coil_no":"group3_coil_no"
+        "coil_no": "group3_coil_no"
       },
       {
-        "length":[
+        "length": [
           "group4_head_to_weld_seam_detector1_length",
           "group4_head_to_weld_seam_detector2_length",
           "group4_head_to_weld_seam_detector3_length"
         ],
-        "coil_no":"group4_coil_no"
+        "coil_no": "group4_coil_no"
       }
     ]
   },
   "segments": [
     {
+      "code": "sf3",
       "name": "3#SF段",
       "point_prefix": "/aygg_tracking/dcl1/process/tech/sf3/",
       "length_correct": -243.507,
-      "length_array_index":0,
-      "points":[
+      "length_array_index": 0,
+      "points": [
         "sf3_section1_furnace_temp_pv",
         "sf3_section2_furnace_temp_pv",
         "sf3_section3_furnace_temp_pv"
       ]
     },
     {
+      "code": "atc",
       "name": "ATC段",
       "point_prefix": "/aygg_tracking/dcl1/process/tech/atc/",
       "length_correct": -228.657,
-      "length_array_index":0,
-      "points":[
+      "length_array_index": 0,
+      "points": [
         "atc_section1_furnace_temp_pv",
         "atc_section2_furnace_temp_pv"
       ]
     },
     {
+      "code": "sf2",
       "name": "2#SF段",
       "point_prefix": "/aygg_tracking/dcl1/process/tech/sf2/",
       "length_correct": -206.757,
-      "length_array_index":0,
-      "points":[
+      "length_array_index": 0,
+      "points": [
         "sf2_section1_furnace_temp_pv",
         "sf2_section2_furnace_temp_pv"
       ]
     },
     {
+      "code": "hef",
       "name": "HEF段",
       "point_prefix": "/aygg_tracking/dcl1/process/tech/hef/",
       "length_correct": -199.257,
-      "length_array_index":0,
-      "points":[
+      "length_array_index": 0,
+      "points": [
         "hef_section1_furnace_temp_pv",
         "hef_section2_furnace_temp_pv"
       ]
     },
     {
+      "code": "sf1",
       "name": "1#SF段",
       "point_prefix": "/aygg_tracking/dcl1/process/tech/sf1/",
       "length_correct": -81.709,
-      "length_array_index":0,
-      "points":[
+      "length_array_index": 0,
+      "points": [
         "sf1_section1_furnace_temp_pv",
         "sf1_section2_furnace_temp_pv",
         "sf1_section3_furnace_temp_pv",
@@ -109,21 +114,23 @@
       ]
     },
     {
+      "code": "rtf2",
       "name": "2#RTF段",
       "point_prefix": "/aygg_tracking/dcl1/process/tech/rtf2/",
       "length_correct": -38.694,
-      "length_array_index":0,
-      "points":[
+      "length_array_index": 0,
+      "points": [
         "rtf2_section1_furnace_temp_pv",
         "rtf2_section2_furnace_temp_pv"
       ]
     },
     {
+      "code": "rtf1",
       "name": "1#RTF段",
       "point_prefix": "/aygg_tracking/dcl1/process/tech/rtf1/",
       "length_correct": -21.482,
-      "length_array_index":0,
-      "points":[
+      "length_array_index": 0,
+      "points": [
         "rtf1_section1_furnace_temp_pv",
         "rtf1_section2_furnace_temp_pv"
       ]

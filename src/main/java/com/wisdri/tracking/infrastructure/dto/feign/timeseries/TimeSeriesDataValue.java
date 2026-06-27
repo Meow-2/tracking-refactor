@@ -1,12 +1,14 @@
 package com.wisdri.tracking.infrastructure.dto.feign.timeseries;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 
 /**
  * 时序数据存储服务单列值。
  */
 @Data
+@AllArgsConstructor
 public class TimeSeriesDataValue {
     /**
      * 列名。

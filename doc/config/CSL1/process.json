@@ -1,32 +1,54 @@
 {
   "enable": true,
   "mqtt_topic": "csl1_process_tracking",
-  "tracking":{
+  "tracking": {
     "point_prefix": "/aygg_tracking/csl1/process/tracking/",
-    "speed_point": "line_speed_pv",
+    "speed_point": {
+      "name": "line_speed_pv",
+      "type": "float"
+    },
     "start_condition": {
-      "point": "line_speed_pv",
+      "point": {
+        "name": "line_speed_pv",
+        "type": "float"
+      },
       "threshold": 0
     },
     "length_mode": "coiler",
     "points": [
       {
-        "length":"tr_length",
-        "coil_no":"coil_info1_exit_coil_no"
+        "length": {
+          "name": "tr_length",
+          "type": "float"
+        },
+        "coil_no": {
+          "name": "coil_info1_exit_coil_no",
+          "type": "string"
+        }
       },
       {
-        "length":"tr_length",
-        "coil_no":"coil_info2_exit_coil_no"
+        "length": {
+          "name": "tr_length",
+          "type": "float"
+        },
+        "coil_no": {
+          "name": "coil_info2_exit_coil_no",
+          "type": "string"
+        }
       }
     ]
   },
   "segments": [
     {
+      "code": "default",
       "name": "默认段",
       "point_prefix": "/aygg_tracking/csl1/process/tech/default/",
       "length_correct": 0,
-      "points":[
-        "por_tension_pv"
+      "points": [
+        {
+          "name": "por_tension_pv",
+          "type": "float"
+        }
       ]
     }
   ]

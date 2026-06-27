@@ -1,6 +1,7 @@
 package com.wisdri.tracking.domain.service.tracking.impl;
 
 import com.wisdri.tracking.domain.model.config.process.LengthMode;
+import com.wisdri.tracking.domain.model.config.process.PointConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.RollingConfig;
 import com.wisdri.tracking.domain.model.config.process.SegmentConfig;
@@ -102,6 +103,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
             results.add(ProcessResult.builder()
                     .unitCode(config.getUnitCode())
                     .trackingType(config.getTrackingType())
+                    .segmentCode(segment.getCode())
                     .segmentName(segment.getName())
                     .coilNo(PointReader.stringValue(latest, trackingPointPath(config.getTracking(), selected.group.getCoilNo())))
                     .headLength(selected.headLength)
@@ -109,6 +111,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                     .passNo(passNo(latest, config.getTracking()))
                     .parameters(parameters(latest, segment))
                     .generatedAt(Instant.now())
+                    .receivedAt(latest.getReceivedAt())
                     .build());
         }
         return results;
@@ -230,7 +233,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
      */
     private BigDecimal correctedLength(PointSnapshot latest,
                                        TrackingSection tracking,
-                                       String lengthPoint,
+                                       PointConfig lengthPoint,
                                        SegmentConfig segment) {
         BigDecimal length = PointReader.decimalValue(latest, trackingPointPath(tracking, lengthPoint));
         if (length == null) {
@@ -247,10 +250,10 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
         if (segment.getPoints() == null) {
             return parameters;
         }
-        for (String point : segment.getPoints()) {
+        for (PointConfig point : segment.getPoints()) {
             Object value = PointReader.rawValue(latest, segmentPointPath(segment, point));
             if (value != null) {
-                parameters.put(point, value);
+                parameters.put(pointName(point), value);
             }
         }
         return parameters;
@@ -270,15 +273,19 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
     /**
      * 构造跟踪段完整点位路径。
      */
-    private String trackingPointPath(TrackingSection tracking, String point) {
-        return PointReader.pathResolve(tracking == null ? null : tracking.getPointPrefix(), point);
+    private String trackingPointPath(TrackingSection tracking, PointConfig point) {
+        return PointReader.pathResolve(tracking == null ? null : tracking.getPointPrefix(), pointName(point));
     }
 
     /**
      * 构造工艺段完整点位路径。
      */
-    private String segmentPointPath(SegmentConfig segment, String point) {
-        return PointReader.pathResolve(segment == null ? null : segment.getPointPrefix(), point);
+    private String segmentPointPath(SegmentConfig segment, PointConfig point) {
+        return PointReader.pathResolve(segment == null ? null : segment.getPointPrefix(), pointName(point));
+    }
+
+    private String pointName(PointConfig point) {
+        return point == null ? null : point.getName();
     }
 
     @Getter

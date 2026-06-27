@@ -1,7 +1,7 @@
 {
   "enable": true,
   "mqtt_topic": "cbl1_process_tracking",
-  "tracking":{
+  "tracking": {
     "point_prefix": "/aygg_tracking/cbl1/process/tracking/",
     "speed_point": "line_speed_pv",
     "start_condition": {
@@ -11,17 +11,18 @@
     "length_mode": "coiler",
     "points": [
       {
-        "length":"exit_tr_length",
-        "coil_no":"tr1_coil_no"
+        "length": "exit_tr_length",
+        "coil_no": "tr1_coil_no"
       }
     ]
   },
   "segments": [
     {
+      "code": "default",
       "name": "默认段",
       "point_prefix": "/aygg_tracking/cbl1/process/tech/default",
       "length_correct": 0,
-      "points":[
+      "points": [
         "thread_por_tension_pv",
         "normal_por_tension_pv",
         "tr_tension_pv"

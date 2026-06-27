@@ -29,4 +29,9 @@ public abstract class TrackingResult {
      * 跟踪结果生成时间。
      */
     private Instant generatedAt;
+
+    /**
+     * 最新点位快照接收时间。
+     */
+    private Instant receivedAt;
 }

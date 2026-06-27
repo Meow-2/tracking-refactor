@@ -48,8 +48,8 @@ public class TimeSeriesStorageGateway {
     /**
      * 列式写入时序数据。
      */
-    public void saveColumn(String database, String table, TimeSeriesDataRequest request) {
-        invokeWithRetry("save-column", () -> timeSeriesStorageFeignClient.saveColumn(database, table, request));
+    public void saveColumn(String table, TimeSeriesDataRequest request) {
+        invokeWithRetry("save-column", () -> timeSeriesStorageFeignClient.saveColumn(table, request));
     }
 
     /**

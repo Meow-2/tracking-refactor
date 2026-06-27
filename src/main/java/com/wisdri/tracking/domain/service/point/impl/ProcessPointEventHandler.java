@@ -1,6 +1,7 @@
 package com.wisdri.tracking.domain.service.point.impl;
 
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
+import com.wisdri.tracking.domain.model.config.process.PointConfig;
 import com.wisdri.tracking.domain.model.config.process.TrackingPointGroup;
 import com.wisdri.tracking.domain.model.point.PointEvent;
 import com.wisdri.tracking.domain.model.point.PointEventType;
@@ -100,9 +101,9 @@ public class ProcessPointEventHandler implements PointEventHandler<ProcessTracki
     /**
      * 构造跟踪段完整点位路径。
      */
-    private String trackingPointPath(ProcessTrackingConfig processConfig, String point) {
+    private String trackingPointPath(ProcessTrackingConfig processConfig, PointConfig point) {
         String prefix = processConfig.getTracking() == null ? null : processConfig.getTracking().getPointPrefix();
-        return PointReader.pathResolve(prefix, point);
+        return PointReader.pathResolve(prefix, point == null ? null : point.getName());
     }
 
 }

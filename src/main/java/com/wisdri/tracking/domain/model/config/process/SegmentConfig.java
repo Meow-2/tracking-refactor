@@ -19,7 +19,12 @@ import java.util.List;
 @AllArgsConstructor
 public class SegmentConfig {
     /**
-     * 工艺段名称。
+     * 工艺段编码，用于表名、结果标识等稳定业务标识。
+     */
+    private String code;
+
+    /**
+     * 工艺段名称，用于展示。
      */
     private String name;
 
@@ -39,7 +44,7 @@ public class SegmentConfig {
     private Integer lengthArrayIndex;
 
     /**
-     * 该工艺段需要采集的参数点位短名列表。
+     * 该工艺段需要采集的参数点位列表。
      */
-    private List<String> points;
+    private List<PointConfig> points;
 }

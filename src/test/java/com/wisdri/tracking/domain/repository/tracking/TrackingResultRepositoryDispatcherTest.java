@@ -2,7 +2,6 @@ package com.wisdri.tracking.domain.repository.tracking;
 
 import com.wisdri.tracking.common.exception.TrackingException;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
-import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.tracking.TrackingResult;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
@@ -25,7 +24,7 @@ class TrackingResultRepositoryDispatcherTest {
                 .trackingType(TrackingType.PROCESS)
                 .build();
 
-        assertThatThrownBy(() -> dispatcher.createTable(config, PointSnapshot.builder().build()))
+        assertThatThrownBy(() -> dispatcher.createTable(config))
                 .isInstanceOf(TrackingException.class)
                 .hasMessageContaining("不支持的跟踪结果表类型");
     }
@@ -57,7 +56,7 @@ class TrackingResultRepositoryDispatcherTest {
         }
 
         @Override
-        public void createTable(ProcessTrackingConfig config, PointSnapshot latestSnapshot) {
+        public void createTable(ProcessTrackingConfig config) {
         }
 
         @Override

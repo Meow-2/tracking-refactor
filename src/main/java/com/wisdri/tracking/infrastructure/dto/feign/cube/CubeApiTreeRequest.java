@@ -38,7 +38,7 @@ public class CubeApiTreeRequest {
     public static CubeApiTreeRequest defaultRequest(String path) {
         CubeApiTreeRequest request = new CubeApiTreeRequest();
         request.setLevel(null);
-        request.setParaRange(2);
+        request.setParaRange(3);
         request.setPath(path);
         request.setPathHeader(false);
         request.setOnlyDir(false);

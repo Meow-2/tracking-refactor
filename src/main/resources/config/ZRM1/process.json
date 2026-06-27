@@ -1,7 +1,7 @@
 {
   "enable": true,
   "mqtt_topic": "zrm1_process_tracking",
-  "tracking":{
+  "tracking": {
     "point_prefix": "/aygg_tracking/zrm1/process/tracking/",
     "speed_point": "mill_speed_pv",
     "start_condition": {
@@ -17,22 +17,23 @@
     "points": [
       {
         "length": "entry_right_tr_coil_length",
-        "coil_no":"entry_tr_coil_no",
+        "coil_no": "entry_tr_coil_no",
         "is_rolling_coiler": false
       },
       {
         "length": "exit_left_tr_coil_length",
-        "coil_no":"exit_tr_coil_no",
+        "coil_no": "exit_tr_coil_no",
         "is_rolling_coiler": true
       }
     ]
   },
   "segments": [
     {
+      "code": "default",
       "name": "默认段",
       "point_prefix": "/aygg_tracking/zrm1/process/tech/default/",
       "length_correct": 0,
-      "points":[
+      "points": [
         "entry_thickness_diff_pv",
         "exit_thickness_diff_pv",
         "entry_thickness_pv",

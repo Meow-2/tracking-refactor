@@ -31,9 +31,8 @@ public interface TimeSeriesStorageFeignClient {
     /**
      * 列式写入时序数据。
      */
-    @PostMapping("/data/db/{database}/table/{table}/_column")
-    R<Boolean> saveColumn(@PathVariable("database") String database,
-                          @PathVariable("table") String table,
+    @PostMapping("/data/db/${time-series-storage.database}/table/{table}/_column")
+    R<Boolean> saveColumn(@PathVariable("table") String table,
                           @RequestBody TimeSeriesDataRequest request);
 
     /**

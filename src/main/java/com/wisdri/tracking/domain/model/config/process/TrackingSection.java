@@ -23,9 +23,9 @@ public class TrackingSection {
     private String pointPrefix;
 
     /**
-     * 速度点位短名。
+     * 速度点位配置。
      */
-    private String speedPoint;
+    private PointConfig speedPoint;
 
     /**
      * 跟踪启动条件；为空时表示不做启动阈值判断。

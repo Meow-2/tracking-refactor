@@ -1,46 +1,95 @@
 {
   "enable": true,
   "mqtt_topic": "zrm1_process_tracking",
-  "tracking":{
+  "tracking": {
     "point_prefix": "/aygg_tracking/zrm1/process/tracking/",
-    "speed_point": "mill_speed_pv",
+    "speed_point": {
+      "name": "mill_speed_pv",
+      "type": "float"
+    },
     "start_condition": {
-      "point": "mill_speed_pv",
+      "point": {
+        "name": "mill_speed_pv",
+        "type": "float"
+      },
       "threshold": 0
     },
     "length_mode": "rolling",
     "rolling": {
-      "direct_point": "rolling_direction",
-      "pass_no_point": "pass_no_pv",
+      "direct_point": {
+        "name": "rolling_direction",
+        "type": "bool"
+      },
+      "pass_no_point": {
+        "name": "pass_no_pv",
+        "type": "int"
+      },
       "direct_reverse": false
     },
     "points": [
       {
-        "length": "entry_right_tr_coil_length",
-        "coil_no":"entry_tr_coil_no",
+        "length": {
+          "name": "entry_right_tr_coil_length",
+          "type": "float"
+        },
+        "coil_no": {
+          "name": "entry_tr_coil_no",
+          "type": "string"
+        },
         "is_rolling_coiler": false
       },
       {
-        "length": "exit_left_tr_coil_length",
-        "coil_no":"exit_tr_coil_no",
+        "length": {
+          "name": "exit_left_tr_coil_length",
+          "type": "float"
+        },
+        "coil_no": {
+          "name": "exit_tr_coil_no",
+          "type": "string"
+        },
         "is_rolling_coiler": true
       }
     ]
   },
   "segments": [
     {
+      "code": "default",
       "name": "默认段",
       "point_prefix": "/aygg_tracking/zrm1/process/tech/default/",
       "length_correct": 0,
-      "points":[
-        "entry_thickness_diff_pv",
-        "exit_thickness_diff_pv",
-        "entry_thickness_pv",
-        "exit_thickness_pv",
-        "entry_thickness_sv",
-        "exit_thickness_sv",
-        "entry_right_tr_tension_pv",
-        "exit_left_tr_tension_pv"
+      "points": [
+        {
+          "name": "entry_thickness_diff_pv",
+          "type": "float"
+        },
+        {
+          "name": "exit_thickness_diff_pv",
+          "type": "float"
+        },
+        {
+          "name": "entry_thickness_pv",
+          "type": "float"
+        },
+        {
+          "name": "exit_thickness_pv",
+          "type": "float"
+        },
+        {
+          "name": "entry_thickness_sv",
+          "type": "float"
+        },
+        {
+          "name": "exit_thickness_sv",
+          "type": "float"
+        },
+        {
+          "name": "entry_right_tr_tension_pv",
+          "type": "float"
+        },
+        {
+          "name": "exit_left_tr_tension_pv",
+          "type": "float"
+        }
       ]
     }
   ]

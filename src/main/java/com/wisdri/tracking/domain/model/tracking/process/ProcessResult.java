@@ -20,6 +20,11 @@ import java.util.Map;
 @EqualsAndHashCode(callSuper = true)
 public class ProcessResult extends TrackingResult {
     /**
+     * 工艺段编码。
+     */
+    private String segmentCode;
+
+    /**
      * 工艺段名称。
      */
     private String segmentName;

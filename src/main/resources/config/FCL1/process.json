@@ -11,46 +11,47 @@
     "length_mode": "welder",
     "points": [
       {
-        "length":[
+        "length": [
           "group1_head_to_seam_detector1_length",
           "group1_head_to_seam_detector2_length",
           "group1_head_to_seam_detector3_length"
         ],
-        "coil_no":"group1_coil_no"
+        "coil_no": "group1_coil_no"
       },
       {
-        "length":[
+        "length": [
           "group2_head_to_seam_detector1_length",
           "group2_head_to_seam_detector2_length",
           "group2_head_to_seam_detector3_length"
         ],
-        "coil_no":"group2_coil_no"
+        "coil_no": "group2_coil_no"
       },
       {
-        "length":[
+        "length": [
           "group3_head_to_seam_detector1_length",
           "group3_head_to_seam_detector2_length",
           "group3_head_to_seam_detector3_length"
         ],
-        "coil_no":"group3_coil_no"
+        "coil_no": "group3_coil_no"
       },
       {
-        "length":[
+        "length": [
           "group4_head_to_seam_detector1_length",
           "group4_head_to_seam_detector2_length",
           "group4_head_to_seam_detector3_length"
         ],
-        "coil_no":"group4_coil_no"
+        "coil_no": "group4_coil_no"
       }
     ]
   },
   "segments": [
     {
+      "code": "ctf",
       "name": "CTF段",
       "point_prefix": "/aygg_tracking/fcl1/process/tech/ctf/",
       "length_correct": -199.742,
-      "length_array_index":0,
-      "points":[
+      "length_array_index": 0,
+      "points": [
         "ctf1_furnace_temp_pv",
         "ctf2_furnace_temp_pv",
         "ctf3_furnace_temp_pv",
@@ -58,11 +59,12 @@
       ]
     },
     {
+      "code": "sf",
       "name": "SF段",
       "point_prefix": "/aygg_tracking/fcl1/process/tech/sf/",
-      "length_correct": -155.168 ,
-      "length_array_index":0,
-      "points":[
+      "length_correct": -155.168,
+      "length_array_index": 0,
+      "points": [
         "sf1_furnace_temp_pv",
         "sf2_furnace_temp_pv",
         "sf3_furnace_temp_pv",
@@ -72,21 +74,23 @@
       ]
     },
     {
+      "code": "rtf",
       "name": "RTF段",
       "point_prefix": "/aygg_tracking/fcl1/process/tech/rtf/",
-      "length_correct": -132.83 ,
-      "length_array_index":0,
-      "points":[
+      "length_correct": -132.83,
+      "length_array_index": 0,
+      "points": [
         "rtf1_furnace_temp_pv",
         "rtf2_furnace_temp_pv"
       ]
     },
     {
+      "code": "phf",
       "name": "PHF段",
       "point_prefix": "/aygg_tracking/fcl1/process/tech/phf/",
-      "length_correct": -108.6 ,
-      "length_array_index":0,
-      "points":[
+      "length_correct": -108.6,
+      "length_array_index": 0,
+      "points": [
         "phf1_furnace_temp_pv",
         "phf2_furnace_temp_pv",
         "phf3_furnace_temp_pv",

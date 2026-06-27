@@ -10,7 +10,7 @@ import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.config.TrackingConfigRepository;
-import com.wisdri.tracking.infrastructure.dto.feign.cube.ConvertedTrackingConfig;
+import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepositoryDispatcher;
 import com.wisdri.tracking.infrastructure.service.feign.gateway.CubeApiGateway;
 import com.wisdri.tracking.infrastructure.service.redis.RedisKeys;
 import org.springframework.beans.BeanUtils;
@@ -20,7 +20,6 @@ import org.springframework.stereotype.Repository;
 import javax.annotation.Resource;
 import java.io.IOException;
 import java.util.EnumMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -62,6 +61,12 @@ public class TrackingConfigRepositoryImpl implements TrackingConfigRepository {
     private CubeApiGateway cubeApiGateway;
 
     /**
+     * 跟踪结果仓储分发器。
+     */
+    @Resource
+    private TrackingResultRepositoryDispatcher trackingResultRepositoryDispatcher;
+
+    /**
      * 从本地缓存读取配置对象引用。
      */
     @Override
@@ -74,23 +79,26 @@ public class TrackingConfigRepositoryImpl implements TrackingConfigRepository {
      */
     @Override
     public void refresh() {
-        List<ConvertedTrackingConfig> configs = syncCubeApiConfigToRedis();
-        for (ConvertedTrackingConfig config : configs) {
-            refreshLocalCacheFromRedis(config.getUnitCode(), config.getTrackingType());
+        Map<TrackingType, TrackingConfig> configs = syncCubeApiConfigToRedis();
+        for (Map.Entry<TrackingType, TrackingConfig> entry : configs.entrySet()) {
+            TrackingConfig config = entry.getValue();
+            refreshLocalCacheFromRedis(config.getUnitCode(), entry.getKey())
+                    .ifPresent(refreshedConfig -> trackingResultRepositoryDispatcher.createTable(refreshedConfig));
         }
     }
 
     /**
      * 从 Cube API 获取配置树并写入 Redis。
      */
-    private List<ConvertedTrackingConfig> syncCubeApiConfigToRedis() {
-        List<ConvertedTrackingConfig> configs = cubeApiGateway.fetchTrackingConfigs();
-        for (ConvertedTrackingConfig config : configs) {
-            String key = configKey(config.getUnitCode(), config.getTrackingType());
+    private Map<TrackingType, TrackingConfig> syncCubeApiConfigToRedis() {
+        Map<TrackingType, TrackingConfig> configs = cubeApiGateway.fetchTrackingConfigs();
+        for (Map.Entry<TrackingType, TrackingConfig> entry : configs.entrySet()) {
+            TrackingConfig config = entry.getValue();
+            String key = configKey(config.getUnitCode(), entry.getKey());
             try {
-                stringRedisTemplate.opsForValue().set(key, JsonUtils.toPrettyJson(objectMapper, config.getConfig()));
+                stringRedisTemplate.opsForValue().set(key, JsonUtils.toPrettyJson(objectMapper, config));
             } catch (IOException e) {
-                throw new TrackingException("写入跟踪配置到 Redis 失败: " + key, e);
+                throw new TrackingException("写入Cube配置到 Redis 失败: " + key, e);
             }
         }
         return configs;
@@ -99,20 +107,20 @@ public class TrackingConfigRepositoryImpl implements TrackingConfigRepository {
     /**
      * 从 Redis 刷新本地缓存对象。
      */
-    private void refreshLocalCacheFromRedis(String unitCode, TrackingType trackingType) {
+    private Optional<TrackingConfig> refreshLocalCacheFromRedis(String unitCode, TrackingType trackingType) {
         String key = configKey(unitCode, trackingType);
         String json = stringRedisTemplate.opsForValue().get(key);
         if (json == null || json.trim().isEmpty()) {
-            cache.get(key);
-            return;
+            return Optional.empty();
         }
         TrackingConfig refreshedConfig = readConfig(unitCode, trackingType, json);
         TrackingConfig cachedConfig = cache.get(key);
         if (cachedConfig == null) {
             cache.put(key, refreshedConfig);
-            return;
+            return Optional.of(refreshedConfig);
         }
         copyConfig(refreshedConfig, cachedConfig);
+        return Optional.of(cachedConfig);
     }
 
     /**

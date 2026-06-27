@@ -2,7 +2,6 @@ package com.wisdri.tracking.domain.repository.tracking;
 
 import com.wisdri.tracking.common.exception.TrackingException;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
-import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.tracking.TrackingResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -26,7 +25,7 @@ public class TrackingResultRepositoryDispatcher {
      * 创建或更新所有支持的跟踪结果表。
      */
     @SuppressWarnings("unchecked")
-    public <C extends TrackingConfig> void createTable(C config, PointSnapshot latestSnapshot) {
+    public <C extends TrackingConfig> void createTable(C config) {
         if (config == null || config.getTrackingType() == null) {
             throw new IllegalArgumentException("跟踪配置和跟踪类型不能为空");
         }
@@ -35,7 +34,7 @@ public class TrackingResultRepositoryDispatcher {
         }
         for (TrackingResultRepository<? extends TrackingConfig, ? extends TrackingResult> repository : repositories) {
             if (repository.support(config.getTrackingType())) {
-                ((TrackingResultRepository<C, ? extends TrackingResult>) repository).createTable(config, latestSnapshot);
+                ((TrackingResultRepository<C, ? extends TrackingResult>) repository).createTable(config);
                 return;
             }
         }
