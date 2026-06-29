@@ -1,5 +1,5 @@
 tracking:
-  unit: ${TRACKING_UNIT:cp1}
+  unit: cp1
   data-storage: true
 
 server:
@@ -11,7 +11,7 @@ spring:
   application:
     name: tracking
   profiles:
-    active: @env@
+    active: dev
 
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
@@ -25,7 +25,7 @@ mybatis-plus:
 #    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 mqtt:
-  client-id: tracking-service-client
+  client-id: tracking-cp1-client
   completion-timeout: 3000
   qos: 1
   clean-session: true
@@ -40,17 +40,17 @@ rocketmq:
     ssl-enabled: false
   push-consumer:
     topic: tracking-data-fifo-topic
-    tag: "*"
-    consumer-group: tracking-data-consumer-group
+    tag: "cp1"
+    consumer-group: tracking-data-consumer-group-cp1
     request-timeout: 3
     ssl-enabled: false
 
 cube-api:
-  tree-root: ${CUBE_API_TREE_ROOT:/aygg_tracking}
+  tree-root: /aygg_tracking
   connectTimeout: 3000
   readTimeout: 5000
 
 time-series-storage:
-  database: ${TIME_SERIES_STORAGE_DATABASE:digital_coil}
+  database: digital_coil
   connectTimeout: 3000
   readTimeout: 5000

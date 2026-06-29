@@ -32,10 +32,17 @@ public class TrackingTaskProducer {
      */
     public void send(TrackingTask task) {
         rocketMQClientTemplate.syncSendFifoMessage(
-                rocketMqConfig.getProducer().getTopic(),
+                destination(task),
                 task,
                 orderKey(task)
         );
+    }
+
+    /**
+     * 使用机组代码作为 Tag，使各机组消费者只接收自己的任务。
+     */
+    private String destination(TrackingTask task) {
+        return rocketMqConfig.getProducer().getTopic() + ":" + task.getUnitCode();
     }
 
     /**
