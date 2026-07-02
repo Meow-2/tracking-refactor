@@ -13,18 +13,15 @@ import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
+import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeNode;
+import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.EnumMap;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Cube API 配置树转换器。
@@ -32,19 +29,10 @@ import java.util.Set;
 @Slf4j
 @Component
 public class CubeApiTrackingConfigConverter {
-    private static final String DATA_FIELD = "data";
     private static final String DEFAULT_FIELD = "default";
     private static final String TECH_FIELD = "tech";
     private static final String POINTS_FIELD = "points";
-    private static final String POINT_NAME_FIELD = "name";
-    private static final String POINT_TYPE_FIELD = "type";
-    private static final String VALUE_TYPE_FIELD = "valueType";
     private static final String DEFAULT_POINT_TYPE = "float";
-    private static final String ITEM_TYPE_FIELD = "itemType";
-    private static final Set<String> METADATA_FIELDS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
-            "id", "pid", "code", "name", "itemType", "cubeKey", "path", "anaItemMeta", "meta", "collectItemId",
-            "valueType", "unit", "tag", "measurement", "mark", "valid", "varAttr1", "varAttr2"
-    )));
 
     /**
      * JSON 节点构造器。
@@ -64,18 +52,16 @@ public class CubeApiTrackingConfigConverter {
     /**
      * 将 Cube API 配置树转换为可写入 Redis 的跟踪配置。
      */
-    public Map<TrackingType, TrackingConfig> convert(JsonNode tree) {
+    public Map<TrackingType, TrackingConfig> convert(CubeApiTreeResponse tree) {
         Map<TrackingType, TrackingConfig> configs = new EnumMap<>(TrackingType.class);
-        if (tree == null || !tree.isObject()) {
+        if (tree == null) {
             return configs;
         }
 
-        Iterator<Map.Entry<String, JsonNode>> unitFields = tree.fields();
-        while (unitFields.hasNext()) {
-            Map.Entry<String, JsonNode> unitField = unitFields.next();
+        for (Map.Entry<String, CubeApiTreeNode> unitField : tree.getRoots().entrySet()) {
             String unitCode = unitField.getKey();
-            JsonNode unitNode = unitField.getValue();
-            if (DATA_FIELD.equals(unitCode) || unitNode == null || !unitNode.isObject()) {
+            CubeApiTreeNode unitNode = unitField.getValue();
+            if (unitNode == null) {
                 continue;
             }
             if (sameUnit(unitCode, trackingProperties.getUnit())) {
@@ -89,13 +75,12 @@ public class CubeApiTrackingConfigConverter {
     /**
      * 转换单个机组下的跟踪配置。
      */
-    private void convertUnit(String unitCode, JsonNode unitNode, Map<TrackingType, TrackingConfig> configs) {
-        Iterator<Map.Entry<String, JsonNode>> typeFields = unitNode.fields();
-        while (typeFields.hasNext()) {
-            Map.Entry<String, JsonNode> typeField = typeFields.next();
+    private void convertUnit(String unitCode, CubeApiTreeNode unitNode,
+                             Map<TrackingType, TrackingConfig> configs) {
+        for (Map.Entry<String, CubeApiTreeNode> typeField : unitNode.getChildren().entrySet()) {
             String typeName = typeField.getKey();
-            JsonNode typeNode = typeField.getValue();
-            if (DATA_FIELD.equals(typeName) || typeNode == null || !typeNode.isObject()) {
+            CubeApiTreeNode typeNode = typeField.getValue();
+            if (typeNode == null) {
                 continue;
             }
 
@@ -122,10 +107,10 @@ public class CubeApiTrackingConfigConverter {
     /**
      * 按跟踪类型转换配置。
      */
-    private JsonNode convertConfig(TrackingType trackingType, JsonNode typeNode, JsonNode defaultNode) {
+    private JsonNode convertConfig(TrackingType trackingType, CubeApiTreeNode typeNode, JsonNode defaultNode) {
         ObjectNode config = defaultNode.deepCopy();
         if (trackingType == TrackingType.PROCESS) {
-            config.set("segments", convertProcessSegments(typeNode.path(TECH_FIELD)));
+            config.set("segments", convertProcessSegments(typeNode.getChildren().get(TECH_FIELD)));
         }
         return config;
     }
@@ -133,18 +118,14 @@ public class CubeApiTrackingConfigConverter {
     /**
      * 转换过程跟踪工艺段配置。
      */
-    private ArrayNode convertProcessSegments(JsonNode techNode) {
+    private ArrayNode convertProcessSegments(CubeApiTreeNode techNode) {
         ArrayNode segments = objectMapper.createArrayNode();
-        if (techNode == null || !techNode.isObject()) {
+        if (techNode == null) {
             return segments;
         }
 
-        Iterator<Map.Entry<String, JsonNode>> segmentFields = techNode.fields();
-        while (segmentFields.hasNext()) {
-            Map.Entry<String, JsonNode> segmentField = segmentFields.next();
-            String segmentKey = segmentField.getKey();
-            JsonNode segmentNode = segmentField.getValue();
-            if (DATA_FIELD.equals(segmentKey) || segmentNode == null || !segmentNode.isObject()) {
+        for (CubeApiTreeNode segmentNode : techNode.getChildren().values()) {
+            if (segmentNode == null) {
                 continue;
             }
 
@@ -163,15 +144,13 @@ public class CubeApiTrackingConfigConverter {
     /**
      * 提取工艺段点位名。
      */
-    private ArrayNode pointNames(JsonNode segmentNode) {
+    private ArrayNode pointNames(CubeApiTreeNode segmentNode) {
         ArrayNode points = objectMapper.createArrayNode();
-        Iterator<String> fieldNames = segmentNode.fieldNames();
-        while (fieldNames.hasNext()) {
-            String fieldName = fieldNames.next();
-            if (isPointField(fieldName, segmentNode.get(fieldName))) {
+        for (Map.Entry<String, CubeApiTreeNode> pointField : segmentNode.getChildren().entrySet()) {
+            if (isPointNode(pointField.getValue())) {
                 ObjectNode point = objectMapper.createObjectNode();
-                point.put(POINT_NAME_FIELD, fieldName);
-                point.put(POINT_TYPE_FIELD, pointType(segmentNode.get(fieldName)));
+                point.put("name", pointField.getKey());
+                point.put("type", pointType(pointField.getValue()));
                 points.add(point);
             }
         }
@@ -181,19 +160,14 @@ public class CubeApiTrackingConfigConverter {
     /**
      * 判断字段是否为点位节点，排除 paraRange=3 返回的目录/段元数据字段。
      */
-    private boolean isPointField(String fieldName, JsonNode fieldNode) {
-        if (DATA_FIELD.equals(fieldName) || METADATA_FIELDS.contains(fieldName)
-                || fieldNode == null || !fieldNode.isObject()) {
-            return false;
-        }
-        JsonNode itemType = fieldNode.path(ITEM_TYPE_FIELD);
-        return itemType.isMissingNode() || itemType.asInt() == 2;
+    private boolean isPointNode(CubeApiTreeNode node) {
+        return node != null && (node.getItemType() == null || node.getItemType() == 2);
     }
 
     /**
      * 从 Cube API 点位元数据读取点位类型。
      */
-    private String pointType(JsonNode pointNode) {
+    private String pointType(CubeApiTreeNode pointNode) {
         String valueType = valueType(pointNode);
         if (valueType == null || valueType.trim().isEmpty()) {
             return DEFAULT_POINT_TYPE;
@@ -215,24 +189,27 @@ public class CubeApiTrackingConfigConverter {
     /**
      * 兼容 valueType 位于点位节点或 data 节点两种结构。
      */
-    private String valueType(JsonNode pointNode) {
-        if (pointNode == null || pointNode.isMissingNode() || pointNode.isNull()) {
+    private String valueType(CubeApiTreeNode pointNode) {
+        if (pointNode == null) {
             return null;
         }
-        JsonNode directValueType = pointNode.path(VALUE_TYPE_FIELD);
-        if (directValueType.isTextual()) {
-            return directValueType.asText();
+        if (pointNode.getValueType() != null) {
+            return pointNode.getValueType();
         }
-        JsonNode dataValueType = pointNode.path(DATA_FIELD).path(VALUE_TYPE_FIELD);
+        JsonNode data = pointNode.getData();
+        JsonNode dataValueType = data == null ? null : data.path("valueType");
+        if (dataValueType == null) {
+            return null;
+        }
         return dataValueType.isTextual() ? dataValueType.asText() : null;
     }
 
     /**
      * 读取节点默认配置。
      */
-    private JsonNode defaultNode(JsonNode node) {
-        JsonNode dataNode = node.path(DATA_FIELD);
-        if (dataNode.isMissingNode() || dataNode.isNull()) {
+    private JsonNode defaultNode(CubeApiTreeNode node) {
+        JsonNode dataNode = node.getData();
+        if (dataNode == null || dataNode.isNull()) {
             return null;
         }
         JsonNode defaultNode = dataNode.path(DEFAULT_FIELD);

@@ -1,8 +1,8 @@
 package com.wisdri.tracking.infrastructure.service.feign.client;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.wisdri.tracking.common.response.R;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeRequest;
+import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeResponse;
 import feign.Request;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -25,7 +25,7 @@ public interface CubeApiFeignClient {
      * 拉取多维度配置树。
      */
     @PostMapping("/openapi/meta/tree")
-    R<JsonNode> fetchConfigTree(@RequestBody CubeApiTreeRequest request);
+    R<CubeApiTreeResponse> fetchConfigTree(@RequestBody CubeApiTreeRequest request);
 
     /**
      * Cube API 专属 Feign 超时配置。

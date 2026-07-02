@@ -1,10 +1,10 @@
 package com.wisdri.tracking.infrastructure.service.feign.gateway;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.wisdri.tracking.common.exception.ExternalServiceException;
 import com.wisdri.tracking.common.response.R;
 import com.wisdri.tracking.infrastructure.service.feign.converter.CubeApiTrackingConfigConverter;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeRequest;
+import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeResponse;
 import com.wisdri.tracking.infrastructure.service.feign.client.CubeApiFeignClient;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
@@ -41,7 +41,8 @@ public class CubeApiGateway {
      * 拉取并转换跟踪配置。
      */
     public Map<TrackingType, TrackingConfig> fetchTrackingConfigs() {
-        R<JsonNode> response = cubeApiFeignClient.fetchConfigTree(CubeApiTreeRequest.defaultRequest(cubeApiTreeRoot));
+        R<CubeApiTreeResponse> response =
+                cubeApiFeignClient.fetchConfigTree(CubeApiTreeRequest.defaultRequest(cubeApiTreeRoot));
         if (!R.isSuccess(response)) {
             throw new ExternalServiceException("Cube API 配置树查询失败");
         }
