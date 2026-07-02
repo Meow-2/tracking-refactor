@@ -8,8 +8,8 @@ import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepository;
 import com.wisdri.tracking.infrastructure.dto.feign.timeseries.*;
+import com.wisdri.tracking.infrastructure.properties.TimeSeriesStorageProperties;
 import com.wisdri.tracking.infrastructure.service.feign.gateway.TimeSeriesStorageGateway;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 import javax.annotation.Resource;
@@ -31,8 +31,11 @@ public class ProcessTrackingResultRepositoryImpl implements TrackingResultReposi
             tableRule("pass_no", TimeSeriesDataType.INT.getCode(), false)
     );
 
-    @Value("${time-series-storage.database}")
-    private String database;
+    /**
+     * 时序存储服务配置。
+     */
+    @Resource
+    private TimeSeriesStorageProperties timeSeriesStorageProperties;
 
     /**
      * 时序数据存储服务网关。
@@ -54,7 +57,7 @@ public class ProcessTrackingResultRepositoryImpl implements TrackingResultReposi
         for (SegmentConfig segment : config.getSegments()) {
             TimeSeriesTableRequest request = new TimeSeriesTableRequest();
             request.setMode(TimeSeriesTableMode.COLUMN.getCode());
-            request.setBucket(database);
+            request.setBucket(timeSeriesStorageProperties.getDatabase());
             request.setMeasurement(tableName(config.getUnitCode(), config.getTrackingType(), segment.getCode()));
             List<TimeSeriesTableRule> rules = new ArrayList<>(NON_TAG_COLUMN);
             if (segment.getPoints() != null) {
