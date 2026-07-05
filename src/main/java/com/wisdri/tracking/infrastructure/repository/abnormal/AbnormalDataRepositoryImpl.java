@@ -1,6 +1,6 @@
 package com.wisdri.tracking.infrastructure.repository.abnormal;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wisdri.tracking.domain.model.abnormal.AbnormalData;
 import com.wisdri.tracking.domain.model.abnormal.AbnormalType;
@@ -32,9 +32,10 @@ public class AbnormalDataRepositoryImpl extends ServiceImpl<AbnormalDataMapper, 
      */
     @Override
     public List<AbnormalData> find(String unitCode, TrackingType trackingType) {
-        QueryWrapper<AbnormalDataEntity> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("unit_code", unitCode)
-                .eq("tracking_type", trackingType == null ? null : trackingType.getCode());
+        LambdaQueryWrapper<AbnormalDataEntity> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(AbnormalDataEntity::getUnitCode, unitCode)
+                .eq(AbnormalDataEntity::getTrackingType,
+                        trackingType == null ? null : trackingType.getCode());
         List<AbnormalDataEntity> entities = abnormalDataMapper.selectList(queryWrapper);
         List<AbnormalData> result = new ArrayList<>();
         if (entities == null || entities.isEmpty()) {
