@@ -12,6 +12,7 @@ import java.util.Locale;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class RedisKeys {
     private static final String TRACKING_CONFIG_PATTERN = "tracking:%s:%s:config";
+    private static final String TRACKING_RUNTIME_PATTERN = "tracking:%s:%s:runtime";
     private static final String LAST_POINT_SNAPSHOT_PATTERN = "tracking:%s:%s:lastdata";
 
     /**
@@ -19,6 +20,13 @@ public final class RedisKeys {
      */
     public static String trackingConfig(String unitCode, TrackingType trackingType) {
         return String.format(TRACKING_CONFIG_PATTERN, normalize(unitCode), normalize(trackingType.getCode()));
+    }
+
+    /**
+     * 跟踪算法运行态 key。
+     */
+    public static String trackingRuntime(String unitCode, TrackingType trackingType) {
+        return String.format(TRACKING_RUNTIME_PATTERN, normalize(unitCode), normalize(trackingType.getCode()));
     }
 
     /**

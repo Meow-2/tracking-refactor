@@ -8,7 +8,7 @@ import com.wisdri.tracking.domain.model.point.PointEventType;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
-import com.wisdri.tracking.domain.repository.config.TrackingConfigRepository;
+import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.point.PointEventHandler;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import org.springframework.stereotype.Component;
@@ -28,7 +28,7 @@ public class ProcessPointEventHandler implements PointEventHandler<ProcessTracki
      * 跟踪配置仓储。
      */
     @Resource
-    private TrackingConfigRepository configRepository;
+    private TrackingRuntimeRepositoryDispatcher runtimeRepositoryDispatcher;
 
     /**
      * 仅支持过程跟踪。
@@ -50,7 +50,7 @@ public class ProcessPointEventHandler implements PointEventHandler<ProcessTracki
         if (!event.isPresent()) {
             return;
         }
-        configRepository.refresh();
+        runtimeRepositoryDispatcher.refreshConfig();
     }
 
     /**

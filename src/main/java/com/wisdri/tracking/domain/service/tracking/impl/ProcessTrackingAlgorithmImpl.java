@@ -9,10 +9,12 @@ import com.wisdri.tracking.domain.model.config.process.StartCondition;
 import com.wisdri.tracking.domain.model.config.process.TrackingPointGroup;
 import com.wisdri.tracking.domain.model.config.process.TrackingSection;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
+import com.wisdri.tracking.domain.model.runtime.process.ProcessSegmentRuntime;
+import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
-import com.wisdri.tracking.domain.repository.config.TrackingConfigRepository;
+import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.abnormal.AbnormalDataHandlerDispatcher;
 import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
@@ -39,7 +41,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
      * 跟踪配置仓储。
      */
     @Resource
-    private TrackingConfigRepository configRepository;
+    private TrackingRuntimeRepositoryDispatcher runtimeRepositoryDispatcher;
 
     /**
      * 异常数据处理服务。
@@ -67,13 +69,13 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
     @Override
     public List<ProcessResult> calculate(TrackingInput input) {
         // 先从缓存读取当前配置，后续 pointEvent 处理可能就地更新该配置。
-        Optional<ProcessTrackingConfig> configOptional = configRepository.findAs(
+        Optional<ProcessTrackingConfig> configOptional = runtimeRepositoryDispatcher.findConfigAs(
                 input.getUnitCode(),
                 input.getTrackingType(),
                 ProcessTrackingConfig.class
         );
         if (!configOptional.isPresent()) {
-            return new ArrayList<>();
+            return saveRuntime(input, new ArrayList<>());
         }
         ProcessTrackingConfig config = configOptional.get();
 
@@ -84,14 +86,14 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
         // 校验最新快照和启动条件，未达到计算条件时不生成结果。
         PointSnapshot latest = input.getLatestSnapshot();
         if (latest == null || config.getTracking() == null || !startConditionReached(latest, config.getTracking())) {
-            return new ArrayList<>();
+            return saveRuntime(input, new ArrayList<>());
         }
 
         // 过滤有效钢卷点位组，后续每个工艺段基于同一组候选点位选择当前钢卷。
         List<TrackingPointGroup> groups = validGroups(latest, config.getTracking());
         List<ProcessResult> results = new ArrayList<>();
         if (config.getSegments() == null) {
-            return results;
+            return saveRuntime(input, results);
         }
 
         // 按工艺段逐段选择钢卷并组装跟踪结果。
@@ -114,6 +116,30 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                     .receivedAt(latest.getReceivedAt())
                     .build());
         }
+        return saveRuntime(input, results);
+    }
+
+    /**
+     * 以本轮算法结果整体替换当前过程运行态。
+     */
+    private List<ProcessResult> saveRuntime(TrackingInput input, List<ProcessResult> results) {
+        Map<String, ProcessSegmentRuntime> segments = new LinkedHashMap<>();
+        for (ProcessResult result : results) {
+            if (result == null || result.getSegmentCode() == null) {
+                continue;
+            }
+            segments.put(result.getSegmentCode(), ProcessSegmentRuntime.builder()
+                    .segmentCode(result.getSegmentCode())
+                    .coilNo(result.getCoilNo())
+                    .headLength(result.getHeadLength())
+                    .build());
+        }
+        runtimeRepositoryDispatcher.saveRuntime(ProcessTrackingRuntime.builder()
+                .unitCode(input.getUnitCode())
+                .trackingType(input.getTrackingType())
+                .updatedAt(Instant.now())
+                .segments(segments)
+                .build());
         return results;
     }
 

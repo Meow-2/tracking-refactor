@@ -8,7 +8,7 @@ import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.tracking.TrackingTask;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
-import com.wisdri.tracking.domain.repository.config.TrackingConfigRepository;
+import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.repository.point.LastPointSnapshotRepository;
 import com.wisdri.tracking.infrastructure.service.mqtt.MqttSubscriptionRegistry;
 import com.wisdri.tracking.infrastructure.service.rocketmq.TrackingTaskProducer;
@@ -45,7 +45,7 @@ public class TrackingTaskProducerUseCase {
      * 跟踪配置仓储。
      */
     @Resource
-    private TrackingConfigRepository configRepository;
+    private TrackingRuntimeRepositoryDispatcher runtimeRepositoryDispatcher;
 
     /**
      * 最新点位快照仓储。
@@ -84,7 +84,7 @@ public class TrackingTaskProducerUseCase {
      * 发送成功后再保存当前快照，作为下一条消息的 previousSnapshot。
      */
     private void produce(String unitCode, TrackingType trackingType, PointSnapshot latestSnapshot) {
-        Optional<TrackingConfig> configOptional = configRepository.find(unitCode, trackingType);
+        Optional<TrackingConfig> configOptional = runtimeRepositoryDispatcher.findConfig(unitCode, trackingType);
         if (!configOptional.isPresent() || !Boolean.TRUE.equals(configOptional.get().getEnable())) {
             return;
         }

@@ -1,4 +1,4 @@
-package com.wisdri.tracking.infrastructure.repository.config;
+package com.wisdri.tracking.infrastructure.repository.runtime;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
@@ -8,8 +8,10 @@ import com.wisdri.tracking.common.exception.TrackingException;
 import com.wisdri.tracking.common.utils.JsonUtils;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
+import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
-import com.wisdri.tracking.domain.repository.config.TrackingConfigRepository;
+import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepository;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepositoryDispatcher;
 import com.wisdri.tracking.infrastructure.service.feign.gateway.CubeApiGateway;
 import com.wisdri.tracking.infrastructure.service.redis.RedisKeys;
@@ -25,14 +27,19 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 基于 Redis 的跟踪配置仓储实现。
+ * 基于 Redis 和本地缓存的跟踪配置、算法运行态仓储实现。
  */
 @Repository
-public class TrackingConfigRepositoryImpl implements TrackingConfigRepository {
+public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository {
     /**
      * 配置缓存。
      */
-    private final Map<String, TrackingConfig> cache = new ConcurrentHashMap<>();
+    private final Map<String, TrackingConfig> configCache = new ConcurrentHashMap<>();
+
+    /**
+     * 算法运行态本地缓存。
+     */
+    private final Map<String, TrackingRuntime> runtimeCache = new ConcurrentHashMap<>();
 
     /**
      * 跟踪类型与配置模型类型映射。
@@ -40,7 +47,12 @@ public class TrackingConfigRepositoryImpl implements TrackingConfigRepository {
     private final Map<TrackingType, Class<? extends TrackingConfig>> configTypes = configTypes();
 
     /**
-     * 配置 JSON 反序列化器。
+     * 跟踪类型与运行态模型类型映射。
+     */
+    private final Map<TrackingType, Class<? extends TrackingRuntime>> runtimeTypes = runtimeTypes();
+
+    /**
+     * 配置和运行态 JSON 序列化器。
      */
     private final ObjectMapper objectMapper = JsonUtils.decimalPreservingMapperBuilder()
             .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
@@ -67,18 +79,62 @@ public class TrackingConfigRepositoryImpl implements TrackingConfigRepository {
     private TrackingResultRepositoryDispatcher trackingResultRepositoryDispatcher;
 
     /**
+     * 当前仓储负责过程跟踪。
+     */
+    @Override
+    public boolean support(TrackingType trackingType) {
+        return TrackingType.PROCESS == trackingType;
+    }
+
+    /**
      * 从本地缓存读取配置对象引用。
      */
     @Override
-    public Optional<TrackingConfig> find(String unitCode, TrackingType trackingType) {
-        return Optional.ofNullable(cache.get(configKey(unitCode, trackingType)));
+    public Optional<TrackingConfig> findConfig(String unitCode, TrackingType trackingType) {
+        return Optional.ofNullable(configCache.get(configKey(unitCode, trackingType)));
+    }
+
+    /**
+     * 从本地缓存读取运行态，本地未命中时从 Redis 恢复。
+     */
+    @Override
+    public Optional<TrackingRuntime> findRuntime(String unitCode, TrackingType trackingType) {
+        String key = runtimeKey(unitCode, trackingType);
+        TrackingRuntime cached = runtimeCache.get(key);
+        if (cached != null) {
+            return Optional.of(cached);
+        }
+        String json = stringRedisTemplate.opsForValue().get(key);
+        if (json == null || json.trim().isEmpty()) {
+            return Optional.empty();
+        }
+        TrackingRuntime runtime = readRuntime(unitCode, trackingType, json);
+        TrackingRuntime existing = runtimeCache.putIfAbsent(key, runtime);
+        return Optional.of(existing == null ? runtime : existing);
+    }
+
+    /**
+     * 将运行态写入 Redis，并整体替换本地缓存。
+     */
+    @Override
+    public void saveRuntime(TrackingRuntime runtime) {
+        if (runtime == null || runtime.getUnitCode() == null || runtime.getTrackingType() == null) {
+            throw new TrackingException("保存跟踪运行态失败: 缺少机组或跟踪类型");
+        }
+        String key = runtimeKey(runtime.getUnitCode(), runtime.getTrackingType());
+        try {
+            stringRedisTemplate.opsForValue().set(key, JsonUtils.toPrettyJson(objectMapper, runtime));
+            runtimeCache.put(key, runtime);
+        } catch (IOException e) {
+            throw new TrackingException("写入跟踪运行态到 Redis 失败: " + key, e);
+        }
     }
 
     /**
      * 从 Cube API 同步配置到 Redis，再从 Redis 刷新本地缓存对象。
      */
     @Override
-    public void refresh() {
+    public void refreshConfig() {
         Map<TrackingType, TrackingConfig> configs = syncCubeApiConfigToRedis();
         for (Map.Entry<TrackingType, TrackingConfig> entry : configs.entrySet()) {
             TrackingConfig config = entry.getValue();
@@ -114,9 +170,9 @@ public class TrackingConfigRepositoryImpl implements TrackingConfigRepository {
             return Optional.empty();
         }
         TrackingConfig refreshedConfig = readConfig(unitCode, trackingType, json);
-        TrackingConfig cachedConfig = cache.get(key);
+        TrackingConfig cachedConfig = configCache.get(key);
         if (cachedConfig == null) {
-            cache.put(key, refreshedConfig);
+            configCache.put(key, refreshedConfig);
             return Optional.of(refreshedConfig);
         }
         copyConfig(refreshedConfig, cachedConfig);
@@ -128,6 +184,10 @@ public class TrackingConfigRepositoryImpl implements TrackingConfigRepository {
      */
     private String configKey(String unitCode, TrackingType trackingType) {
         return RedisKeys.trackingConfig(unitCode, trackingType);
+    }
+
+    private String runtimeKey(String unitCode, TrackingType trackingType) {
+        return RedisKeys.trackingRuntime(unitCode, trackingType);
     }
 
     /**
@@ -149,11 +209,38 @@ public class TrackingConfigRepositoryImpl implements TrackingConfigRepository {
     }
 
     /**
+     * 根据跟踪类型读取运行态。
+     */
+    private TrackingRuntime readRuntime(String unitCode, TrackingType trackingType, String json) {
+        Class<? extends TrackingRuntime> runtimeType = runtimeTypes.get(trackingType);
+        if (runtimeType == null) {
+            throw new TrackingException("不支持的跟踪运行态类型: " + trackingType);
+        }
+        try {
+            TrackingRuntime runtime = objectMapper.readValue(json, runtimeType);
+            runtime.setUnitCode(unitCode);
+            runtime.setTrackingType(trackingType);
+            return runtime;
+        } catch (IOException e) {
+            throw new TrackingException("读取跟踪运行态失败: " + runtimeKey(unitCode, trackingType), e);
+        }
+    }
+
+    /**
      * 注册各跟踪类型对应的配置模型类型。
      */
     private Map<TrackingType, Class<? extends TrackingConfig>> configTypes() {
         Map<TrackingType, Class<? extends TrackingConfig>> types = new EnumMap<>(TrackingType.class);
         types.put(TrackingType.PROCESS, ProcessTrackingConfig.class);
+        return types;
+    }
+
+    /**
+     * 注册各跟踪类型对应的运行态模型类型。
+     */
+    private Map<TrackingType, Class<? extends TrackingRuntime>> runtimeTypes() {
+        Map<TrackingType, Class<? extends TrackingRuntime>> types = new EnumMap<>(TrackingType.class);
+        types.put(TrackingType.PROCESS, ProcessTrackingRuntime.class);
         return types;
     }
 

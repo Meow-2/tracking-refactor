@@ -2,7 +2,7 @@ package com.wisdri.tracking.application.usecase.tracking;
 
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
-import com.wisdri.tracking.domain.repository.config.TrackingConfigRepository;
+import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import com.wisdri.tracking.infrastructure.service.mqtt.MqttSubscriptionRegistry;
 import org.springframework.stereotype.Service;
@@ -25,7 +25,7 @@ public class PointSubscriptionUseCase {
      * 跟踪配置仓储。
      */
     @Resource
-    private TrackingConfigRepository trackingConfigRepository;
+    private TrackingRuntimeRepositoryDispatcher trackingRuntimeRepositoryDispatcher;
 
     /**
      * MQTT 订阅服务。
@@ -41,9 +41,9 @@ public class PointSubscriptionUseCase {
      * 反查到 unitCode 和 trackingType。
      */
     public void start() {
-        trackingConfigRepository.refresh();
+        trackingRuntimeRepositoryDispatcher.refreshConfig();
         for (TrackingType trackingType : TrackingType.values()) {
-            Optional<TrackingConfig> configOptional = trackingConfigRepository.find(
+            Optional<TrackingConfig> configOptional = trackingRuntimeRepositoryDispatcher.findConfig(
                     trackingProperties.getUnit(),
                     trackingType
             );
