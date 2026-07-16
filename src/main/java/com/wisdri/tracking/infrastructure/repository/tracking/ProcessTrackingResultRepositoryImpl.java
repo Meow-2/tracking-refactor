@@ -9,6 +9,7 @@ import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepository;
 import com.wisdri.tracking.infrastructure.dto.feign.timeseries.*;
 import com.wisdri.tracking.infrastructure.properties.TimeSeriesStorageProperties;
+import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import com.wisdri.tracking.infrastructure.service.feign.gateway.TimeSeriesStorageGateway;
 import org.springframework.stereotype.Repository;
 
@@ -43,6 +44,12 @@ public class ProcessTrackingResultRepositoryImpl implements TrackingResultReposi
     @Resource
     private TimeSeriesStorageGateway timeSeriesStorageGateway;
 
+    /**
+     * 跟踪应用配置。
+     */
+    @Resource
+    private TrackingProperties trackingProperties;
+
     @Override
     public boolean support(TrackingType trackingType) {
         return TrackingType.PROCESS == trackingType;
@@ -50,6 +57,9 @@ public class ProcessTrackingResultRepositoryImpl implements TrackingResultReposi
 
     @Override
     public void createTable(ProcessTrackingConfig config) {
+        if (trackingProperties != null && !trackingProperties.trackingResultStorageEnabled()) {
+            return;
+        }
         if (config == null || config.getSegments() == null || config.getSegments().isEmpty()) {
             return;
         }
@@ -72,6 +82,9 @@ public class ProcessTrackingResultRepositoryImpl implements TrackingResultReposi
 
     @Override
     public void save(List<ProcessResult> results) {
+        if (trackingProperties != null && !trackingProperties.trackingResultStorageEnabled()) {
+            return;
+        }
         if (results == null || results.isEmpty()) {
             return;
         }

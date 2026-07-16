@@ -3,6 +3,7 @@ package com.wisdri.tracking.infrastructure.dto.feign.cube;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -15,6 +16,8 @@ import java.util.Map;
  * 根节点名称由配置动态决定，因此使用名称到节点的映射接收。
  */
 public class CubeApiTreeResponse {
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     /**
      * 根节点自身的附加数据，不属于业务根目录。
      */
@@ -34,8 +37,11 @@ public class CubeApiTreeResponse {
      * @param node 根节点内容
      */
     @JsonAnySetter
-    public void addRoot(String code, CubeApiTreeNode node) {
-        roots.put(code, node);
+    public void addRoot(String code, JsonNode node) {
+        if (node == null || !node.isObject()) {
+            return;
+        }
+        roots.put(code, OBJECT_MAPPER.convertValue(node, CubeApiTreeNode.class));
     }
 
     /**

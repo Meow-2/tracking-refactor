@@ -3,6 +3,7 @@ package com.wisdri.tracking.infrastructure.dto.feign.cube;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 
 import java.util.LinkedHashMap;
@@ -15,6 +16,8 @@ import java.util.Map;
  */
 @Data
 public class CubeApiTreeNode {
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     /** 节点 ID。 */
     private Long id;
     /** 父节点 ID。 */
@@ -73,8 +76,11 @@ public class CubeApiTreeNode {
      * @param child 子节点内容
      */
     @JsonAnySetter
-    public void addChild(String code, CubeApiTreeNode child) {
-        children.put(code, child);
+    public void addChild(String code, JsonNode child) {
+        if (child == null || !child.isObject()) {
+            return;
+        }
+        children.put(code, OBJECT_MAPPER.convertValue(child, CubeApiTreeNode.class));
     }
 
     /**

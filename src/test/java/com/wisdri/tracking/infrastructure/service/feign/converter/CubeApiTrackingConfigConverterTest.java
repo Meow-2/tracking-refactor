@@ -21,6 +21,7 @@ class CubeApiTrackingConfigConverterTest {
     @Test
     void convertReadsDynamicTreeIntoProcessConfig() throws Exception {
         CubeApiTreeResponse tree = objectMapper.readValue("{\n"
+                + "  \"itemType\": 1,\n"
                 + "  \"data\": {\"name\": \"root metadata\"},\n"
                 + "  \"other\": {\"process\": {\"data\": {\"default\": {\"enable\": false}}}},\n"
                 + "  \"cp1\": {\n"

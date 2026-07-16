@@ -7,6 +7,7 @@ import com.wisdri.tracking.domain.model.abnormal.AbnormalType;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.abnormal.AbnormalDataRepository;
 import com.wisdri.tracking.infrastructure.dto.postgres.abnormal.AbnormalDataEntity;
+import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import com.wisdri.tracking.infrastructure.service.postgres.abnormal.AbnormalDataMapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,12 @@ public class AbnormalDataRepositoryImpl extends ServiceImpl<AbnormalDataMapper, 
      */
     @Resource
     private AbnormalDataMapper abnormalDataMapper;
+
+    /**
+     * 跟踪应用配置。
+     */
+    @Resource
+    private TrackingProperties trackingProperties;
 
     /**
      * 按机组和跟踪类型查询异常数据。
@@ -53,6 +60,9 @@ public class AbnormalDataRepositoryImpl extends ServiceImpl<AbnormalDataMapper, 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void save(List<AbnormalData> abnormalData) {
+        if (trackingProperties != null && !trackingProperties.abnormalStorageEnabled()) {
+            return;
+        }
         if (abnormalData == null || abnormalData.isEmpty()) {
             return;
         }
