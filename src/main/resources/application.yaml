@@ -1,5 +1,5 @@
 tracking:
-  unit: baf1
+  unit: cp1
   storage:
     abnormal:
       enabled: false
@@ -15,7 +15,7 @@ spring:
   application:
     name: tracking
   profiles:
-    active: dev
+    active: local
 
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
@@ -29,7 +29,7 @@ mybatis-plus:
 #    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 mqtt:
-  client-id: tracking-${tracking.unit}-client
+  client-id: tracking-${tracking.unit}-client-local
   completion-timeout: 3000
   qos: 1
   clean-session: true
