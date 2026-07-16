@@ -1,10 +1,13 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -Eeuo pipefail
+
 echo "----------------tracking deployment start---------------"
 
 echo "---------------remove old image---------------"
-docker rmi -f 172.16.200.26/quality/tracking:latest
+docker rmi -f 172.16.200.26/quality/tracking:latest || true
 echo "----------------build new image------------------"
-docker build -t 172.16.200.26/quality/tracking .
+docker build -t 172.16.200.26/quality/tracking:latest .
 echo "----------------push new image------------------"
 docker push 172.16.200.26/quality/tracking:latest
 

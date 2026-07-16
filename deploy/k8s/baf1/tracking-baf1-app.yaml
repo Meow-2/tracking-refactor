@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tracking-baf1
+  namespace: tracking
+  labels:
+    app: tracking-baf1
+    version: v1
+    app.kubernetes.io/name: tracking-baf1
+    app.kubernetes.io/version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tracking-baf1
+      version: v1
+      app.kubernetes.io/name: tracking-baf1
+      app.kubernetes.io/version: v1
+  template:
+    metadata:
+      labels:
+        app: tracking-baf1
+        version: v1
+        app.kubernetes.io/name: tracking-baf1
+        app.kubernetes.io/version: v1
+    spec:
+      containers:
+        - name: tracking
+          image: 172.16.200.26/quality/tracking
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: tracking-baf1-config
+          resources:
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tracking-baf1
+  namespace: tracking
+  labels:
+    app: tracking-baf1
+    version: v1
+    app.kubernetes.io/name: tracking-baf1
+    app.kubernetes.io/version: v1
+spec:
+  selector:
+    app: tracking-baf1
+    version: v1
+    app.kubernetes.io/name: tracking-baf1
+    app.kubernetes.io/version: v1
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 32337
+  type: NodePort
+

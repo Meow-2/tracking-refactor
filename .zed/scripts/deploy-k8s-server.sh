@@ -16,6 +16,7 @@ K8S_HOST="${K8S_HOST:-172.16.200.36}"
 K8S_USER="${K8S_USER:-root}"
 K8S_PORT="${K8S_PORT:-22}"
 K8S_NAMESPACE="${K8S_NAMESPACE:-tracking}"
+K8S_MANIFEST_DIR="${K8S_MANIFEST_DIR:-/data/mainfest/tracking}"
 K8S_ROLLOUT_TIMEOUT="${K8S_ROLLOUT_TIMEOUT:-300s}"
 K8S_SSH_PASS="${K8S_SSH_PASS:-Aygg@2026}"
 
@@ -24,7 +25,10 @@ MAVEN_SETTINGS_PATH="${MAVEN_SETTINGS_PATH:-${HOME}/.m2/settings.xml}"
 MAVEN_LOCAL_REPOSITORY="${MAVEN_LOCAL_REPOSITORY:-${HOME}/.m2/repository}"
 SKIP_TESTS="${SKIP_TESTS:-true}"
 
-UNITS=("cbl1" "cp1" "csl1" "dcl1" "fcl1" "zrm1")
+LOCAL_K8S_DIR="${LOCAL_K8S_DIR:-${PROJECT_DIR}/deploy/k8s}"
+LOCAL_DOCKER_DIR="${LOCAL_DOCKER_DIR:-${PROJECT_DIR}/deploy/docker}"
+
+UNITS=("baf1" "cbl1" "cp1" "csl1" "dcl1" "fcl1" "zrm1")
 RUN_ID="$(date +%y%m%d-%H%M)-$$"
 
 log() {
@@ -45,7 +49,12 @@ Required environment variables:
   NFS_SSH_PASS  Build server SSH password
   K8S_SSH_PASS  Kubernetes control host SSH password
 
-This script builds and pushes one tracking image, then restarts:
+This script builds and pushes one tracking image, synchronizes deploy/docker to
+the build server, and synchronizes deploy/k8s to:
+  /data/mainfest/tracking
+
+Then it applies the manifests and restarts:
+  tracking-baf1
   tracking-cbl1
   tracking-cp1
   tracking-csl1
@@ -53,7 +62,7 @@ This script builds and pushes one tracking image, then restarts:
   tracking-fcl1
   tracking-zrm1
 
-Each Deployment must set its own TRACKING_UNIT environment variable.
+Each ConfigMap must set its own TRACKING_UNIT environment variable.
 EOF
 }
 
@@ -118,12 +127,37 @@ find_jar() {
   printf '%s\n' "${jars[0]}"
 }
 
+create_k8s_archive() {
+  local archive
+
+  [[ -d "${LOCAL_K8S_DIR}" ]] || die "Kubernetes manifest directory not found: ${LOCAL_K8S_DIR}"
+  archive="$(mktemp "${TMPDIR:-/tmp}/tracking-k8s.XXXXXX")"
+  tar -C "${LOCAL_K8S_DIR}" -czf "${archive}" .
+  printf '%s\n' "${archive}"
+}
+
+build_k8s_apply_command() {
+  local remote_archive="$1"
+
+  printf 'mkdir -p %q && tar -xzf %q -C %q && rm -f %q && (kubectl get namespace %q >/dev/null 2>&1 || kubectl create namespace %q) && kubectl -n %q apply --recursive -f %q' \
+    "${K8S_MANIFEST_DIR}" \
+    "${remote_archive}" \
+    "${K8S_MANIFEST_DIR}" \
+    "${remote_archive}" \
+    "${K8S_NAMESPACE}" \
+    "${K8S_NAMESPACE}" \
+    "${K8S_NAMESPACE}" \
+    "${K8S_MANIFEST_DIR}"
+}
+
 build_k8s_preflight_command() {
   local unit command=""
 
   for unit in "${UNITS[@]}"; do
     command+="kubectl -n $(printf '%q' "${K8S_NAMESPACE}") get deployment/$(printf '%q' "tracking-${unit}") >/dev/null && "
     command+="kubectl -n $(printf '%q' "${K8S_NAMESPACE}") get service/$(printf '%q' "tracking-${unit}") >/dev/null && "
+    command+="kubectl -n $(printf '%q' "${K8S_NAMESPACE}") get configmap/$(printf '%q' "tracking-${unit}-config") >/dev/null && "
+    command+="kubectl -n $(printf '%q' "${K8S_NAMESPACE}") get pvc/$(printf '%q' "tracking-${unit}-pvc") >/dev/null && "
   done
   printf '%strue' "${command}"
 }
@@ -151,8 +185,14 @@ require_command find
 require_command sshpass
 require_command ssh
 require_command scp
+require_command tar
 require_env NFS_SSH_PASS
 require_env K8S_SSH_PASS
+
+[[ -f "${LOCAL_DOCKER_DIR}/Dockerfile" ]] ||
+  die "Dockerfile not found: ${LOCAL_DOCKER_DIR}/Dockerfile"
+[[ -f "${LOCAL_DOCKER_DIR}/build-push.sh" ]] ||
+  die "Build script not found: ${LOCAL_DOCKER_DIR}/build-push.sh"
 
 log "Building shared tracking Jar"
 build_jar
@@ -164,17 +204,30 @@ REMOTE_BACKUP_NAME="${LOCAL_JAR_NAME}.bak-${RUN_ID}"
 
 log "Deploying ${LOCAL_JAR_NAME} to ${NFS_DEPLOY_DIR}"
 remote_bash "${NFS_SSH_PASS}" "${NFS_USER}" "${NFS_HOST}" "${NFS_PORT}" \
-  "mkdir -p $(printf '%q' "${NFS_DEPLOY_DIR}") && cd $(printf '%q' "${NFS_DEPLOY_DIR}") && [[ -f $(printf '%q' "${NFS_BUILD_SCRIPT}") ]]"
+  "mkdir -p $(printf '%q' "${NFS_DEPLOY_DIR}")"
+copy_to_remote "${NFS_SSH_PASS}" "${NFS_USER}" "${NFS_HOST}" "${NFS_PORT}" \
+  "${LOCAL_DOCKER_DIR}/Dockerfile" "${NFS_DEPLOY_DIR}/Dockerfile"
+copy_to_remote "${NFS_SSH_PASS}" "${NFS_USER}" "${NFS_HOST}" "${NFS_PORT}" \
+  "${LOCAL_DOCKER_DIR}/build-push.sh" "${NFS_DEPLOY_DIR}/build-push.sh"
 copy_to_remote "${NFS_SSH_PASS}" "${NFS_USER}" "${NFS_HOST}" "${NFS_PORT}" \
   "${LOCAL_JAR_PATH}" "${NFS_DEPLOY_DIR}/${REMOTE_UPLOAD_NAME}"
 remote_bash "${NFS_SSH_PASS}" "${NFS_USER}" "${NFS_HOST}" "${NFS_PORT}" \
   "cd $(printf '%q' "${NFS_DEPLOY_DIR}") && if [[ -f $(printf '%q' "${LOCAL_JAR_NAME}") ]]; then mv $(printf '%q' "${LOCAL_JAR_NAME}") $(printf '%q' "${REMOTE_BACKUP_NAME}"); fi && mv $(printf '%q' "${REMOTE_UPLOAD_NAME}") $(printf '%q' "${LOCAL_JAR_NAME}") && bash $(printf '%q' "${NFS_BUILD_SCRIPT}")"
 
-log "Checking six Deployments and Services"
+log "Synchronizing Kubernetes manifests to ${K8S_MANIFEST_DIR}"
+LOCAL_K8S_ARCHIVE="$(create_k8s_archive)"
+REMOTE_K8S_ARCHIVE="/tmp/tracking-k8s-${RUN_ID}.tar.gz"
+trap 'rm -f "${LOCAL_K8S_ARCHIVE:-}"' EXIT
+copy_to_remote "${K8S_SSH_PASS}" "${K8S_USER}" "${K8S_HOST}" "${K8S_PORT}" \
+  "${LOCAL_K8S_ARCHIVE}" "${REMOTE_K8S_ARCHIVE}"
+remote_bash "${K8S_SSH_PASS}" "${K8S_USER}" "${K8S_HOST}" "${K8S_PORT}" \
+  "$(build_k8s_apply_command "${REMOTE_K8S_ARCHIVE}")"
+
+log "Checking seven Deployments, Services, ConfigMaps, and PVCs"
 remote_bash "${K8S_SSH_PASS}" "${K8S_USER}" "${K8S_HOST}" "${K8S_PORT}" \
   "$(build_k8s_preflight_command)"
 
-log "Restarting six tracking Deployments"
+log "Restarting seven tracking Deployments"
 remote_bash "${K8S_SSH_PASS}" "${K8S_USER}" "${K8S_HOST}" "${K8S_PORT}" \
   "$(build_k8s_rollout_command)"
 

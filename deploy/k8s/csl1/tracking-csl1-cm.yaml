@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tracking-cp1-config
+  name: tracking-csl1-config
   namespace: tracking
 data:
   # ----- 全局配置 -----
 
-  TRACKING_UNIT: "cp1"
+  TRACKING_UNIT: "csl1"
   TRACKING_STORAGE_ABNORMAL_ENABLED: "true"
   TRACKING_STORAGE_TRACKINGRESULT_ENABLED: "true"
   SERVER_PORT: "8080"
@@ -29,3 +29,4 @@ data:
   CUBEAPI_BASEURL: "http://172.16.203.12:30800"
 
   TIMESERIESSTORAGE_BASEURL: "http://quality-ts:8080"
+
