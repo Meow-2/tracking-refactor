@@ -4,12 +4,12 @@
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://172.16.203.30:5432/aygg_tracking
+    url: jdbc:postgresql://localhost:5432/aygg_tracking
     username: postgres
-    password: 123456
+    password: postgres
 
   redis:
-    host: 172.16.203.18
+    host: localhost
     port: 6379
     password: Aygg@2026
     database: 0
@@ -22,12 +22,12 @@ mqtt:
 
 rocketmq:
   producer:
-    endpoints: 172.16.203.11:8081
+    endpoints: localhost:8081
   push-consumer:
-    endpoints: 172.16.203.11:8081
+    endpoints: localhost:8081
 
 cube-api:
   base-url: http://172.16.203.12:30800
 
 time-series-storage:
-  base-url: http://127.0.0.1:8886
+  base-url: http://localhost:8886
