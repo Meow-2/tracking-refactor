@@ -1,5 +1,5 @@
 tracking:
-  unit: zrm1
+  unit: baf1
   storage:
     abnormal:
       enabled: false
@@ -29,7 +29,7 @@ mybatis-plus:
 #    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
 mqtt:
-  client-id: tracking-zrm1-client
+  client-id: tracking-${tracking.unit}-client
   completion-timeout: 3000
   qos: 1
   clean-session: true
@@ -44,8 +44,8 @@ rocketmq:
     ssl-enabled: false
   push-consumer:
     topic: tracking-data-fifo-topic
-    tag: "zrm1"
-    consumer-group: tracking-data-consumer-group-zrm1
+    tag: "${tracking.unit}"
+    consumer-group: tracking-data-consumer-group-${tracking.unit}
     request-timeout: 3
     ssl-enabled: false
 
