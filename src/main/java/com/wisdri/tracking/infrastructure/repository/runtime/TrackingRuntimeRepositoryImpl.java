@@ -147,17 +147,23 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
      * 从 Cube API 获取配置树并写入 Redis。
      */
     private Map<TrackingType, TrackingConfig> syncCubeApiConfigToRedis() {
-        Map<TrackingType, TrackingConfig> configs = cubeApiGateway.fetchTrackingConfigs();
-        for (Map.Entry<TrackingType, TrackingConfig> entry : configs.entrySet()) {
+        Map<TrackingType, TrackingConfig> fetchedConfigs = cubeApiGateway.fetchTrackingConfigs();
+        Map<TrackingType, TrackingConfig> supportedConfigs = new EnumMap<>(TrackingType.class);
+        for (Map.Entry<TrackingType, TrackingConfig> entry : fetchedConfigs.entrySet()) {
+            // 分层接入期间只同步当前仓储已经完整支持的类型，避免半成品配置进入运行链路。
+            if (!support(entry.getKey())) {
+                continue;
+            }
             TrackingConfig config = entry.getValue();
             String key = configKey(config.getUnitCode(), entry.getKey());
             try {
                 stringRedisTemplate.opsForValue().set(key, JsonUtils.toPrettyJson(objectMapper, config));
+                supportedConfigs.put(entry.getKey(), config);
             } catch (IOException e) {
                 throw new TrackingException("写入Cube配置到 Redis 失败: " + key, e);
             }
         }
-        return configs;
+        return supportedConfigs;
     }
 
     /**

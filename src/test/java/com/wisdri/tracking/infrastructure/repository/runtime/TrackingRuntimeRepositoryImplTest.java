@@ -1,6 +1,7 @@
 package com.wisdri.tracking.infrastructure.repository.runtime;
 
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
+import com.wisdri.tracking.domain.model.config.batch.BatchTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessSegmentRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
@@ -22,6 +23,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -125,6 +127,35 @@ class TrackingRuntimeRepositoryImplTest {
         assertSame(cached, updated);
         assertTrue(updated.getEnable());
         assertEquals("refreshed", updated.getMqttTopic());
+    }
+
+    @Test
+    void ignoresConvertedTrackingTypeUntilRepositorySupportIsActivated() {
+        TrackingRuntimeRepositoryImpl repository = repository();
+        CubeApiGateway cubeApiGateway = mock(CubeApiGateway.class);
+        TrackingResultRepositoryDispatcher dispatcher = mock(TrackingResultRepositoryDispatcher.class);
+        ReflectionTestUtils.setField(repository, "cubeApiGateway", cubeApiGateway);
+        ReflectionTestUtils.setField(repository, "trackingResultRepositoryDispatcher", dispatcher);
+
+        ProcessTrackingConfig process = ProcessTrackingConfig.builder()
+                .unitCode("BAF1")
+                .trackingType(TrackingType.PROCESS)
+                .enable(true)
+                .build();
+        BatchTrackingConfig batch = BatchTrackingConfig.builder()
+                .unitCode("BAF1")
+                .trackingType(TrackingType.BATCH)
+                .enable(true)
+                .build();
+        Map<TrackingType, TrackingConfig> fetched = new EnumMap<>(TrackingType.class);
+        fetched.put(TrackingType.PROCESS, process);
+        fetched.put(TrackingType.BATCH, batch);
+        when(cubeApiGateway.fetchTrackingConfigs()).thenReturn(fetched);
+
+        repository.refreshConfig();
+
+        assertTrue(redis.containsKey("tracking:baf1:process:config"));
+        assertFalse(redis.containsKey("tracking:baf1:batch:config"));
     }
 
     private TrackingRuntimeRepositoryImpl repository() {

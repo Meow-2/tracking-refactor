@@ -2,7 +2,7 @@ package com.wisdri.tracking.infrastructure.service.feign.gateway;
 
 import com.wisdri.tracking.common.exception.ExternalServiceException;
 import com.wisdri.tracking.common.response.R;
-import com.wisdri.tracking.infrastructure.service.feign.converter.CubeApiTrackingConfigConverter;
+import com.wisdri.tracking.infrastructure.service.feign.converter.CubeApiTrackingConfigConverterDispatcher;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeRequest;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeResponse;
 import com.wisdri.tracking.infrastructure.service.feign.client.CubeApiFeignClient;
@@ -29,7 +29,7 @@ public class CubeApiGateway {
      * Cube API 配置树转换器。
      */
     @Resource
-    private CubeApiTrackingConfigConverter cubeApiTrackingConfigConverter;
+    private CubeApiTrackingConfigConverterDispatcher cubeApiTrackingConfigConverterDispatcher;
 
     /**
      * Cube API 配置树根路径。
@@ -46,6 +46,6 @@ public class CubeApiGateway {
         if (!R.isSuccess(response)) {
             throw new ExternalServiceException("Cube API 配置树查询失败");
         }
-        return cubeApiTrackingConfigConverter.convert(response.getData());
+        return cubeApiTrackingConfigConverterDispatcher.convert(response.getData());
     }
 }

@@ -7,10 +7,12 @@ import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeResponse;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
+import com.wisdri.tracking.infrastructure.service.feign.converter.process.ProcessCubeApiTrackingConfigConverter;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
+import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,8 +44,10 @@ class CubeApiTrackingConfigConverterTest {
 
         TrackingProperties properties = new TrackingProperties();
         properties.setUnit("CP1");
-        CubeApiTrackingConfigConverter converter = new CubeApiTrackingConfigConverter();
+        CubeApiTrackingConfigConverterDispatcher converter = new CubeApiTrackingConfigConverterDispatcher();
         ReflectionTestUtils.setField(converter, "trackingProperties", properties);
+        ReflectionTestUtils.setField(converter, "converters",
+                Collections.singletonList(new ProcessCubeApiTrackingConfigConverter()));
 
         Map<TrackingType, TrackingConfig> result = converter.convert(tree);
 
