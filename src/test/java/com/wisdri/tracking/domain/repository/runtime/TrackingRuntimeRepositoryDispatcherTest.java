@@ -2,6 +2,7 @@ package com.wisdri.tracking.domain.repository.runtime;
 
 import com.wisdri.tracking.common.exception.TrackingException;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
+import com.wisdri.tracking.domain.model.runtime.batch.BatchTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,18 +21,39 @@ import static org.mockito.Mockito.when;
 
 class TrackingRuntimeRepositoryDispatcherTest {
     private TrackingRuntimeRepository processRepository;
+    private TrackingRuntimeRepository batchRepository;
     private TrackingRuntimeRepository shearRepository;
     private TrackingRuntimeRepositoryDispatcher dispatcher;
 
     @BeforeEach
     void setUp() {
         processRepository = mock(TrackingRuntimeRepository.class);
+        batchRepository = mock(TrackingRuntimeRepository.class);
         shearRepository = mock(TrackingRuntimeRepository.class);
         when(processRepository.support(TrackingType.PROCESS)).thenReturn(true);
+        when(batchRepository.support(TrackingType.BATCH)).thenReturn(true);
         when(shearRepository.support(TrackingType.SHEAR)).thenReturn(true);
         dispatcher = new TrackingRuntimeRepositoryDispatcher();
         ReflectionTestUtils.setField(dispatcher, "repositories",
-                Arrays.asList(processRepository, shearRepository));
+                Arrays.asList(processRepository, batchRepository, shearRepository));
+    }
+
+    @Test
+    void routesTemplateRuntimeByTrackingTypeAndTemplateCode() {
+        BatchTrackingRuntime runtime = BatchTrackingRuntime.builder()
+                .unitCode("BAF1")
+                .trackingType(TrackingType.BATCH)
+                .templateCode("fb1")
+                .build();
+        when(batchRepository.findRuntimeAs(
+                "BAF1", TrackingType.BATCH, "fb1", BatchTrackingRuntime.class
+        )).thenReturn(Optional.of(runtime));
+
+        assertEquals(runtime, dispatcher.findRuntimeAs(
+                "BAF1", TrackingType.BATCH, "fb1", BatchTrackingRuntime.class
+        ).orElseThrow(AssertionError::new));
+        verify(batchRepository).findRuntimeAs(
+                "BAF1", TrackingType.BATCH, "fb1", BatchTrackingRuntime.class);
     }
 
     @Test

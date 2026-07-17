@@ -13,6 +13,7 @@ import java.util.Locale;
 public final class RedisKeys {
     private static final String TRACKING_CONFIG_PATTERN = "tracking:%s:%s:config";
     private static final String TRACKING_RUNTIME_PATTERN = "tracking:%s:%s:runtime";
+    private static final String TEMPLATE_TRACKING_RUNTIME_PATTERN = "tracking:%s:%s:%s:runtime";
     private static final String LAST_POINT_SNAPSHOT_PATTERN = "tracking:%s:%s:lastdata";
     private static final String TEMPLATE_LAST_POINT_SNAPSHOT_PATTERN = "tracking:%s:%s:%s:lastdata";
 
@@ -28,6 +29,19 @@ public final class RedisKeys {
      */
     public static String trackingRuntime(String unitCode, TrackingType trackingType) {
         return String.format(TRACKING_RUNTIME_PATTERN, normalize(unitCode), normalize(trackingType.getCode()));
+    }
+
+    /**
+     * 按模板实例构造算法运行态 key；模板为空时保持原有 key 格式。
+     */
+    public static String trackingRuntime(String unitCode,
+                                         TrackingType trackingType,
+                                         String templateCode) {
+        if (templateCode == null || templateCode.trim().isEmpty()) {
+            return trackingRuntime(unitCode, trackingType);
+        }
+        return String.format(TEMPLATE_TRACKING_RUNTIME_PATTERN,
+                normalize(unitCode), normalize(trackingType.getCode()), normalize(templateCode));
     }
 
     /**

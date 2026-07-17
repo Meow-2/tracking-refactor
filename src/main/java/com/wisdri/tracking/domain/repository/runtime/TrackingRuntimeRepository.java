@@ -37,12 +37,35 @@ public interface TrackingRuntimeRepository {
     Optional<TrackingRuntime> findRuntime(String unitCode, TrackingType trackingType);
 
     /**
+     * 读取指定模板实例的算法运行态。
+     * <p>
+     * 默认实现保持非模板仓储兼容；需要实例隔离的仓储应覆盖此方法。
+     */
+    default Optional<TrackingRuntime> findRuntime(String unitCode,
+                                                   TrackingType trackingType,
+                                                   String templateCode) {
+        return findRuntime(unitCode, trackingType);
+    }
+
+    /**
      * 按指定运行态类型读取当前算法运行态。
      */
     default <T extends TrackingRuntime> Optional<T> findRuntimeAs(String unitCode,
                                                                   TrackingType trackingType,
                                                                   Class<T> runtimeType) {
         return findRuntime(unitCode, trackingType)
+                .filter(runtimeType::isInstance)
+                .map(runtimeType::cast);
+    }
+
+    /**
+     * 按指定运行态类型读取模板实例运行态。
+     */
+    default <T extends TrackingRuntime> Optional<T> findRuntimeAs(String unitCode,
+                                                                  TrackingType trackingType,
+                                                                  String templateCode,
+                                                                  Class<T> runtimeType) {
+        return findRuntime(unitCode, trackingType, templateCode)
                 .filter(runtimeType::isInstance)
                 .map(runtimeType::cast);
     }

@@ -7,8 +7,10 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.wisdri.tracking.common.exception.TrackingException;
 import com.wisdri.tracking.common.utils.JsonUtils;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
+import com.wisdri.tracking.domain.model.config.batch.BatchTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.batch.BatchTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepository;
@@ -99,7 +101,18 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
      */
     @Override
     public Optional<TrackingRuntime> findRuntime(String unitCode, TrackingType trackingType) {
-        String key = runtimeKey(unitCode, trackingType);
+        return findRuntime(unitCode, trackingType, null);
+    }
+
+    /**
+     * 从本地缓存读取模板实例运行态，本地未命中时从 Redis 恢复。
+     */
+    @Override
+    public Optional<TrackingRuntime> findRuntime(String unitCode,
+                                                  TrackingType trackingType,
+                                                  String templateCode) {
+        validateTemplateCode(trackingType, templateCode);
+        String key = runtimeKey(unitCode, trackingType, templateCode);
         TrackingRuntime cached = runtimeCache.get(key);
         if (cached != null) {
             return Optional.of(cached);
@@ -108,7 +121,7 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
         if (json == null || json.trim().isEmpty()) {
             return Optional.empty();
         }
-        TrackingRuntime runtime = readRuntime(unitCode, trackingType, json);
+        TrackingRuntime runtime = readRuntime(unitCode, trackingType, templateCode, json);
         TrackingRuntime existing = runtimeCache.putIfAbsent(key, runtime);
         return Optional.of(existing == null ? runtime : existing);
     }
@@ -121,7 +134,8 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
         if (runtime == null || runtime.getUnitCode() == null || runtime.getTrackingType() == null) {
             throw new TrackingException("保存跟踪运行态失败: 缺少机组或跟踪类型");
         }
-        String key = runtimeKey(runtime.getUnitCode(), runtime.getTrackingType());
+        validateTemplateCode(runtime.getTrackingType(), runtime.getTemplateCode());
+        String key = runtimeKey(runtime.getUnitCode(), runtime.getTrackingType(), runtime.getTemplateCode());
         try {
             stringRedisTemplate.opsForValue().set(key, JsonUtils.toPrettyJson(objectMapper, runtime));
             runtimeCache.put(key, runtime);
@@ -192,8 +206,18 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
         return RedisKeys.trackingConfig(unitCode, trackingType);
     }
 
-    private String runtimeKey(String unitCode, TrackingType trackingType) {
-        return RedisKeys.trackingRuntime(unitCode, trackingType);
+    private String runtimeKey(String unitCode, TrackingType trackingType, String templateCode) {
+        return RedisKeys.trackingRuntime(unitCode, trackingType, templateCode);
+    }
+
+    /**
+     * 批次运行态必须绑定具体模板实例，避免多个炉台误用同一个 Redis key。
+     */
+    private void validateTemplateCode(TrackingType trackingType, String templateCode) {
+        if (TrackingType.BATCH == trackingType
+                && (templateCode == null || templateCode.trim().isEmpty())) {
+            throw new TrackingException("读写批次跟踪运行态失败: templateCode 不能为空");
+        }
     }
 
     /**
@@ -217,7 +241,10 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
     /**
      * 根据跟踪类型读取运行态。
      */
-    private TrackingRuntime readRuntime(String unitCode, TrackingType trackingType, String json) {
+    private TrackingRuntime readRuntime(String unitCode,
+                                        TrackingType trackingType,
+                                        String templateCode,
+                                        String json) {
         Class<? extends TrackingRuntime> runtimeType = runtimeTypes.get(trackingType);
         if (runtimeType == null) {
             throw new TrackingException("不支持的跟踪运行态类型: " + trackingType);
@@ -226,9 +253,11 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
             TrackingRuntime runtime = objectMapper.readValue(json, runtimeType);
             runtime.setUnitCode(unitCode);
             runtime.setTrackingType(trackingType);
+            runtime.setTemplateCode(templateCode);
             return runtime;
         } catch (IOException e) {
-            throw new TrackingException("读取跟踪运行态失败: " + runtimeKey(unitCode, trackingType), e);
+            throw new TrackingException("读取跟踪运行态失败: "
+                    + runtimeKey(unitCode, trackingType, templateCode), e);
         }
     }
 
@@ -238,6 +267,7 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
     private Map<TrackingType, Class<? extends TrackingConfig>> configTypes() {
         Map<TrackingType, Class<? extends TrackingConfig>> types = new EnumMap<>(TrackingType.class);
         types.put(TrackingType.PROCESS, ProcessTrackingConfig.class);
+        types.put(TrackingType.BATCH, BatchTrackingConfig.class);
         return types;
     }
 
@@ -247,6 +277,7 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
     private Map<TrackingType, Class<? extends TrackingRuntime>> runtimeTypes() {
         Map<TrackingType, Class<? extends TrackingRuntime>> types = new EnumMap<>(TrackingType.class);
         types.put(TrackingType.PROCESS, ProcessTrackingRuntime.class);
+        types.put(TrackingType.BATCH, BatchTrackingRuntime.class);
         return types;
     }
 

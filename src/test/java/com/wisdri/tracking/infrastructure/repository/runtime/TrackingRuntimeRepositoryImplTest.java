@@ -3,6 +3,7 @@ package com.wisdri.tracking.infrastructure.repository.runtime;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.batch.BatchTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
+import com.wisdri.tracking.domain.model.runtime.batch.BatchTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessSegmentRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
@@ -67,6 +68,7 @@ class TrackingRuntimeRepositoryImplTest {
 
         String json = redis.get("tracking:cp1:process:runtime");
         assertTrue(json.contains("\"head_length\""));
+        assertFalse(json.contains("template_code"));
 
         TrackingRuntimeRepositoryImpl restartedRepository = repository();
         ProcessTrackingRuntime restored = restartedRepository.findRuntimeAs(
@@ -74,6 +76,26 @@ class TrackingRuntimeRepositoryImplTest {
         ).orElseThrow(AssertionError::new);
         assertEquals("C001", restored.getSegments().get("S1").getCoilNo());
         assertEquals(new BigDecimal("12.30"), restored.getSegments().get("S1").getHeadLength());
+    }
+
+    @Test
+    void isolatesBatchRuntimeByTemplateCode() {
+        TrackingRuntimeRepositoryImpl repository = repository();
+        BatchTrackingRuntime fb1 = batchRuntime("fb1", "N001");
+        BatchTrackingRuntime fb2 = batchRuntime("fb2", "N002");
+
+        repository.saveRuntime(fb1);
+        repository.saveRuntime(fb2);
+
+        assertTrue(redis.containsKey("tracking:baf1:batch:fb1:runtime"));
+        assertTrue(redis.containsKey("tracking:baf1:batch:fb2:runtime"));
+        TrackingRuntimeRepositoryImpl restartedRepository = repository();
+        BatchTrackingRuntime restored = restartedRepository.findRuntimeAs(
+                "BAF1", TrackingType.BATCH, "fb1", BatchTrackingRuntime.class
+        ).orElseThrow(AssertionError::new);
+        assertEquals("fb1", restored.getTemplateCode());
+        assertEquals(new BigDecimal("1"), restored.getProductionStatus());
+        assertEquals("N001", restored.getCoilNos().get("north"));
     }
 
     @Test
@@ -175,6 +197,17 @@ class TrackingRuntimeRepositoryImplTest {
                 .trackingType(TrackingType.PROCESS)
                 .updatedAt(Instant.now())
                 .segments(Collections.singletonMap("S1", segment))
+                .build();
+    }
+
+    private BatchTrackingRuntime batchRuntime(String templateCode, String coilNo) {
+        return BatchTrackingRuntime.builder()
+                .unitCode("BAF1")
+                .trackingType(TrackingType.BATCH)
+                .templateCode(templateCode)
+                .productionStatus(BigDecimal.ONE)
+                .coilNos(Collections.singletonMap("north", coilNo))
+                .updatedAt(Instant.now())
                 .build();
     }
 

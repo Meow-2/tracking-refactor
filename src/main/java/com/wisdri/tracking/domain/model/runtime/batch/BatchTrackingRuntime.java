@@ -19,11 +19,6 @@ import java.util.Map;
 @EqualsAndHashCode(callSuper = true)
 public class BatchTrackingRuntime extends TrackingRuntime {
     /**
-     * 当前运行态所属的模板实例编码，例如 fb1。
-     */
-    private String templateCode;
-
-    /**
      * 最近一帧读取到的生产状态值。
      */
     private BigDecimal productionStatus;

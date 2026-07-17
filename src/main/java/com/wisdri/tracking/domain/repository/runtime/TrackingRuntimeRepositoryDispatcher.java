@@ -48,6 +48,16 @@ public class TrackingRuntimeRepositoryDispatcher {
     }
 
     /**
+     * 从对应仓储读取指定模板实例的算法运行态。
+     */
+    public Optional<TrackingRuntime> findRuntime(String unitCode,
+                                                  TrackingType trackingType,
+                                                  String templateCode) {
+        return repository(trackingType)
+                .flatMap(repository -> repository.findRuntime(unitCode, trackingType, templateCode));
+    }
+
+    /**
      * 按指定运行态类型读取算法运行态。
      */
     public <T extends TrackingRuntime> Optional<T> findRuntimeAs(String unitCode,
@@ -55,6 +65,18 @@ public class TrackingRuntimeRepositoryDispatcher {
                                                                  Class<T> runtimeType) {
         return repository(trackingType)
                 .flatMap(repository -> repository.findRuntimeAs(unitCode, trackingType, runtimeType));
+    }
+
+    /**
+     * 按指定运行态类型读取模板实例运行态。
+     */
+    public <T extends TrackingRuntime> Optional<T> findRuntimeAs(String unitCode,
+                                                                 TrackingType trackingType,
+                                                                 String templateCode,
+                                                                 Class<T> runtimeType) {
+        return repository(trackingType)
+                .flatMap(repository -> repository.findRuntimeAs(
+                        unitCode, trackingType, templateCode, runtimeType));
     }
 
     /**
