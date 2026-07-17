@@ -2,7 +2,7 @@ package com.wisdri.tracking.infrastructure.service.feign.converter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
-import com.wisdri.tracking.domain.model.config.process.PointDataType;
+import com.wisdri.tracking.domain.model.config.PointDataType;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeResponse;

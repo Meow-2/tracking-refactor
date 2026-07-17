@@ -1,0 +1,55 @@
+{
+  "enable": true,
+  "template": {
+    "code": "fb{index}",
+    "index_from": 1,
+    "index_to": 36
+  },
+  "mqtt_topic": "baf1_batch_tracking_{template}",
+  "tracking": {
+    "point_prefix": "/aygg_tracking/baf1/batch/{template}/tracking/{template}_",
+    "start_condition": {
+      "point": {
+        "name": "prod_status",
+        "type": "int"
+      },
+      "threshold": 0
+    },
+    "point": [
+      {
+        "segment": "north",
+        "coil_no": {
+          "name": "north_coil_no",
+          "type": "string"
+        }
+      },
+      {
+        "segment": "south",
+        "coil_no": {
+          "name": "south_coil_no",
+          "type": "string"
+        }
+      }
+    ]
+  },
+  "segments": [
+    {
+      "point_prefix": "/aygg_tracking/baf1/batch/{template}/south/{template}_south_",
+      "cube_parsing_prefix": "{template}_south_",
+      "code": "south",
+      "name": "南侧"
+    },
+    {
+      "point_prefix": "/aygg_tracking/baf1/batch/{template}/north/{template}_north_",
+      "cube_parsing_prefix": "{template}_north_",
+      "code": "north",
+      "name": "北侧"
+    },
+    {
+      "point_prefix": "/aygg_tracking/baf1/batch/{template}/common/{template}_",
+      "cube_parsing_prefix": "{template}_",
+      "code": "common",
+      "name": "公共"
+    }
+  ]
+}

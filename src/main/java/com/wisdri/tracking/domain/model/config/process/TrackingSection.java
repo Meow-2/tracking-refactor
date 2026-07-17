@@ -1,5 +1,8 @@
 package com.wisdri.tracking.domain.model.config.process;
 
+import com.wisdri.tracking.domain.model.config.PointConfig;
+import com.wisdri.tracking.domain.model.config.StartCondition;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

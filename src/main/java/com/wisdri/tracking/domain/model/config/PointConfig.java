@@ -1,4 +1,4 @@
-package com.wisdri.tracking.domain.model.config.process;
+package com.wisdri.tracking.domain.model.config;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 点位配置。
+ * 跟踪点位配置。
  */
 @Data
 @Builder

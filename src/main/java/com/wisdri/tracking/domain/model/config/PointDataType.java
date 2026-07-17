@@ -1,4 +1,4 @@
-package com.wisdri.tracking.domain.model.config.process;
+package com.wisdri.tracking.domain.model.config;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
@@ -8,7 +8,7 @@ import lombok.RequiredArgsConstructor;
 import java.util.Locale;
 
 /**
- * 点位数据类型。
+ * 跟踪点位数据类型。
  */
 @Getter
 @RequiredArgsConstructor
@@ -26,6 +26,9 @@ public enum PointDataType {
         return code;
     }
 
+    /**
+     * 忽略大小写解析 JSON 中的点位类型编码。
+     */
     @JsonCreator
     public static PointDataType fromCode(String code) {
         if (code == null) {

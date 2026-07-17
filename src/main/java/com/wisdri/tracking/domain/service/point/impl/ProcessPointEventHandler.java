@@ -1,7 +1,7 @@
 package com.wisdri.tracking.domain.service.point.impl;
 
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
-import com.wisdri.tracking.domain.model.config.process.PointConfig;
+import com.wisdri.tracking.domain.model.config.PointConfig;
 import com.wisdri.tracking.domain.model.config.process.TrackingPointGroup;
 import com.wisdri.tracking.domain.model.point.PointEvent;
 import com.wisdri.tracking.domain.model.point.PointEventType;

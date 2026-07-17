@@ -1,7 +1,7 @@
 package com.wisdri.tracking.domain.service.tracking.impl;
 
 import com.wisdri.tracking.domain.model.config.process.LengthMode;
-import com.wisdri.tracking.domain.model.config.process.PointConfig;
+import com.wisdri.tracking.domain.model.config.PointConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.SegmentConfig;
 import com.wisdri.tracking.domain.model.config.process.TrackingPointGroup;

@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 public enum TrackingType {
 
     PROCESS("process","过程跟踪"),
+    BATCH("batch", "批次跟踪"),
     SHEAR("shear","剪切跟踪"),
     UNCOILER("uncoiler","开卷跟踪"),
     WELDING("welding","焊接跟踪"),
