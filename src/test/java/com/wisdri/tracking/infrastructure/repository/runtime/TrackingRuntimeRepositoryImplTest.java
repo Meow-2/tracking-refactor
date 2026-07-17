@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class TrackingRuntimeRepositoryImplTest {
@@ -152,7 +153,7 @@ class TrackingRuntimeRepositoryImplTest {
     }
 
     @Test
-    void ignoresConvertedTrackingTypeUntilRepositorySupportIsActivated() {
+    void synchronizesProcessAndBatchConfigsAfterBatchSupportIsActivated() {
         TrackingRuntimeRepositoryImpl repository = repository();
         CubeApiGateway cubeApiGateway = mock(CubeApiGateway.class);
         TrackingResultRepositoryDispatcher dispatcher = mock(TrackingResultRepositoryDispatcher.class);
@@ -177,7 +178,12 @@ class TrackingRuntimeRepositoryImplTest {
         repository.refreshConfig();
 
         assertTrue(redis.containsKey("tracking:baf1:process:config"));
-        assertFalse(redis.containsKey("tracking:baf1:batch:config"));
+        assertTrue(redis.containsKey("tracking:baf1:batch:config"));
+        assertTrue(repository.findConfigAs(
+                "BAF1", TrackingType.BATCH, BatchTrackingConfig.class
+        ).isPresent());
+        verify(dispatcher).createTable(process);
+        verify(dispatcher).createTable(batch);
     }
 
     private TrackingRuntimeRepositoryImpl repository() {

@@ -81,11 +81,11 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
     private TrackingResultRepositoryDispatcher trackingResultRepositoryDispatcher;
 
     /**
-     * 当前仓储负责过程跟踪。
+     * 当前仓储负责过程跟踪和批次跟踪。
      */
     @Override
     public boolean support(TrackingType trackingType) {
-        return TrackingType.PROCESS == trackingType;
+        return TrackingType.PROCESS == trackingType || TrackingType.BATCH == trackingType;
     }
 
     /**
@@ -164,7 +164,7 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
         Map<TrackingType, TrackingConfig> fetchedConfigs = cubeApiGateway.fetchTrackingConfigs();
         Map<TrackingType, TrackingConfig> supportedConfigs = new EnumMap<>(TrackingType.class);
         for (Map.Entry<TrackingType, TrackingConfig> entry : fetchedConfigs.entrySet()) {
-            // 分层接入期间只同步当前仓储已经完整支持的类型，避免半成品配置进入运行链路。
+            // 只同步已经完整接入配置、算法和结果存储的跟踪类型。
             if (!support(entry.getKey())) {
                 continue;
             }
