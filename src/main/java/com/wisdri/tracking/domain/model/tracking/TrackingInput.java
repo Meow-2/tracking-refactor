@@ -27,6 +27,11 @@ public class TrackingInput {
     private TrackingType trackingType;
 
     /**
+     * 模板实例编码，批次跟踪使用，例如 fb1；其他跟踪类型为空。
+     */
+    private String templateCode;
+
+    /**
      * 最新点位快照。
      */
     private PointSnapshot latestSnapshot;
@@ -42,6 +47,7 @@ public class TrackingInput {
         return TrackingInput.builder()
                 .unitCode(task.getUnitCode())
                 .trackingType(task.getTrackingType())
+                .templateCode(task.getTemplateCode())
                 .latestSnapshot(task.getLatestSnapshot())
                 .previousSnapshot(task.getPreviousSnapshot())
                 .build();

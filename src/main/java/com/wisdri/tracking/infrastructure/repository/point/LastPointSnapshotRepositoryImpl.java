@@ -44,7 +44,14 @@ public class LastPointSnapshotRepositoryImpl implements LastPointSnapshotReposit
      */
     @Override
     public Optional<PointSnapshot> find(String unitCode, TrackingType trackingType) {
-        String key = snapshotKey(unitCode, trackingType);
+        return find(unitCode, trackingType, null);
+    }
+
+    @Override
+    public Optional<PointSnapshot> find(String unitCode,
+                                        TrackingType trackingType,
+                                        String templateCode) {
+        String key = snapshotKey(unitCode, trackingType, templateCode);
         String json = stringRedisTemplate.opsForValue().get(key);
         if (json == null || json.trim().isEmpty()) {
             return Optional.empty();
@@ -61,7 +68,15 @@ public class LastPointSnapshotRepositoryImpl implements LastPointSnapshotReposit
      */
     @Override
     public void save(String unitCode, TrackingType trackingType, PointSnapshot snapshot) {
-        String key = snapshotKey(unitCode, trackingType);
+        save(unitCode, trackingType, null, snapshot);
+    }
+
+    @Override
+    public void save(String unitCode,
+                     TrackingType trackingType,
+                     String templateCode,
+                     PointSnapshot snapshot) {
+        String key = snapshotKey(unitCode, trackingType, templateCode);
         try {
             stringRedisTemplate.opsForValue().set(key, JsonUtils.toPrettyJson(objectMapper, snapshot));
         } catch (IOException e) {
@@ -73,6 +88,10 @@ public class LastPointSnapshotRepositoryImpl implements LastPointSnapshotReposit
      * 构造 Redis 上一条点位快照 key。
      */
     private String snapshotKey(String unitCode, TrackingType trackingType) {
-        return RedisKeys.lastPointSnapshot(unitCode, trackingType);
+        return snapshotKey(unitCode, trackingType, null);
+    }
+
+    private String snapshotKey(String unitCode, TrackingType trackingType, String templateCode) {
+        return RedisKeys.lastPointSnapshot(unitCode, trackingType, templateCode);
     }
 }

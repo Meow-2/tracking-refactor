@@ -27,8 +27,8 @@ public class TrackingTaskProducer {
     /**
      * 发送跟踪任务，同一机组同一跟踪类型保持 FIFO 顺序。
      * <p>
-     * RocketMQ FIFO 消息按 orderKey 分组有序，因此这里使用 unitCode + trackingType
-     * 作为顺序键，保证同一个 topic 对应的任务不会被并发乱序消费。
+     * RocketMQ FIFO 消息按 orderKey 分组有序。模板化跟踪额外使用 templateCode，
+     * 保证单模板实例有序，同时允许不同模板实例并行消费。
      */
     public void send(TrackingTask task) {
         rocketMQClientTemplate.syncSendFifoMessage(
@@ -49,6 +49,10 @@ public class TrackingTaskProducer {
      * 构造 RocketMQ FIFO 顺序键。
      */
     private String orderKey(TrackingTask task) {
-        return task.getUnitCode() + ":" + task.getTrackingType().getCode();
+        String orderKey = task.getUnitCode() + ":" + task.getTrackingType().getCode();
+        if (task.getTemplateCode() == null || task.getTemplateCode().trim().isEmpty()) {
+            return orderKey;
+        }
+        return orderKey + ":" + task.getTemplateCode();
     }
 }

@@ -17,7 +17,26 @@ public interface LastPointSnapshotRepository {
     Optional<PointSnapshot> find(String unitCode, TrackingType trackingType);
 
     /**
+     * 查询指定模板实例的上一条点位快照。
+     */
+    default Optional<PointSnapshot> find(String unitCode,
+                                         TrackingType trackingType,
+                                         String templateCode) {
+        return find(unitCode, trackingType);
+    }
+
+    /**
      * 保存指定机组和跟踪类型的最新点位快照，供下一次消息处理使用。
      */
     void save(String unitCode, TrackingType trackingType, PointSnapshot snapshot);
+
+    /**
+     * 保存指定模板实例的最新点位快照。
+     */
+    default void save(String unitCode,
+                      TrackingType trackingType,
+                      String templateCode,
+                      PointSnapshot snapshot) {
+        save(unitCode, trackingType, snapshot);
+    }
 }

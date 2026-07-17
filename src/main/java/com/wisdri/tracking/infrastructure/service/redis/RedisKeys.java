@@ -14,6 +14,7 @@ public final class RedisKeys {
     private static final String TRACKING_CONFIG_PATTERN = "tracking:%s:%s:config";
     private static final String TRACKING_RUNTIME_PATTERN = "tracking:%s:%s:runtime";
     private static final String LAST_POINT_SNAPSHOT_PATTERN = "tracking:%s:%s:lastdata";
+    private static final String TEMPLATE_LAST_POINT_SNAPSHOT_PATTERN = "tracking:%s:%s:%s:lastdata";
 
     /**
      * 跟踪配置 key。
@@ -34,6 +35,19 @@ public final class RedisKeys {
      */
     public static String lastPointSnapshot(String unitCode, TrackingType trackingType) {
         return String.format(LAST_POINT_SNAPSHOT_PATTERN, normalize(unitCode), normalize(trackingType.getCode()));
+    }
+
+    /**
+     * 按模板实例构造上一条快照 key；模板为空时保持原有 key 格式。
+     */
+    public static String lastPointSnapshot(String unitCode,
+                                           TrackingType trackingType,
+                                           String templateCode) {
+        if (templateCode == null || templateCode.trim().isEmpty()) {
+            return lastPointSnapshot(unitCode, trackingType);
+        }
+        return String.format(TEMPLATE_LAST_POINT_SNAPSHOT_PATTERN,
+                normalize(unitCode), normalize(trackingType.getCode()), normalize(templateCode));
     }
 
     private static String normalize(String value) {

@@ -11,6 +11,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.repository.point.LastPointSnapshotRepository;
 import com.wisdri.tracking.infrastructure.service.mqtt.MqttSubscriptionRegistry;
+import com.wisdri.tracking.infrastructure.dto.mqtt.TrackingSubscription;
 import com.wisdri.tracking.infrastructure.service.rocketmq.TrackingTaskProducer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -66,14 +67,15 @@ public class TrackingTaskProducerUseCase {
      * payload 必须是 JSON object，并会被解析为 PointSnapshot。
      */
     public void handle(String topic, String payload) {
-        Optional<TrackingConfig> configOptional = mqttSubscriptionRegistry.find(topic);
-        if (!configOptional.isPresent()) {
+        Optional<TrackingSubscription> subscriptionOptional = mqttSubscriptionRegistry.find(topic);
+        if (!subscriptionOptional.isPresent()) {
             log.warn("收到未注册的 MQTT 跟踪消息，topic={}", topic);
             return;
         }
-        TrackingConfig config = configOptional.get();
+        TrackingSubscription subscription = subscriptionOptional.get();
+        TrackingConfig config = subscription.getConfig();
         PointSnapshot latestSnapshot = parse(payload);
-        produce(config.getUnitCode(), config.getTrackingType(), latestSnapshot);
+        produce(config.getUnitCode(), config.getTrackingType(), subscription.getTemplateCode(), latestSnapshot);
     }
 
     /**
@@ -83,20 +85,26 @@ public class TrackingTaskProducerUseCase {
      * 任务中同时携带上一帧快照和当前快照，供后续跟踪算法计算增量状态；
      * 发送成功后再保存当前快照，作为下一条消息的 previousSnapshot。
      */
-    private void produce(String unitCode, TrackingType trackingType, PointSnapshot latestSnapshot) {
+    private void produce(String unitCode,
+                         TrackingType trackingType,
+                         String templateCode,
+                         PointSnapshot latestSnapshot) {
         Optional<TrackingConfig> configOptional = runtimeRepositoryDispatcher.findConfig(unitCode, trackingType);
         if (!configOptional.isPresent() || !Boolean.TRUE.equals(configOptional.get().getEnable())) {
             return;
         }
-        PointSnapshot previousSnapshot = lastPointSnapshotRepository.find(unitCode, trackingType).orElse(null);
+        PointSnapshot previousSnapshot = lastPointSnapshotRepository
+                .find(unitCode, trackingType, templateCode)
+                .orElse(null);
         TrackingTask task = TrackingTask.builder()
                 .unitCode(unitCode)
                 .trackingType(trackingType)
+                .templateCode(templateCode)
                 .latestSnapshot(latestSnapshot)
                 .previousSnapshot(previousSnapshot)
                 .publishedAt(Instant.now())
                 .build();
-        lastPointSnapshotRepository.save(unitCode, trackingType, latestSnapshot);
+        lastPointSnapshotRepository.save(unitCode, trackingType, templateCode, latestSnapshot);
         trackingTaskProducer.send(task);
     }
 
