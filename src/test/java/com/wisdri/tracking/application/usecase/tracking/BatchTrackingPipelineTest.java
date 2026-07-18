@@ -14,6 +14,7 @@ import com.wisdri.tracking.domain.model.tracking.batch.BatchResult;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepository;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepositoryDispatcher;
+import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithmDispatcher;
 import com.wisdri.tracking.domain.service.tracking.impl.BatchTrackingAlgorithmImpl;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,8 @@ class BatchTrackingPipelineTest {
 
         BatchTrackingAlgorithmImpl batchAlgorithm = new BatchTrackingAlgorithmImpl();
         ReflectionTestUtils.setField(batchAlgorithm, "runtimeRepositoryDispatcher", runtimeDispatcher);
+        ReflectionTestUtils.setField(batchAlgorithm, "pointEventHandlerDispatcher",
+                mock(PointEventHandlerDispatcher.class));
         TrackingAlgorithmDispatcher algorithmDispatcher = new TrackingAlgorithmDispatcher();
         ReflectionTestUtils.setField(algorithmDispatcher, "algorithms", Collections.singletonList(batchAlgorithm));
 

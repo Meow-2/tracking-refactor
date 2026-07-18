@@ -13,6 +13,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.batch.BatchResult;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
+import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -43,13 +44,16 @@ class BatchTrackingAlgorithmImplTest {
     private static final Instant RECEIVED_AT = Instant.parse("2026-07-17T08:00:00Z");
 
     private TrackingRuntimeRepositoryDispatcher runtimeRepositoryDispatcher;
+    private PointEventHandlerDispatcher pointEventHandlerDispatcher;
     private BatchTrackingAlgorithmImpl algorithm;
 
     @BeforeEach
     void setUp() {
         runtimeRepositoryDispatcher = mock(TrackingRuntimeRepositoryDispatcher.class);
+        pointEventHandlerDispatcher = mock(PointEventHandlerDispatcher.class);
         algorithm = new BatchTrackingAlgorithmImpl();
         ReflectionTestUtils.setField(algorithm, "runtimeRepositoryDispatcher", runtimeRepositoryDispatcher);
+        ReflectionTestUtils.setField(algorithm, "pointEventHandlerDispatcher", pointEventHandlerDispatcher);
         when(runtimeRepositoryDispatcher.findConfigAs(
                 "BAF1", TrackingType.BATCH, BatchTrackingConfig.class
         )).thenReturn(Optional.of(config()));
@@ -77,6 +81,7 @@ class BatchTrackingAlgorithmImplTest {
         assertEquals(10, north.getParameters().get("common_only"));
         assertEquals(20, north.getParameters().get("north_only"));
         assertEquals(RECEIVED_AT, north.getReceivedAt());
+        verify(pointEventHandlerDispatcher).handle(any(TrackingInput.class), any(BatchTrackingConfig.class));
 
         BatchResult south = results.get(1);
         assertEquals("south", south.getSegmentCode());

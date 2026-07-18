@@ -12,6 +12,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.batch.BatchResult;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
+import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
 import org.springframework.stereotype.Component;
@@ -45,6 +46,12 @@ public class BatchTrackingAlgorithmImpl implements TrackingAlgorithm<BatchResult
     private TrackingRuntimeRepositoryDispatcher runtimeRepositoryDispatcher;
 
     /**
+     * 点位事件处理分发器。
+     */
+    @Resource
+    private PointEventHandlerDispatcher pointEventHandlerDispatcher;
+
+    /**
      * 支持批次跟踪。
      */
     @Override
@@ -65,6 +72,7 @@ public class BatchTrackingAlgorithmImpl implements TrackingAlgorithm<BatchResult
         }
 
         BatchTrackingConfig config = configOptional.get();
+        pointEventHandlerDispatcher.handle(input, config);
         PointSnapshot latest = input.getLatestSnapshot();
         BigDecimal productionStatus = productionStatus(latest, config.getTracking(), input.getTemplateCode());
         Map<String, String> coilNos = coilNos(latest, config.getTracking(), input.getTemplateCode());
