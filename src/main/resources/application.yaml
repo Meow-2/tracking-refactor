@@ -19,7 +19,7 @@ spring:
 
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
-  type-aliases-package: com.wisdri.tracking
+  type-aliases-package: com.wisdri.tracking.infrastructure.dto.postgres
   global-config:
     banner: false
     db-config:
