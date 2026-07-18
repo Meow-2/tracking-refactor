@@ -38,6 +38,7 @@ import static org.mockito.Mockito.verify;
 
 class BatchTrackingResultRepositoryImplTest {
     private static final Instant RECEIVED_AT = Instant.parse("2026-07-17T08:00:00Z");
+    private static final long NORTH_TIMESTAMP = RECEIVED_AT.toEpochMilli() + 1;
 
     private TimeSeriesStorageGateway gateway;
     private BatchTrackingResultRepositoryImpl repository;
@@ -62,8 +63,8 @@ class BatchTrackingResultRepositoryImplTest {
         TimeSeriesTableRequest request = captor.getValue();
         assertEquals("baf1_batch", request.getMeasurement());
         assertEquals("tracking_db", request.getBucket());
-        assertRule(request.getRule(), "fb_code", "string", true);
-        assertRule(request.getRule(), "segment_code", "string", true);
+        assertRule(request.getRule(), "fb_code", "string", false);
+        assertRule(request.getRule(), "segment_code", "string", false);
         assertRule(request.getRule(), "coil_no", "string", false);
         assertRule(request.getRule(), "prod_status", "float", false);
         assertRule(request.getRule(), "shared", "string", true);
@@ -84,13 +85,17 @@ class BatchTrackingResultRepositoryImplTest {
         ArgumentCaptor<TimeSeriesDataRequest> captor = ArgumentCaptor.forClass(TimeSeriesDataRequest.class);
         verify(gateway, times(2)).saveColumn(eq("baf1_batch"), captor.capture());
         TimeSeriesDataRequest northRequest = captor.getAllValues().get(0);
-        assertEquals(RECEIVED_AT.toEpochMilli(), northRequest.getTimestamp());
-        assertValue(northRequest.getValues(), "fb_code", "fb1", true);
-        assertValue(northRequest.getValues(), "segment_code", "north", true);
-        assertValue(northRequest.getValues(), "coil_no", "N001", false);
-        assertValue(northRequest.getValues(), "prod_status", new BigDecimal("1"), false);
-        assertValue(northRequest.getValues(), "shared", "north-value", true);
+        assertEquals(NORTH_TIMESTAMP, northRequest.getTimestamp());
+        assertValue(northRequest.getValues(), "fb_code", "fb1", false, NORTH_TIMESTAMP);
+        assertValue(northRequest.getValues(), "segment_code", "north", false, NORTH_TIMESTAMP);
+        assertValue(northRequest.getValues(), "coil_no", "N001", false, NORTH_TIMESTAMP);
+        assertValue(northRequest.getValues(), "prod_status", new BigDecimal("1"), false, NORTH_TIMESTAMP);
+        assertValue(northRequest.getValues(), "shared", "north-value", true, NORTH_TIMESTAMP);
         assertFalse(northRequest.getValues().stream().anyMatch(value -> "empty".equals(value.getId())));
+
+        TimeSeriesDataRequest southRequest = captor.getAllValues().get(1);
+        assertEquals(RECEIVED_AT.toEpochMilli(), southRequest.getTimestamp());
+        assertValue(southRequest.getValues(), "segment_code", "south", false);
     }
 
     @Test
@@ -160,6 +165,14 @@ class BatchTrackingResultRepositoryImplTest {
                              String id,
                              Object expected,
                              boolean tag) {
+        assertValue(values, id, expected, tag, RECEIVED_AT.toEpochMilli());
+    }
+
+    private void assertValue(List<TimeSeriesDataValue> values,
+                             String id,
+                             Object expected,
+                             boolean tag,
+                             long expectedTimestamp) {
         TimeSeriesDataValue value = values.stream()
                 .filter(candidate -> id.equals(candidate.getId()))
                 .findFirst()
@@ -167,6 +180,6 @@ class BatchTrackingResultRepositoryImplTest {
         assertEquals(expected, value.getV());
         assertEquals(tag, value.getIsTag());
         assertTrue(value.getQ());
-        assertEquals(RECEIVED_AT.toEpochMilli(), value.getT());
+        assertEquals(expectedTimestamp, value.getT());
     }
 }

@@ -31,15 +31,16 @@ import java.util.Map;
 /**
  * 批次跟踪结果时序仓储。
  * <p>
- * 同一机组的所有模板实例和南北侧共用一张表，通过 fb_code、segment_code 两个 tag 区分。
+ * 同一机组的所有模板实例和南北侧共用一张表，通过 fb_code、segment_code 两个字段区分。
  */
 @Repository
 public class BatchTrackingResultRepositoryImpl
         implements TrackingResultRepository<BatchTrackingConfig, BatchResult> {
+    private static final String NORTH_SEGMENT = "north";
     private static final List<String> DYNAMIC_SEGMENT_ORDER = Arrays.asList("common", "north", "south");
     private static final List<TimeSeriesTableRule> FIXED_COLUMNS = Arrays.asList(
-            tableRule("fb_code", TimeSeriesDataType.STRING.getCode(), true),
-            tableRule("segment_code", TimeSeriesDataType.STRING.getCode(), true),
+            tableRule("fb_code", TimeSeriesDataType.STRING.getCode(), false),
+            tableRule("segment_code", TimeSeriesDataType.STRING.getCode(), false),
             tableRule("coil_no", TimeSeriesDataType.STRING.getCode(), false),
             tableRule("prod_status", TimeSeriesDataType.FLOAT.getCode(), false)
     );
@@ -142,7 +143,7 @@ public class BatchTrackingResultRepositoryImpl
     }
 
     private TimeSeriesDataRequest batchRequest(BatchResult result) {
-        Long timestamp = timestamp(result.getReceivedAt());
+        Long timestamp = timestamp(result);
         TimeSeriesDataRequest request = new TimeSeriesDataRequest();
         request.setTimestamp(timestamp);
         request.setIsSameDeviceTime(true);
@@ -152,8 +153,8 @@ public class BatchTrackingResultRepositoryImpl
 
     private List<TimeSeriesDataValue> batchValues(BatchResult result, Long timestamp) {
         List<TimeSeriesDataValue> values = new ArrayList<>();
-        add(values, "fb_code", result.getTemplateCode(), true, timestamp);
-        add(values, "segment_code", result.getSegmentCode(), true, timestamp);
+        add(values, "fb_code", result.getTemplateCode(), false, timestamp);
+        add(values, "segment_code", result.getSegmentCode(), false, timestamp);
         add(values, "coil_no", result.getCoilNo(), false, timestamp);
         add(values, "prod_status", result.getProductionStatus(), false, timestamp);
         if (result.getParameters() != null) {
@@ -181,8 +182,16 @@ public class BatchTrackingResultRepositoryImpl
         return unitCode.toLowerCase(Locale.ROOT) + "_batch";
     }
 
-    private Long timestamp(Instant instant) {
-        return instant == null ? null : instant.toEpochMilli();
+    /**
+     * north 在原始 MQTT 接收时间上增加 1ms，避免与同帧 south 使用相同主时间戳而相互覆盖。
+     */
+    private Long timestamp(BatchResult result) {
+        Instant receivedAt = result == null ? null : result.getReceivedAt();
+        if (receivedAt == null) {
+            return null;
+        }
+        long timestamp = receivedAt.toEpochMilli();
+        return NORTH_SEGMENT.equalsIgnoreCase(result.getSegmentCode()) ? timestamp + 1 : timestamp;
     }
 
     private static TimeSeriesTableRule tableRule(String id, String datatype, boolean tag) {
