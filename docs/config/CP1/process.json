@@ -97,5 +97,28 @@
         }
       }
     ]
-  }
+  },
+  "segments": [
+    {
+      "name": "NOF段",
+      "code": "nof",
+      "point_prefix": "/aygg_tracking/cp1/process/tech/nof/",
+      "length_correct": -70.822,
+      "length_array_index": 1,
+      "points": [
+        {
+          "name": "nof1_furnace_temp_pv",
+          "type": "float"
+        },
+        {
+          "name": "nof2_furnace_temp_pv",
+          "type": "float"
+        },
+        {
+          "name": "nof3_furnace_temp_pv",
+          "type": "float"
+        }
+      ]
+    }
+  ]
 }
