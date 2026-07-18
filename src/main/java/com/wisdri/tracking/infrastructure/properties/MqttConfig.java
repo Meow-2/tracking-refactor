@@ -54,6 +54,11 @@ public class MqttConfig {
     private Boolean cleanSession = false;
 
     /**
+     * 连接断开后是否由 Paho 自动重连。
+     */
+    private Boolean automaticReconnect = true;
+
+    /**
      * 连接超时时间，单位秒。
      */
     private Integer connectionTimeout = 10;
@@ -86,6 +91,7 @@ public class MqttConfig {
         MqttConnectOptions options = new MqttConnectOptions();
         options.setServerURIs(new String[]{url});
         options.setCleanSession(Boolean.TRUE.equals(cleanSession));
+        options.setAutomaticReconnect(Boolean.TRUE.equals(automaticReconnect));
         options.setConnectionTimeout(connectionTimeout);
         options.setKeepAliveInterval(keepAliveInterval);
         if (username != null && !username.trim().isEmpty()) {

@@ -33,6 +33,7 @@ mqtt:
   completion-timeout: 3000
   qos: 1
   clean-session: true
+  automatic-reconnect: true
   connection-timeout: 10
   keep-alive-interval: 20
 
