@@ -76,7 +76,9 @@ class ProcessTrackingAlgorithmImplTest {
         ProcessTrackingRuntime populated = (ProcessTrackingRuntime) captor.getAllValues().get(0);
         assertEquals("C001", populated.getSegments().get("S1").getCoilNo());
         assertEquals(new BigDecimal("15.5"), populated.getSegments().get("S1").getHeadLength());
-        verify(trackingStepLogger, times(2)).log(any(TrackingInput.class),
+        assertEquals(new BigDecimal("2.5"), populated.getSpeedPointValue());
+        assertEquals(BigDecimal.ONE, populated.getStartConditionPointValue());
+        verify(trackingStepLogger).log(any(TrackingInput.class),
                 eq("区段候选钢卷评估"), eq("S1"), anyMap());
         verify(trackingStepLogger).log(any(TrackingInput.class),
                 eq("区段结果生成"), eq("S1"), anyMap());
@@ -106,6 +108,13 @@ class ProcessTrackingAlgorithmImplTest {
                 eq("启动条件检查"), details.capture());
         assertEquals(false, details.getValue().get("passed"));
         assertEquals(BigDecimal.ZERO, details.getValue().get("actual"));
+
+        ArgumentCaptor<TrackingRuntime> runtime = ArgumentCaptor.forClass(TrackingRuntime.class);
+        verify(runtimeRepositoryDispatcher).saveRuntime(runtime.capture());
+        ProcessTrackingRuntime saved = (ProcessTrackingRuntime) runtime.getValue();
+        assertEquals(new BigDecimal("2.5"), saved.getSpeedPointValue());
+        assertEquals(BigDecimal.ZERO, saved.getStartConditionPointValue());
+        assertTrue(saved.getSegments().isEmpty());
     }
 
     private ProcessTrackingConfig config() {
@@ -116,6 +125,11 @@ class ProcessTrackingAlgorithmImplTest {
                 .length(Collections.singletonList(lengthPoint))
                 .build();
         TrackingSection tracking = TrackingSection.builder()
+                .speedPoint(PointConfig.builder().name("speed").build())
+                .startCondition(StartCondition.builder()
+                        .point(PointConfig.builder().name("status").build())
+                        .threshold(BigDecimal.ONE)
+                        .build())
                 .lengthMode(LengthMode.COILER)
                 .points(Collections.singletonList(group))
                 .build();
@@ -147,6 +161,8 @@ class ProcessTrackingAlgorithmImplTest {
         Map<String, Object> values = new HashMap<>();
         values.put("coil", coilNo);
         values.put("length", length);
+        values.put("speed", new BigDecimal("2.5"));
+        values.put("status", BigDecimal.ONE);
         return values;
     }
 }

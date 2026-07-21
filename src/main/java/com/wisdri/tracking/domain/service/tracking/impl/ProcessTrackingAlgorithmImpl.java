@@ -85,7 +85,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                         ? configOptional.get().getTracking().getLengthMode() : null
         ));
         if (!configOptional.isPresent()) {
-            return complete(input, startedAt, "缺少跟踪配置", new ArrayList<>());
+            return complete(input, startedAt, "缺少跟踪配置", null, new ArrayList<>());
         }
         ProcessTrackingConfig config = configOptional.get();
 
@@ -96,7 +96,8 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
         // 校验最新快照和启动条件，未达到计算条件时不生成结果。
         PointSnapshot latest = input.getLatestSnapshot();
         if (latest == null || config.getTracking() == null) {
-            return complete(input, startedAt, "缺少点位快照或跟踪配置", new ArrayList<>());
+            return complete(input, startedAt, "缺少点位快照或跟踪配置",
+                    config.getTracking(), new ArrayList<>());
         }
         TrackingSection tracking = config.getTracking();
         StartCondition condition = tracking.getStartCondition();
@@ -109,7 +110,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                 "passed", conditionReached
         ));
         if (!conditionReached) {
-            return complete(input, startedAt, "未达到启动条件", new ArrayList<>());
+            return complete(input, startedAt, "未达到启动条件", tracking, new ArrayList<>());
         }
 
         // 过滤有效钢卷点位组，后续每个工艺段基于同一组候选点位选择当前钢卷。
@@ -120,7 +121,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
         ));
         List<ProcessResult> results = new ArrayList<>();
         if (config.getSegments() == null) {
-            return complete(input, startedAt, "segments_missing", results);
+            return complete(input, startedAt, "segments_missing", tracking, results);
         }
 
         // 按工艺段逐段选择钢卷并组装跟踪结果。
@@ -158,25 +159,29 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                             "parameters", parameters
                     ));
         }
-        return complete(input, startedAt, results.isEmpty() ? "未选中任何区段结果" : null, results);
+        return complete(input, startedAt, results.isEmpty() ? "未选中任何区段结果" : null,
+                tracking, results);
     }
 
     private List<ProcessResult> complete(TrackingInput input,
                                          long startedAt,
                                          String reason,
+                                         TrackingSection tracking,
                                          List<ProcessResult> results) {
         trackingStepLogger.log(input, "计算完成", TrackingStepLogger.details(
                 "resultCount", results.size(),
                 "reason", reason,
                 "elapsedMillis", (System.nanoTime() - startedAt) / 1_000_000L
         ));
-        return saveRuntime(input, results);
+        return saveRuntime(input, tracking, results);
     }
 
     /**
      * 以本轮算法结果整体替换当前过程运行态。
      */
-    private List<ProcessResult> saveRuntime(TrackingInput input, List<ProcessResult> results) {
+    private List<ProcessResult> saveRuntime(TrackingInput input,
+                                            TrackingSection tracking,
+                                            List<ProcessResult> results) {
         Map<String, ProcessSegmentRuntime> segments = new LinkedHashMap<>();
         for (ProcessResult result : results) {
             if (result == null || result.getSegmentCode() == null) {
@@ -192,6 +197,8 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                 .unitCode(input.getUnitCode())
                 .trackingType(input.getTrackingType())
                 .updatedAt(Instant.now())
+                .speedPointValue(speedPointValue(input.getLatestSnapshot(), tracking))
+                .startConditionPointValue(startConditionValue(input.getLatestSnapshot(), tracking))
                 .segments(segments)
                 .build());
         return results;
@@ -202,10 +209,17 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
      */
     private BigDecimal startConditionValue(PointSnapshot latest, TrackingSection tracking) {
         StartCondition condition = tracking == null ? null : tracking.getStartCondition();
-        if (condition == null) {
+        if (latest == null || condition == null) {
             return null;
         }
         return PointReader.decimalValue(latest, trackingPointPath(tracking, condition.getPoint()));
+    }
+
+    private BigDecimal speedPointValue(PointSnapshot latest, TrackingSection tracking) {
+        if (latest == null || tracking == null) {
+            return null;
+        }
+        return PointReader.decimalValue(latest, trackingPointPath(tracking, tracking.getSpeedPoint()));
     }
 
     private boolean startConditionReached(BigDecimal value, StartCondition condition) {

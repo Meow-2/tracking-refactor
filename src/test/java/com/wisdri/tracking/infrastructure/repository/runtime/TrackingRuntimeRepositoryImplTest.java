@@ -62,6 +62,8 @@ class TrackingRuntimeRepositoryImplTest {
                 .unitCode("CP1")
                 .trackingType(TrackingType.PROCESS)
                 .updatedAt(Instant.parse("2026-07-05T12:00:00Z"))
+                .speedPointValue(new BigDecimal("2.5"))
+                .startConditionPointValue(BigDecimal.ONE)
                 .segments(Collections.singletonMap("S1", segment))
                 .build();
 
@@ -69,6 +71,9 @@ class TrackingRuntimeRepositoryImplTest {
 
         String json = redis.get("tracking:cp1:process:runtime");
         assertTrue(json.contains("\"head_length\""));
+        assertTrue(json.contains("\"updated_at\" : \"2026-07-05T20:00:00+08:00\""));
+        assertTrue(json.contains("\"speed_point_value\" : 2.5"));
+        assertTrue(json.contains("\"start_condition_point_value\" : 1"));
         assertFalse(json.contains("template_code"));
 
         TrackingRuntimeRepositoryImpl restartedRepository = repository();
@@ -77,6 +82,9 @@ class TrackingRuntimeRepositoryImplTest {
         ).orElseThrow(AssertionError::new);
         assertEquals("C001", restored.getSegments().get("S1").getCoilNo());
         assertEquals(new BigDecimal("12.30"), restored.getSegments().get("S1").getHeadLength());
+        assertEquals(new BigDecimal("2.5"), restored.getSpeedPointValue());
+        assertEquals(BigDecimal.ONE, restored.getStartConditionPointValue());
+        assertEquals(Instant.parse("2026-07-05T12:00:00Z"), restored.getUpdatedAt());
     }
 
     @Test
