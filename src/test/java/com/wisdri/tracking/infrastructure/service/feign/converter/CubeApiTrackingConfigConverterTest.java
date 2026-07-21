@@ -33,7 +33,7 @@ class CubeApiTrackingConfigConverterTest {
                 + "        \"sf\": {\n"
                 + "          \"data\": {\"default\": {\"code\": \"sf\", \"name\": \"均热段\","
                 + " \"point_prefix\": \"/aygg_tracking/cp1/process/tech/sf/\"}},\n"
-                + "          \"temperature\": {\"itemType\": 2, \"valueType\": \"double\"},\n"
+                + "          \"temperature\": {\"itemType\": 2, \"valueType\": \"float\"},\n"
                 + "          \"enabled\": {\"itemType\": 2, \"data\": {\"valueType\": \"boolean\"}},\n"
                 + "          \"directory\": {\"itemType\": 1}\n"
                 + "        }\n"
@@ -64,7 +64,7 @@ class CubeApiTrackingConfigConverterTest {
                 .extracting("name", "type")
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple("temperature", PointDataType.FLOAT),
-                        org.assertj.core.groups.Tuple.tuple("enabled", PointDataType.BOOL)
+                        org.assertj.core.groups.Tuple.tuple("enabled", PointDataType.BOOLEAN)
                 );
     }
 }

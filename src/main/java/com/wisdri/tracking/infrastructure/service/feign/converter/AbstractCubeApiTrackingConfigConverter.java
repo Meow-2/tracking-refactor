@@ -7,11 +7,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.wisdri.tracking.common.exception.TrackingException;
 import com.wisdri.tracking.common.utils.JsonUtils;
+import com.wisdri.tracking.domain.model.config.PointDataType;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeNode;
-
-import java.util.Locale;
 
 /**
  * Cube API 类型转换器的公共 JSON 和点位元数据处理能力。
@@ -70,17 +69,7 @@ public abstract class AbstractCubeApiTrackingConfigConverter implements CubeApiT
         if (valueType == null || valueType.trim().isEmpty()) {
             return DEFAULT_POINT_TYPE;
         }
-        String normalized = valueType.trim().toLowerCase(Locale.ROOT);
-        if (normalized.contains("bool")) {
-            return "bool";
-        }
-        if (normalized.contains("string") || normalized.contains("char") || normalized.contains("text")) {
-            return "string";
-        }
-        if (normalized.contains("int") || normalized.contains("long") || normalized.contains("short")) {
-            return "int";
-        }
-        return DEFAULT_POINT_TYPE;
+        return PointDataType.fromCode(valueType.trim()).getCode();
     }
 
     private String valueType(CubeApiTreeNode pointNode) {

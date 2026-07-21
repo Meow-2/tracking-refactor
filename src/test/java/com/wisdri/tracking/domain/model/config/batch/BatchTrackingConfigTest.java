@@ -38,7 +38,7 @@ class BatchTrackingConfigTest {
                 .extracting(TrackingPointGroup::getSegment)
                 .containsExactly("north", "south");
         assertThat(config.getTracking().getStartCondition().getPoint().getType())
-                .isEqualTo(PointDataType.INT);
+                .isEqualTo(PointDataType.SHORT);
         assertThat(config.getSegments())
                 .extracting(SegmentConfig::getCode)
                 .containsExactly("south", "north", "common");

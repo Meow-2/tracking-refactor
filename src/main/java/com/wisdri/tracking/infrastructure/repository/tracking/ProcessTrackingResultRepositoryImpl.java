@@ -2,7 +2,6 @@ package com.wisdri.tracking.infrastructure.repository.tracking;
 
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.config.PointConfig;
-import com.wisdri.tracking.domain.model.config.PointDataType;
 import com.wisdri.tracking.domain.model.config.process.SegmentConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
@@ -72,7 +71,8 @@ public class ProcessTrackingResultRepositoryImpl implements TrackingResultReposi
             List<TimeSeriesTableRule> rules = new ArrayList<>(NON_TAG_COLUMN);
             if (segment.getPoints() != null) {
                 for (PointConfig point : segment.getPoints()) {
-                    rules.add(tableRule(point.getName(), timeSeriesDataType(point.getType()), true));
+                    rules.add(tableRule(point.getName(),
+                            TimeSeriesDataType.fromPointDataType(point.getType()).getCode(), true));
                 }
             }
             request.setRule(rules);
@@ -133,16 +133,6 @@ public class ProcessTrackingResultRepositoryImpl implements TrackingResultReposi
 
     private static TimeSeriesTableRule tableRule(String id, String datatype, boolean tag) {
         return new TimeSeriesTableRule(id, datatype, tag);
-    }
-
-    private String timeSeriesDataType(PointDataType pointDataType) {
-        if (pointDataType == PointDataType.STRING) {
-            return TimeSeriesDataType.STRING.getCode();
-        }
-        if (pointDataType == PointDataType.INT || pointDataType == PointDataType.BOOL) {
-            return TimeSeriesDataType.INT.getCode();
-        }
-        return TimeSeriesDataType.FLOAT.getCode();
     }
 
 }

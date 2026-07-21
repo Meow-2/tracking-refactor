@@ -22,7 +22,7 @@
       },
       "pass_no_point": {
         "name": "pass_no_pv",
-        "type": "int"
+        "type": "short"
       },
       "direct_reverse": false
     },

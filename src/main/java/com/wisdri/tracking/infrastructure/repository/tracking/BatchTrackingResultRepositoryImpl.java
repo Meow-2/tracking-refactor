@@ -2,7 +2,6 @@ package com.wisdri.tracking.infrastructure.repository.tracking;
 
 import com.wisdri.tracking.common.exception.TrackingException;
 import com.wisdri.tracking.domain.model.config.PointConfig;
-import com.wisdri.tracking.domain.model.config.PointDataType;
 import com.wisdri.tracking.domain.model.config.batch.BatchTrackingConfig;
 import com.wisdri.tracking.domain.model.config.batch.SegmentConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
@@ -37,12 +36,16 @@ import java.util.Map;
 public class BatchTrackingResultRepositoryImpl
         implements TrackingResultRepository<BatchTrackingConfig, BatchResult> {
     private static final String NORTH_SEGMENT = "north";
+    private static final String SOUTH_SEGMENT = "south";
     private static final List<String> DYNAMIC_SEGMENT_ORDER = Arrays.asList("common", "north", "south");
     private static final List<TimeSeriesTableRule> FIXED_COLUMNS = Arrays.asList(
-            tableRule("fb_code", TimeSeriesDataType.STRING.getCode(), false),
-            tableRule("segment_code", TimeSeriesDataType.STRING.getCode(), false),
+            tableRule("fb_code", TimeSeriesDataType.INT.getCode(), false),
+            tableRule("segment_code", TimeSeriesDataType.INT.getCode(), false),
             tableRule("coil_no", TimeSeriesDataType.STRING.getCode(), false),
-            tableRule("prod_status", TimeSeriesDataType.FLOAT.getCode(), false)
+            tableRule("head_length", TimeSeriesDataType.FLOAT.getCode(), false),
+            tableRule("speed", TimeSeriesDataType.FLOAT.getCode(), false),
+            tableRule("pass_no", TimeSeriesDataType.INT.getCode(), false),
+            tableRule("prod_status", TimeSeriesDataType.FLOAT.getCode(), true)
     );
 
     /**
@@ -120,7 +123,7 @@ public class BatchTrackingResultRepositoryImpl
                     continue;
                 }
                 TimeSeriesTableRule rule = tableRule(
-                        point.getName(), timeSeriesDataType(point.getType()), true);
+                        point.getName(), TimeSeriesDataType.fromPointDataType(point.getType()).getCode(), true);
                 TimeSeriesTableRule previous = rules.putIfAbsent(point.getName(), rule);
                 if (previous != null && !previous.getDatatype().equals(rule.getDatatype())) {
                     throw new TrackingException("批次动态列类型冲突: " + point.getName());
@@ -153,8 +156,8 @@ public class BatchTrackingResultRepositoryImpl
 
     private List<TimeSeriesDataValue> batchValues(BatchResult result, Long timestamp) {
         List<TimeSeriesDataValue> values = new ArrayList<>();
-        add(values, "fb_code", result.getTemplateCode(), false, timestamp);
-        add(values, "segment_code", result.getSegmentCode(), false, timestamp);
+        add(values, "fb_code", fbCode(result.getTemplateCode()), false, timestamp);
+        add(values, "segment_code", segmentCode(result.getSegmentCode()), false, timestamp);
         add(values, "coil_no", result.getCoilNo(), false, timestamp);
         add(values, "prod_status", result.getProductionStatus(), false, timestamp);
         if (result.getParameters() != null) {
@@ -165,6 +168,31 @@ public class BatchTrackingResultRepositoryImpl
             }
         }
         return values;
+    }
+
+    private Integer fbCode(String templateCode) {
+        if (templateCode == null) {
+            return null;
+        }
+        String digits = templateCode.replaceAll("\\D", "");
+        if (digits.isEmpty()) {
+            throw new TrackingException("批次模板编码不包含数字: " + templateCode);
+        }
+        try {
+            return Integer.valueOf(digits);
+        } catch (NumberFormatException e) {
+            throw new TrackingException("批次模板编码数字部分超出整型范围: " + templateCode, e);
+        }
+    }
+
+    private Integer segmentCode(String segmentCode) {
+        if (SOUTH_SEGMENT.equalsIgnoreCase(segmentCode)) {
+            return 0;
+        }
+        if (NORTH_SEGMENT.equalsIgnoreCase(segmentCode)) {
+            return 1;
+        }
+        throw new TrackingException("不支持的批次工艺侧编码: " + segmentCode);
     }
 
     private void add(List<TimeSeriesDataValue> values,
@@ -198,13 +226,4 @@ public class BatchTrackingResultRepositoryImpl
         return new TimeSeriesTableRule(id, datatype, tag);
     }
 
-    private String timeSeriesDataType(PointDataType pointDataType) {
-        if (pointDataType == PointDataType.STRING) {
-            return TimeSeriesDataType.STRING.getCode();
-        }
-        if (pointDataType == PointDataType.INT || pointDataType == PointDataType.BOOL) {
-            return TimeSeriesDataType.INT.getCode();
-        }
-        return TimeSeriesDataType.FLOAT.getCode();
-    }
 }

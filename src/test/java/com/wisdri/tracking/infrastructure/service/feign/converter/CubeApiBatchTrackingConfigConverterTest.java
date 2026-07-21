@@ -46,7 +46,7 @@ class CubeApiBatchTrackingConfigConverterTest {
                 .extracting("name", "type")
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple("temperature", PointDataType.STRING),
-                        org.assertj.core.groups.Tuple.tuple("power", PointDataType.INT)
+                        org.assertj.core.groups.Tuple.tuple("power", PointDataType.SHORT)
                 );
         assertThat(segment(config, "north").getPoints())
                 .extracting("name", "type")
@@ -55,7 +55,7 @@ class CubeApiBatchTrackingConfigConverterTest {
         // 名称看起来像 south 点位，但它位于 common 目录，因此仍归 common。
         assertThat(segment(config, "common").getPoints())
                 .extracting("name", "type")
-                .containsExactly(org.assertj.core.groups.Tuple.tuple("south_like", PointDataType.BOOL));
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("south_like", PointDataType.BOOLEAN));
     }
 
     @Test
@@ -75,8 +75,8 @@ class CubeApiBatchTrackingConfigConverterTest {
     @Test
     void rejectsDifferentPointStructureBetweenTemplates() throws Exception {
         String json = validBatchTree().replace(
-                "\"fb2_south_power\": {\"itemType\": 2, \"valueType\": \"int\"}",
-                "\"fb2_south_other\": {\"itemType\": 2, \"valueType\": \"int\"}"
+                "\"fb2_south_power\": {\"itemType\": 2, \"valueType\": \"short\"}",
+                "\"fb2_south_other\": {\"itemType\": 2, \"valueType\": \"short\"}"
         );
 
         assertThat(converter.convert(tree(json))).isEmpty();
@@ -118,12 +118,12 @@ class CubeApiBatchTrackingConfigConverterTest {
     private String templateDirectory(String templateCode) {
         return "      \"" + templateCode + "\": {\n"
                 + "        \"south\": {\n"
-                + "          \"" + templateCode + "_south_temperature\": {\"itemType\": 2, \"valueType\": \"double\"},\n"
-                + "          \"" + templateCode + "_south_power\": {\"itemType\": 2, \"valueType\": \"int\"},\n"
+                + "          \"" + templateCode + "_south_temperature\": {\"itemType\": 2, \"valueType\": \"float\"},\n"
+                + "          \"" + templateCode + "_south_power\": {\"itemType\": 2, \"valueType\": \"short\"},\n"
                 + "          \"nested\": {\"itemType\": 1, \"ignored\": {\"itemType\": 2}}\n"
                 + "        },\n"
                 + "        \"north\": {\n"
-                + "          \"" + templateCode + "_north_temperature\": {\"itemType\": 2, \"valueType\": \"double\"}\n"
+                + "          \"" + templateCode + "_north_temperature\": {\"itemType\": 2, \"valueType\": \"float\"}\n"
                 + "        },\n"
                 + "        \"common\": {\n"
                 + "          \"" + templateCode + "_south_like\": {\"itemType\": 2, \"valueType\": \"boolean\"}\n"

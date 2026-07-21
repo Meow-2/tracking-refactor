@@ -13,10 +13,10 @@ import java.util.Locale;
 @Getter
 @RequiredArgsConstructor
 public enum PointDataType {
-    FLOAT("float", "浮点型"),
-    STRING("string", "字符串型"),
-    INT("int", "整型"),
-    BOOL("bool", "布尔型");
+    BOOLEAN("boolean", "布尔型"),
+    SHORT("short", "短整型"),
+    FLOAT("float", "单精度浮点型"),
+    STRING("string", "字符串型");
 
     private final String code;
     private final String desc;
@@ -33,6 +33,9 @@ public enum PointDataType {
     public static PointDataType fromCode(String code) {
         if (code == null) {
             return null;
+        }
+        if ("bool".equalsIgnoreCase(code)) {
+            return BOOLEAN;
         }
         for (PointDataType type : values()) {
             if (type.code.equalsIgnoreCase(code)) {

@@ -63,13 +63,17 @@ class BatchTrackingResultRepositoryImplTest {
         TimeSeriesTableRequest request = captor.getValue();
         assertEquals("baf1_batch", request.getMeasurement());
         assertEquals("tracking_db", request.getBucket());
-        assertRule(request.getRule(), "fb_code", "string", false);
-        assertRule(request.getRule(), "segment_code", "string", false);
+        assertRule(request.getRule(), "fb_code", "int", false);
+        assertRule(request.getRule(), "segment_code", "int", false);
         assertRule(request.getRule(), "coil_no", "string", false);
         assertRule(request.getRule(), "prod_status", "float", false);
+        assertRule(request.getRule(), "head_length", "float", false);
+        assertRule(request.getRule(), "speed", "float", false);
+        assertRule(request.getRule(), "pass_no", "int", false);
         assertRule(request.getRule(), "shared", "string", true);
         assertRule(request.getRule(), "north_temp", "float", true);
-        assertRule(request.getRule(), "south_count", "int", true);
+        assertRule(request.getRule(), "south_count", "short", true);
+        assertRule(request.getRule(), "south_ready", "boolean", true);
         assertEquals(1, request.getRule().stream()
                 .filter(rule -> "shared".equals(rule.getId()))
                 .count());
@@ -86,23 +90,26 @@ class BatchTrackingResultRepositoryImplTest {
         verify(gateway, times(2)).saveColumn(eq("baf1_batch"), captor.capture());
         TimeSeriesDataRequest northRequest = captor.getAllValues().get(0);
         assertEquals(NORTH_TIMESTAMP, northRequest.getTimestamp());
-        assertValue(northRequest.getValues(), "fb_code", "fb1", false, NORTH_TIMESTAMP);
-        assertValue(northRequest.getValues(), "segment_code", "north", false, NORTH_TIMESTAMP);
+        assertValue(northRequest.getValues(), "fb_code", 1, false, NORTH_TIMESTAMP);
+        assertValue(northRequest.getValues(), "segment_code", 1, false, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "coil_no", "N001", false, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "prod_status", new BigDecimal("1"), false, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "shared", "north-value", true, NORTH_TIMESTAMP);
         assertFalse(northRequest.getValues().stream().anyMatch(value -> "empty".equals(value.getId())));
+        assertFalse(northRequest.getValues().stream().anyMatch(value -> "head_length".equals(value.getId())));
+        assertFalse(northRequest.getValues().stream().anyMatch(value -> "speed".equals(value.getId())));
+        assertFalse(northRequest.getValues().stream().anyMatch(value -> "pass_no".equals(value.getId())));
 
         TimeSeriesDataRequest southRequest = captor.getAllValues().get(1);
         assertEquals(RECEIVED_AT.toEpochMilli(), southRequest.getTimestamp());
-        assertValue(southRequest.getValues(), "segment_code", "south", false);
+        assertValue(southRequest.getValues(), "segment_code", 0, false);
     }
 
     @Test
     void rejectsConflictingDynamicColumnTypes() {
         BatchTrackingConfig config = config();
         config.getSegments().get(0).setPoints(Collections.singletonList(
-                point("shared", PointDataType.INT)));
+                point("shared", PointDataType.SHORT)));
 
         assertThrows(TrackingException.class, () -> repository.createTable(config));
     }
@@ -114,7 +121,8 @@ class BatchTrackingResultRepositoryImplTest {
                 point("shared", PointDataType.STRING),
                 point("north_temp", PointDataType.FLOAT));
         SegmentConfig south = segment("south",
-                point("south_count", PointDataType.INT));
+                point("south_count", PointDataType.SHORT),
+                point("south_ready", PointDataType.BOOLEAN));
         return BatchTrackingConfig.builder()
                 .unitCode("BAF1")
                 .trackingType(TrackingType.BATCH)

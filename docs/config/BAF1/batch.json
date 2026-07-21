@@ -11,7 +11,7 @@
     "start_condition": {
       "point": {
         "name": "prod_status",
-        "type": "int"
+        "type": "short"
       },
       "threshold": 0
     },
