@@ -1,6 +1,5 @@
 package com.wisdri.tracking.application.usecase.tracking;
 
-import com.wisdri.tracking.common.utils.JsonUtils;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingResult;
 import com.wisdri.tracking.domain.model.tracking.TrackingTask;
@@ -44,7 +43,8 @@ public class TrackingTaskConsumerUseCase {
         if (results == null || results.isEmpty()) {
             return;
         }
-        log.info("跟踪计算结果: {}", JsonUtils.toPrettyJson(results));
         trackingResultRepositoryDispatcher.save(results);
+        log.info("跟踪任务处理完成，机组编码={}，跟踪类型={}，模板编码={}，结果数量={}",
+                task.getUnitCode(), task.getTrackingType(), task.getTemplateCode(), results.size());
     }
 }

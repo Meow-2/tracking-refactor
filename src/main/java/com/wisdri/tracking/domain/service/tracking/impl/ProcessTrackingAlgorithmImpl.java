@@ -19,6 +19,7 @@ import com.wisdri.tracking.domain.service.abnormal.AbnormalDataHandlerDispatcher
 import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
+import com.wisdri.tracking.domain.service.tracking.trace.TrackingStepLogger;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.springframework.stereotype.Component;
@@ -55,6 +56,9 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
     @Resource
     private PointEventHandlerDispatcher pointEventHandlerDispatcher;
 
+    @Resource
+    private TrackingStepLogger trackingStepLogger;
+
     /**
      * 支持过程跟踪。
      */
@@ -68,14 +72,20 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
      */
     @Override
     public List<ProcessResult> calculate(TrackingInput input) {
+        long startedAt = System.nanoTime();
         // 先从缓存读取当前配置，后续 pointEvent 处理可能就地更新该配置。
         Optional<ProcessTrackingConfig> configOptional = runtimeRepositoryDispatcher.findConfigAs(
                 input.getUnitCode(),
                 input.getTrackingType(),
                 ProcessTrackingConfig.class
         );
+        trackingStepLogger.log(input, "计算开始", TrackingStepLogger.details(
+                "configPresent", configOptional.isPresent(),
+                "lengthMode", configOptional.isPresent() && configOptional.get().getTracking() != null
+                        ? configOptional.get().getTracking().getLengthMode() : null
+        ));
         if (!configOptional.isPresent()) {
-            return saveRuntime(input, new ArrayList<>());
+            return complete(input, startedAt, "缺少跟踪配置", new ArrayList<>());
         }
         ProcessTrackingConfig config = configOptional.get();
 
@@ -85,37 +95,81 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
 
         // 校验最新快照和启动条件，未达到计算条件时不生成结果。
         PointSnapshot latest = input.getLatestSnapshot();
-        if (latest == null || config.getTracking() == null || !startConditionReached(latest, config.getTracking())) {
-            return saveRuntime(input, new ArrayList<>());
+        if (latest == null || config.getTracking() == null) {
+            return complete(input, startedAt, "缺少点位快照或跟踪配置", new ArrayList<>());
+        }
+        TrackingSection tracking = config.getTracking();
+        StartCondition condition = tracking.getStartCondition();
+        BigDecimal conditionValue = startConditionValue(latest, tracking);
+        boolean conditionReached = startConditionReached(conditionValue, condition);
+        trackingStepLogger.log(input, "启动条件检查", TrackingStepLogger.details(
+                "point", pointName(condition == null ? null : condition.getPoint()),
+                "actual", conditionValue,
+                "threshold", condition == null ? null : condition.getThreshold(),
+                "passed", conditionReached
+        ));
+        if (!conditionReached) {
+            return complete(input, startedAt, "未达到启动条件", new ArrayList<>());
         }
 
         // 过滤有效钢卷点位组，后续每个工艺段基于同一组候选点位选择当前钢卷。
-        List<TrackingPointGroup> groups = validGroups(latest, config.getTracking());
+        List<TrackingPointGroup> groups = validGroups(latest, tracking);
+        trackingStepLogger.log(input, "钢卷分组筛选", TrackingStepLogger.details(
+                "groups", groupDetails(latest, tracking, tracking.getPoints(), groups),
+                "eligibleCount", groups.size()
+        ));
         List<ProcessResult> results = new ArrayList<>();
         if (config.getSegments() == null) {
-            return saveRuntime(input, results);
+            return complete(input, startedAt, "segments_missing", results);
         }
 
         // 按工艺段逐段选择钢卷并组装跟踪结果。
         for (SegmentConfig segment : config.getSegments()) {
-            SelectedGroup selected = selectGroup(latest, config.getTracking(), segment, groups);
+            SelectedGroup selected = selectGroup(input, latest, tracking, segment, groups);
             if (selected == null) {
                 continue;
             }
-            results.add(ProcessResult.builder()
+            String coilNo = PointReader.stringValue(latest,
+                    trackingPointPath(tracking, selected.group.getCoilNo()));
+            BigDecimal speed = PointReader.decimalValue(latest,
+                    trackingPointPath(tracking, tracking.getSpeedPoint()));
+            Integer passNo = passNo(latest, tracking);
+            Map<String, Object> parameters = parameters(latest, segment);
+            ProcessResult result = ProcessResult.builder()
                     .unitCode(config.getUnitCode())
                     .trackingType(config.getTrackingType())
                     .segmentCode(segment.getCode())
                     .segmentName(segment.getName())
-                    .coilNo(PointReader.stringValue(latest, trackingPointPath(config.getTracking(), selected.group.getCoilNo())))
+                    .coilNo(coilNo)
                     .headLength(selected.headLength)
-                    .speed(PointReader.decimalValue(latest, trackingPointPath(config.getTracking(), config.getTracking().getSpeedPoint())))
-                    .passNo(passNo(latest, config.getTracking()))
-                    .parameters(parameters(latest, segment))
+                    .speed(speed)
+                    .passNo(passNo)
+                    .parameters(parameters)
                     .generatedAt(Instant.now())
                     .receivedAt(latest.getReceivedAt())
-                    .build());
+                    .build();
+            results.add(result);
+            trackingStepLogger.log(input, "区段结果生成", segment.getCode(),
+                    TrackingStepLogger.details(
+                            "coilNo", coilNo,
+                            "headLength", selected.headLength,
+                            "speed", speed,
+                            "passNo", passNo,
+                            "parameters", parameters
+                    ));
         }
+        return complete(input, startedAt, results.isEmpty() ? "未选中任何区段结果" : null, results);
+    }
+
+    private List<ProcessResult> complete(TrackingInput input,
+                                         long startedAt,
+                                         String reason,
+                                         List<ProcessResult> results) {
+        trackingStepLogger.log(input, "计算完成", TrackingStepLogger.details(
+                "resultCount", results.size(),
+                "reason", reason,
+                "elapsedMillis", (System.nanoTime() - startedAt) / 1_000_000L
+        ));
         return saveRuntime(input, results);
     }
 
@@ -146,13 +200,20 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
     /**
      * 判断启动条件是否达到。
      */
-    private boolean startConditionReached(PointSnapshot latest, TrackingSection tracking) {
-        StartCondition condition = tracking.getStartCondition();
+    private BigDecimal startConditionValue(PointSnapshot latest, TrackingSection tracking) {
+        StartCondition condition = tracking == null ? null : tracking.getStartCondition();
+        if (condition == null) {
+            return null;
+        }
+        return PointReader.decimalValue(latest, trackingPointPath(tracking, condition.getPoint()));
+    }
+
+    private boolean startConditionReached(BigDecimal value, StartCondition condition) {
         if (condition == null) {
             return true;
         }
-        BigDecimal value = PointReader.decimalValue(latest, trackingPointPath(tracking, condition.getPoint()));
-        return value != null && value.compareTo(condition.getThreshold()) >= 0;
+        return value != null && condition.getThreshold() != null
+                && value.compareTo(condition.getThreshold()) >= 0;
     }
 
     /**
@@ -172,75 +233,142 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
         return result;
     }
 
+    private List<Map<String, Object>> groupDetails(PointSnapshot latest,
+                                                   TrackingSection tracking,
+                                                   List<TrackingPointGroup> groups,
+                                                   List<TrackingPointGroup> eligibleGroups) {
+        List<Map<String, Object>> details = new ArrayList<>();
+        if (groups == null) {
+            return details;
+        }
+        for (int index = 0; index < groups.size(); index++) {
+            TrackingPointGroup group = groups.get(index);
+            String coilNo = group == null ? null : PointReader.stringValue(
+                    latest, trackingPointPath(tracking, group.getCoilNo()));
+            boolean eligible = group != null && eligibleGroups.contains(group);
+            details.add(TrackingStepLogger.details(
+                    "groupIndex", index,
+                    "coilNo", coilNo == null ? null : coilNo.trim(),
+                    "rollingCoiler", group == null ? null : group.getIsRollingCoiler(),
+                    "eligible", eligible,
+                    "reason", eligible ? "候选钢卷" : "钢卷号为空或卷取侧不匹配"
+            ));
+        }
+        return details;
+    }
+
     /**
      * 根据长度模式选择当前工艺段对应的钢卷点位组。
      */
-    private SelectedGroup selectGroup(PointSnapshot latest,
+    private SelectedGroup selectGroup(TrackingInput input,
+                                      PointSnapshot latest,
                                       TrackingSection tracking,
                                       SegmentConfig segment,
                                       List<TrackingPointGroup> groups) {
         LengthMode lengthMode = tracking.getLengthMode();
         if (LengthMode.WELDER == lengthMode) {
-            return selectWelder(latest, tracking, segment, groups);
+            return selectWelder(input, latest, tracking, segment, groups);
         }
         List<TrackingPointGroup> candidates = groups;
         if (LengthMode.ROLLING == lengthMode) {
-            candidates = rollingCandidates(latest, tracking, groups);
+            candidates = rollingCandidates(input, latest, tracking, groups);
         }
-        return selectCoiler(latest, tracking, segment, candidates);
+        return selectCoiler(input, latest, tracking, segment, candidates);
     }
 
     /**
      * 焊缝模式：选择修正后带头长度大于等于 0 且最小的点位组。
      */
-    private SelectedGroup selectWelder(PointSnapshot latest,
+    private SelectedGroup selectWelder(TrackingInput input,
+                                       PointSnapshot latest,
                                        TrackingSection tracking,
                                        SegmentConfig segment,
                                        List<TrackingPointGroup> groups) {
         SelectedGroup selected = null;
         int index = Optional.ofNullable(segment.getLengthArrayIndex()).orElse(0);
-        for (TrackingPointGroup group : groups) {
+        List<Map<String, Object>> evaluations = new ArrayList<>();
+        for (int groupIndex = 0; groupIndex < groups.size(); groupIndex++) {
+            TrackingPointGroup group = groups.get(groupIndex);
+            String coilNo = PointReader.stringValue(latest, trackingPointPath(tracking, group.getCoilNo()));
             if (group.getLength() == null || group.getLength().size() <= index) {
+                evaluations.add(candidateDetail(groupIndex, coilNo, null, null,
+                        false, "缺少长度下标"));
                 continue;
             }
-            BigDecimal headLength = correctedLength(latest, tracking, group.getLength().get(index), segment);
-            if (headLength == null || headLength.compareTo(BigDecimal.ZERO) < 0) {
+            BigDecimal rawLength = PointReader.decimalValue(
+                    latest, trackingPointPath(tracking, group.getLength().get(index)));
+            BigDecimal headLength = rawLength == null ? null
+                    : rawLength.add(Optional.ofNullable(segment.getLengthCorrect()).orElse(BigDecimal.ZERO));
+            if (headLength == null) {
+                evaluations.add(candidateDetail(groupIndex, coilNo, rawLength, null,
+                        false, "缺少长度值"));
                 continue;
             }
+            if (headLength.compareTo(BigDecimal.ZERO) < 0) {
+                evaluations.add(candidateDetail(groupIndex, coilNo, rawLength, headLength,
+                        false, "修正后长度小于零"));
+                continue;
+            }
+            evaluations.add(candidateDetail(groupIndex, coilNo, rawLength, headLength,
+                    true, "候选钢卷"));
             if (selected == null || headLength.compareTo(selected.headLength) < 0) {
                 selected = new SelectedGroup(group, headLength);
             }
         }
+        logCandidateEvaluation(input, segment, LengthMode.WELDER, index, evaluations, selected, latest, tracking);
         return selected;
     }
 
     /**
      * 卷取机模式：选择修正后带头长度满足条件且最大的点位组。
      */
-    private SelectedGroup selectCoiler(PointSnapshot latest,
+    private SelectedGroup selectCoiler(TrackingInput input,
+                                       PointSnapshot latest,
                                        TrackingSection tracking,
                                        SegmentConfig segment,
                                        List<TrackingPointGroup> groups) {
         SelectedGroup selected = null;
-        for (TrackingPointGroup group : groups) {
+        List<Map<String, Object>> evaluations = new ArrayList<>();
+        BigDecimal lengthCorrect = Optional.ofNullable(segment.getLengthCorrect()).orElse(BigDecimal.ZERO);
+        for (int groupIndex = 0; groupIndex < groups.size(); groupIndex++) {
+            TrackingPointGroup group = groups.get(groupIndex);
+            String coilNo = PointReader.stringValue(latest, trackingPointPath(tracking, group.getCoilNo()));
             if (group.getLength() == null || group.getLength().isEmpty()) {
+                evaluations.add(candidateDetail(groupIndex, coilNo, null, null,
+                        false, "缺少长度点位"));
                 continue;
             }
-            BigDecimal headLength = correctedLength(latest, tracking, group.getLength().get(0), segment);
-            if (headLength == null || headLength.compareTo(Optional.ofNullable(segment.getLengthCorrect()).orElse(BigDecimal.ZERO)) < 0) {
+            BigDecimal rawLength = PointReader.decimalValue(
+                    latest, trackingPointPath(tracking, group.getLength().get(0)));
+            BigDecimal headLength = rawLength == null ? null : rawLength.add(lengthCorrect);
+            if (headLength == null) {
+                evaluations.add(candidateDetail(groupIndex, coilNo, rawLength, null,
+                        false, "缺少长度值"));
                 continue;
             }
+            if (headLength.compareTo(lengthCorrect) < 0) {
+                evaluations.add(candidateDetail(groupIndex, coilNo, rawLength, headLength,
+                        false, "修正后长度低于最小值"));
+                continue;
+            }
+            evaluations.add(candidateDetail(groupIndex, coilNo, rawLength, headLength,
+                    true, "候选钢卷"));
             if (selected == null || headLength.compareTo(selected.headLength) > 0) {
                 selected = new SelectedGroup(group, headLength);
             }
         }
+        logCandidateEvaluation(input, segment, tracking.getLengthMode(), 0,
+                evaluations, selected, latest, tracking);
         return selected;
     }
 
     /**
      * 轧机模式：根据轧制方向筛选入口侧或出口侧点位组。
      */
-    private List<TrackingPointGroup> rollingCandidates(PointSnapshot latest, TrackingSection tracking, List<TrackingPointGroup> groups) {
+    private List<TrackingPointGroup> rollingCandidates(TrackingInput input,
+                                                       PointSnapshot latest,
+                                                       TrackingSection tracking,
+                                                       List<TrackingPointGroup> groups) {
         RollingConfig rolling = tracking.getRolling();
         boolean direct = rolling != null && Boolean.TRUE.equals(PointReader.booleanValue(latest, trackingPointPath(tracking, rolling.getDirectPoint())));
         boolean reverse = rolling != null && Boolean.TRUE.equals(rolling.getDirectReverse());
@@ -251,21 +379,50 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                 result.add(group);
             }
         }
+        trackingStepLogger.log(input, "轧制方向判断", TrackingStepLogger.details(
+                "direct", direct,
+                "directReverse", reverse,
+                "targetRollingCoiler", targetCoiler,
+                "eligibleGroups", groupDetails(latest, tracking, groups, result)
+        ));
         return result;
     }
 
-    /**
-     * 计算修正后的带头长度。
-     */
-    private BigDecimal correctedLength(PointSnapshot latest,
-                                       TrackingSection tracking,
-                                       PointConfig lengthPoint,
-                                       SegmentConfig segment) {
-        BigDecimal length = PointReader.decimalValue(latest, trackingPointPath(tracking, lengthPoint));
-        if (length == null) {
-            return null;
-        }
-        return length.add(Optional.ofNullable(segment.getLengthCorrect()).orElse(BigDecimal.ZERO));
+    private void logCandidateEvaluation(TrackingInput input,
+                                        SegmentConfig segment,
+                                        LengthMode lengthMode,
+                                        int lengthIndex,
+                                        List<Map<String, Object>> evaluations,
+                                        SelectedGroup selected,
+                                        PointSnapshot latest,
+                                        TrackingSection tracking) {
+        String selectedCoil = selected == null ? null : PointReader.stringValue(
+                latest, trackingPointPath(tracking, selected.group.getCoilNo()));
+        trackingStepLogger.log(input, "区段候选钢卷评估", segment.getCode(),
+                TrackingStepLogger.details(
+                        "lengthMode", lengthMode,
+                        "lengthArrayIndex", lengthIndex,
+                        "lengthCorrect", segment.getLengthCorrect(),
+                        "candidates", evaluations,
+                        "selectedCoilNo", selectedCoil,
+                        "selectedHeadLength", selected == null ? null : selected.headLength
+                ));
+    }
+
+    private Map<String, Object> candidateDetail(int groupIndex,
+                                                String coilNo,
+                                                BigDecimal rawLength,
+                                                BigDecimal correctedLength,
+                                                boolean eligible,
+                                                String reason) {
+        return TrackingStepLogger.details(
+                "groupIndex", groupIndex,
+                "coilNo", coilNo,
+                "rawLength", rawLength,
+                "correctedLength", correctedLength,
+                "eligible", eligible,
+                "reason", reason
+        );
     }
 
     /**

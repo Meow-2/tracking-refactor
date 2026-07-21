@@ -14,6 +14,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.batch.BatchResult;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
+import com.wisdri.tracking.domain.service.tracking.trace.TrackingStepLogger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -34,6 +35,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -45,15 +48,18 @@ class BatchTrackingAlgorithmImplTest {
 
     private TrackingRuntimeRepositoryDispatcher runtimeRepositoryDispatcher;
     private PointEventHandlerDispatcher pointEventHandlerDispatcher;
+    private TrackingStepLogger trackingStepLogger;
     private BatchTrackingAlgorithmImpl algorithm;
 
     @BeforeEach
     void setUp() {
         runtimeRepositoryDispatcher = mock(TrackingRuntimeRepositoryDispatcher.class);
         pointEventHandlerDispatcher = mock(PointEventHandlerDispatcher.class);
+        trackingStepLogger = mock(TrackingStepLogger.class);
         algorithm = new BatchTrackingAlgorithmImpl();
         ReflectionTestUtils.setField(algorithm, "runtimeRepositoryDispatcher", runtimeRepositoryDispatcher);
         ReflectionTestUtils.setField(algorithm, "pointEventHandlerDispatcher", pointEventHandlerDispatcher);
+        ReflectionTestUtils.setField(algorithm, "trackingStepLogger", trackingStepLogger);
         when(runtimeRepositoryDispatcher.findConfigAs(
                 "BAF1", TrackingType.BATCH, BatchTrackingConfig.class
         )).thenReturn(Optional.of(config()));
@@ -82,6 +88,10 @@ class BatchTrackingAlgorithmImplTest {
         assertEquals(20, north.getParameters().get("north_only"));
         assertEquals(RECEIVED_AT, north.getReceivedAt());
         verify(pointEventHandlerDispatcher).handle(any(TrackingInput.class), any(BatchTrackingConfig.class));
+        verify(trackingStepLogger).log(any(TrackingInput.class),
+                eq("生产条件检查"), anyMap());
+        verify(trackingStepLogger).log(any(TrackingInput.class),
+                eq("区段结果生成"), eq("north"), anyMap());
 
         BatchResult south = results.get(1);
         assertEquals("south", south.getSegmentCode());
@@ -102,6 +112,8 @@ class BatchTrackingAlgorithmImplTest {
         BatchTrackingRuntime runtime = savedRuntime();
         assertEquals("N001", runtime.getCoilNos().get("north"));
         assertFalse(runtime.getCoilNos().containsKey("south"));
+        verify(trackingStepLogger).log(any(TrackingInput.class),
+                eq("区段跳过"), eq("south"), anyMap());
     }
 
     @Test

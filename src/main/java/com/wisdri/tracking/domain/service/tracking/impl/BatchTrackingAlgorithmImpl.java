@@ -15,6 +15,7 @@ import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDi
 import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
+import com.wisdri.tracking.domain.service.tracking.trace.TrackingStepLogger;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -51,6 +52,9 @@ public class BatchTrackingAlgorithmImpl implements TrackingAlgorithm<BatchResult
     @Resource
     private PointEventHandlerDispatcher pointEventHandlerDispatcher;
 
+    @Resource
+    private TrackingStepLogger trackingStepLogger;
+
     /**
      * 支持批次跟踪。
      */
@@ -64,11 +68,16 @@ public class BatchTrackingAlgorithmImpl implements TrackingAlgorithm<BatchResult
      */
     @Override
     public List<BatchResult> calculate(TrackingInput input) {
+        long startedAt = System.nanoTime();
         validateInput(input);
         Optional<BatchTrackingConfig> configOptional = runtimeRepositoryDispatcher.findConfigAs(
                 input.getUnitCode(), input.getTrackingType(), BatchTrackingConfig.class);
+        trackingStepLogger.log(input, "计算开始", TrackingStepLogger.details(
+                "configPresent", configOptional.isPresent()
+        ));
         if (!configOptional.isPresent()) {
-            return saveRuntime(input, null, new LinkedHashMap<>(), new ArrayList<>());
+            return complete(input, startedAt, "缺少跟踪配置",
+                    null, new LinkedHashMap<>(), new ArrayList<>());
         }
 
         BatchTrackingConfig config = configOptional.get();
@@ -76,19 +85,38 @@ public class BatchTrackingAlgorithmImpl implements TrackingAlgorithm<BatchResult
         PointSnapshot latest = input.getLatestSnapshot();
         BigDecimal productionStatus = productionStatus(latest, config.getTracking(), input.getTemplateCode());
         Map<String, String> coilNos = coilNos(latest, config.getTracking(), input.getTemplateCode());
+        StartCondition startCondition = config.getTracking() == null
+                ? null : config.getTracking().getStartCondition();
+        boolean productionReached = productionReached(productionStatus, config.getTracking());
+        trackingStepLogger.log(input, "生产条件检查", TrackingStepLogger.details(
+                "point", pointName(startCondition == null ? null : startCondition.getPoint()),
+                "actual", productionStatus,
+                "threshold", startCondition == null ? null : startCondition.getThreshold(),
+                "passed", productionReached
+        ));
+        trackingStepLogger.log(input, "钢卷号解析", TrackingStepLogger.details(
+                "north", coilNos.get("north"),
+                "south", coilNos.get("south")
+        ));
         List<BatchResult> results = new ArrayList<>();
-        if (productionReached(productionStatus, config.getTracking())) {
+        if (productionReached) {
             Instant generatedAt = Instant.now();
             for (String segmentCode : RESULT_SEGMENTS) {
                 String coilNo = coilNos.get(segmentCode);
                 if (coilNo == null) {
+                    trackingStepLogger.log(input, "区段跳过", segmentCode,
+                            TrackingStepLogger.details("reason", "钢卷号为空"));
                     continue;
                 }
                 SegmentConfig segment = segment(config, segmentCode);
                 if (segment == null) {
+                    trackingStepLogger.log(input, "区段跳过", segmentCode,
+                            TrackingStepLogger.details("reason", "缺少区段配置"));
                     continue;
                 }
-                results.add(BatchResult.builder()
+                Map<String, Object> parameters = parameters(
+                        latest, config, segment, input.getTemplateCode());
+                BatchResult result = BatchResult.builder()
                         .unitCode(config.getUnitCode())
                         .trackingType(config.getTrackingType())
                         .templateCode(input.getTemplateCode())
@@ -96,12 +124,34 @@ public class BatchTrackingAlgorithmImpl implements TrackingAlgorithm<BatchResult
                         .segmentName(segment.getName())
                         .coilNo(coilNo)
                         .productionStatus(productionStatus)
-                        .parameters(parameters(latest, config, segment, input.getTemplateCode()))
+                        .parameters(parameters)
                         .generatedAt(generatedAt)
                         .receivedAt(latest == null ? null : latest.getReceivedAt())
-                        .build());
+                        .build();
+                results.add(result);
+                trackingStepLogger.log(input, "区段结果生成", segmentCode,
+                        TrackingStepLogger.details(
+                                "coilNo", coilNo,
+                                "productionStatus", productionStatus,
+                                "parameters", parameters
+                        ));
             }
         }
+        return complete(input, startedAt, productionReached ? null : "未达到生产条件",
+                productionStatus, coilNos, results);
+    }
+
+    private List<BatchResult> complete(TrackingInput input,
+                                       long startedAt,
+                                       String reason,
+                                       BigDecimal productionStatus,
+                                       Map<String, String> coilNos,
+                                       List<BatchResult> results) {
+        trackingStepLogger.log(input, "计算完成", TrackingStepLogger.details(
+                "resultCount", results.size(),
+                "reason", reason,
+                "elapsedMillis", (System.nanoTime() - startedAt) / 1_000_000L
+        ));
         return saveRuntime(input, productionStatus, coilNos, results);
     }
 

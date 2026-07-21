@@ -35,6 +35,23 @@ public final class JsonUtils {
     }
 
     /**
+     * 创建用于日志展示的 mapper，将 Instant 格式化为亚洲上海时间。
+     */
+    public static ObjectMapper shanghaiTimeDisplayMapper() {
+        SimpleModule displayTimeModule = new SimpleModule();
+        displayTimeModule.addSerializer(Instant.class, new JsonSerializer<Instant>() {
+            @Override
+            public void serialize(Instant value, JsonGenerator generator, SerializerProvider serializers)
+                    throws IOException {
+                generator.writeString(DISPLAY_TIME_FORMATTER.format(value));
+            }
+        });
+        return decimalPreservingMapperBuilder()
+                .addModule(displayTimeModule)
+                .build();
+    }
+
+    /**
      * 创建保留小数精度的 Jackson mapper builder。
      * <p>
      * 调用方可以在该基础配置上追加命名策略、时间模块等场景配置。
@@ -65,17 +82,7 @@ public final class JsonUtils {
     }
 
     private static ObjectMapper prettyJsonMapper() {
-        SimpleModule displayTimeModule = new SimpleModule();
-        displayTimeModule.addSerializer(Instant.class, new JsonSerializer<Instant>() {
-            @Override
-            public void serialize(Instant value, JsonGenerator generator, SerializerProvider serializers)
-                    throws IOException {
-                generator.writeString(DISPLAY_TIME_FORMATTER.format(value));
-            }
-        });
-        return decimalPreservingMapperBuilder()
-                .addModule(displayTimeModule)
-                .build();
+        return shanghaiTimeDisplayMapper();
     }
 
     /**

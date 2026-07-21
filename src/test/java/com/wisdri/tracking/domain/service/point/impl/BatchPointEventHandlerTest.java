@@ -8,6 +8,7 @@ import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
+import com.wisdri.tracking.domain.service.tracking.trace.TrackingStepLogger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -18,19 +19,25 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 class BatchPointEventHandlerTest {
     private TrackingRuntimeRepositoryDispatcher runtimeRepositoryDispatcher;
+    private TrackingStepLogger trackingStepLogger;
     private BatchPointEventHandler handler;
 
     @BeforeEach
     void setUp() {
         runtimeRepositoryDispatcher = mock(TrackingRuntimeRepositoryDispatcher.class);
+        trackingStepLogger = mock(TrackingStepLogger.class);
         handler = new BatchPointEventHandler();
         ReflectionTestUtils.setField(handler, "runtimeRepositoryDispatcher", runtimeRepositoryDispatcher);
+        ReflectionTestUtils.setField(handler, "trackingStepLogger", trackingStepLogger);
     }
 
     @Test
@@ -38,6 +45,7 @@ class BatchPointEventHandlerTest {
         handler.handle(input(snapshot("N001", "S001"), snapshot("N002", "S001")), config());
 
         verify(runtimeRepositoryDispatcher).refreshConfig();
+        verify(trackingStepLogger).log(any(TrackingInput.class), eq("钢卷集合检查"), anyMap());
     }
 
     @Test

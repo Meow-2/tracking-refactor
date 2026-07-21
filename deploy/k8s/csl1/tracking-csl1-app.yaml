@@ -38,6 +38,13 @@ spec:
             requests:
               memory: "512Mi"
               cpu: "200m"
+          volumeMounts:
+            - name: tracking-logs
+              mountPath: /logs
+      volumes:
+        - name: tracking-logs
+          persistentVolumeClaim:
+            claimName: tracking-csl1-pvc
       restartPolicy: Always
 ---
 apiVersion: v1
@@ -61,4 +68,3 @@ spec:
       targetPort: 8080
       nodePort: 32336
   type: NodePort
-

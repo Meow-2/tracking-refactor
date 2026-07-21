@@ -10,6 +10,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.point.PointEventHandler;
 import com.wisdri.tracking.domain.service.point.PointReader;
+import com.wisdri.tracking.domain.service.tracking.trace.TrackingStepLogger;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -29,6 +30,9 @@ public class BatchPointEventHandler implements PointEventHandler<BatchTrackingCo
     @Resource
     private TrackingRuntimeRepositoryDispatcher runtimeRepositoryDispatcher;
 
+    @Resource
+    private TrackingStepLogger trackingStepLogger;
+
     @Override
     public boolean support(TrackingType trackingType) {
         return TrackingType.BATCH == trackingType;
@@ -39,12 +43,20 @@ public class BatchPointEventHandler implements PointEventHandler<BatchTrackingCo
      */
     @Override
     public void handle(TrackingInput input, BatchTrackingConfig config) {
-        if (input == null || config == null || input.getPreviousSnapshot() == null) {
+        if (input == null || config == null) {
             return;
         }
         Set<String> latestCoils = coilSet(input.getLatestSnapshot(), config.getTracking(), input.getTemplateCode());
         Set<String> previousCoils = coilSet(input.getPreviousSnapshot(), config.getTracking(), input.getTemplateCode());
-        if (!latestCoils.equals(previousCoils)) {
+        boolean previousAvailable = input.getPreviousSnapshot() != null;
+        boolean changed = previousAvailable && !latestCoils.equals(previousCoils);
+        trackingStepLogger.log(input, "钢卷集合检查", TrackingStepLogger.details(
+                "previousAvailable", previousAvailable,
+                "previousCoils", previousCoils,
+                "latestCoils", latestCoils,
+                "refreshTriggered", changed
+        ));
+        if (changed) {
             runtimeRepositoryDispatcher.refreshConfig();
         }
     }

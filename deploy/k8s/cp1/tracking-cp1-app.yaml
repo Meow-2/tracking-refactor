@@ -38,6 +38,13 @@ spec:
             requests:
               memory: "512Mi"
               cpu: "200m"
+          volumeMounts:
+            - name: tracking-logs
+              mountPath: /logs
+      volumes:
+        - name: tracking-logs
+          persistentVolumeClaim:
+            claimName: tracking-cp1-pvc
       restartPolicy: Always
 ---
 apiVersion: v1

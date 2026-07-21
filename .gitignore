@@ -34,3 +34,6 @@ build/
 
 ### Codex ###
 .codex/
+
+### Runtime logs ###
+logs/

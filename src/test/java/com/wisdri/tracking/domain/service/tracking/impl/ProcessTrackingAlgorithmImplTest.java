@@ -2,6 +2,7 @@ package com.wisdri.tracking.domain.service.tracking.impl;
 
 import com.wisdri.tracking.domain.model.config.process.LengthMode;
 import com.wisdri.tracking.domain.model.config.PointConfig;
+import com.wisdri.tracking.domain.model.config.StartCondition;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.SegmentConfig;
 import com.wisdri.tracking.domain.model.config.process.TrackingPointGroup;
@@ -15,6 +16,7 @@ import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.abnormal.AbnormalDataHandlerDispatcher;
 import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
+import com.wisdri.tracking.domain.service.tracking.trace.TrackingStepLogger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -31,6 +33,8 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -39,17 +43,20 @@ import static org.mockito.Mockito.when;
 
 class ProcessTrackingAlgorithmImplTest {
     private TrackingRuntimeRepositoryDispatcher runtimeRepositoryDispatcher;
+    private TrackingStepLogger trackingStepLogger;
     private ProcessTrackingAlgorithmImpl algorithm;
 
     @BeforeEach
     void setUp() {
         runtimeRepositoryDispatcher = mock(TrackingRuntimeRepositoryDispatcher.class);
+        trackingStepLogger = mock(TrackingStepLogger.class);
         algorithm = new ProcessTrackingAlgorithmImpl();
         ReflectionTestUtils.setField(algorithm, "runtimeRepositoryDispatcher", runtimeRepositoryDispatcher);
         ReflectionTestUtils.setField(algorithm, "abnormalDataHandlerDispatcher",
                 mock(AbnormalDataHandlerDispatcher.class));
         ReflectionTestUtils.setField(algorithm, "pointEventHandlerDispatcher",
                 mock(PointEventHandlerDispatcher.class));
+        ReflectionTestUtils.setField(algorithm, "trackingStepLogger", trackingStepLogger);
         when(runtimeRepositoryDispatcher.findConfigAs(
                 "CP1", TrackingType.PROCESS, ProcessTrackingConfig.class
         )).thenReturn(Optional.of(config()));
@@ -69,9 +76,36 @@ class ProcessTrackingAlgorithmImplTest {
         ProcessTrackingRuntime populated = (ProcessTrackingRuntime) captor.getAllValues().get(0);
         assertEquals("C001", populated.getSegments().get("S1").getCoilNo());
         assertEquals(new BigDecimal("15.5"), populated.getSegments().get("S1").getHeadLength());
+        verify(trackingStepLogger, times(2)).log(any(TrackingInput.class),
+                eq("区段候选钢卷评估"), eq("S1"), anyMap());
+        verify(trackingStepLogger).log(any(TrackingInput.class),
+                eq("区段结果生成"), eq("S1"), anyMap());
 
         ProcessTrackingRuntime cleared = (ProcessTrackingRuntime) captor.getAllValues().get(1);
         assertTrue(cleared.getSegments().isEmpty());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void logsFailedStartConditionAndSkipsCalculation() {
+        ProcessTrackingConfig config = config();
+        config.getTracking().setStartCondition(StartCondition.builder()
+                .point(PointConfig.builder().name("status").build())
+                .threshold(BigDecimal.ONE)
+                .build());
+        when(runtimeRepositoryDispatcher.findConfigAs(
+                "CP1", TrackingType.PROCESS, ProcessTrackingConfig.class
+        )).thenReturn(Optional.of(config));
+        Map<String, Object> values = values("C001", new BigDecimal("15.5"));
+        values.put("status", BigDecimal.ZERO);
+
+        assertTrue(algorithm.calculate(input(values)).isEmpty());
+
+        ArgumentCaptor<Map<String, Object>> details = ArgumentCaptor.forClass(Map.class);
+        verify(trackingStepLogger).log(any(TrackingInput.class),
+                eq("启动条件检查"), details.capture());
+        assertEquals(false, details.getValue().get("passed"));
+        assertEquals(BigDecimal.ZERO, details.getValue().get("actual"));
     }
 
     private ProcessTrackingConfig config() {
