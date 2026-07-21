@@ -58,7 +58,12 @@ class LastPointSnapshotRepositoryImplTest {
         repository.save("CP1", TrackingType.PROCESS, snapshot("process"));
 
         assertThat(redis).containsKey("tracking:cp1:process:lastdata");
-        assertThat(repository.find("CP1", TrackingType.PROCESS)).isPresent();
+        assertThat(redis.get("tracking:cp1:process:lastdata"))
+                .contains("\"receivedAt\" : \"2026-07-17T16:00:00+08:00\"");
+        assertThat(repository.find("CP1", TrackingType.PROCESS))
+                .get()
+                .extracting(PointSnapshot::getReceivedAt)
+                .isEqualTo(Instant.parse("2026-07-17T08:00:00Z"));
     }
 
     private PointSnapshot snapshot(String source) {

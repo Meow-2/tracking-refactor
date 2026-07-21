@@ -1,9 +1,11 @@
 package com.wisdri.tracking.common.utils;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.JsonGenerator;
-import com.wisdri.tracking.common.exception.TrackingException;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
@@ -13,11 +15,13 @@ import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.wisdri.tracking.common.exception.TrackingException;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
@@ -38,6 +42,13 @@ public final class JsonUtils {
      * 创建用于日志展示的 mapper，将 Instant 格式化为亚洲上海时间。
      */
     public static ObjectMapper shanghaiTimeDisplayMapper() {
+        return shanghaiTimeDisplayMapperBuilder().build();
+    }
+
+    /**
+     * 创建将 Instant 格式化为亚洲上海时间的 mapper builder。
+     */
+    public static JsonMapper.Builder shanghaiTimeDisplayMapperBuilder() {
         SimpleModule displayTimeModule = new SimpleModule();
         displayTimeModule.addSerializer(Instant.class, new JsonSerializer<Instant>() {
             @Override
@@ -46,9 +57,17 @@ public final class JsonUtils {
                 generator.writeString(DISPLAY_TIME_FORMATTER.format(value));
             }
         });
+        displayTimeModule.addDeserializer(Instant.class, new JsonDeserializer<Instant>() {
+            @Override
+            public Instant deserialize(JsonParser parser, DeserializationContext context)
+                    throws IOException {
+                return OffsetDateTime.parse(
+                        parser.getText(), DateTimeFormatter.ISO_OFFSET_DATE_TIME
+                ).toInstant();
+            }
+        });
         return decimalPreservingMapperBuilder()
-                .addModule(displayTimeModule)
-                .build();
+                .addModule(displayTimeModule);
     }
 
     /**

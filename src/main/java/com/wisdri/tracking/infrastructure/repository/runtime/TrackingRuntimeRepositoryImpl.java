@@ -56,7 +56,7 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
     /**
      * 配置和运行态 JSON 序列化器。
      */
-    private final ObjectMapper objectMapper = JsonUtils.decimalPreservingMapperBuilder()
+    private final ObjectMapper objectMapper = JsonUtils.shanghaiTimeDisplayMapperBuilder()
             .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
             .configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true)
             .configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS, true)
