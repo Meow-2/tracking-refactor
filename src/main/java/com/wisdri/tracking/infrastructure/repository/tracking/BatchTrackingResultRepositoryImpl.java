@@ -159,7 +159,7 @@ public class BatchTrackingResultRepositoryImpl
         add(values, "fb_code", fbCode(result.getTemplateCode()), false, timestamp);
         add(values, "segment_code", segmentCode(result.getSegmentCode()), false, timestamp);
         add(values, "coil_no", result.getCoilNo(), false, timestamp);
-        add(values, "prod_status", result.getProductionStatus(), false, timestamp);
+        add(values, "prod_status", result.getProductionStatus(), true, timestamp);
         if (result.getParameters() != null) {
             for (Map.Entry<String, Object> entry : result.getParameters().entrySet()) {
                 if (entry.getValue() != null) {

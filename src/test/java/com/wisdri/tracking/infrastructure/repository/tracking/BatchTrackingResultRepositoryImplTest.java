@@ -66,7 +66,7 @@ class BatchTrackingResultRepositoryImplTest {
         assertRule(request.getRule(), "fb_code", "int", false);
         assertRule(request.getRule(), "segment_code", "int", false);
         assertRule(request.getRule(), "coil_no", "string", false);
-        assertRule(request.getRule(), "prod_status", "float", false);
+        assertRule(request.getRule(), "prod_status", "float", true);
         assertRule(request.getRule(), "head_length", "float", false);
         assertRule(request.getRule(), "speed", "float", false);
         assertRule(request.getRule(), "pass_no", "int", false);
@@ -93,7 +93,7 @@ class BatchTrackingResultRepositoryImplTest {
         assertValue(northRequest.getValues(), "fb_code", 1, false, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "segment_code", 1, false, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "coil_no", "N001", false, NORTH_TIMESTAMP);
-        assertValue(northRequest.getValues(), "prod_status", new BigDecimal("1"), false, NORTH_TIMESTAMP);
+        assertValue(northRequest.getValues(), "prod_status", new BigDecimal("1"), true, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "shared", "north-value", true, NORTH_TIMESTAMP);
         assertFalse(northRequest.getValues().stream().anyMatch(value -> "empty".equals(value.getId())));
         assertFalse(northRequest.getValues().stream().anyMatch(value -> "head_length".equals(value.getId())));
