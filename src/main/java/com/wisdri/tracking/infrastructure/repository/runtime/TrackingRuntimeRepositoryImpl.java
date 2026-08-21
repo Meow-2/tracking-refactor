@@ -9,9 +9,8 @@ import com.wisdri.tracking.common.utils.JsonUtils;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.batch.BatchTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
+import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
-import com.wisdri.tracking.domain.model.runtime.batch.BatchTrackingRuntime;
-import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepository;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepositoryDispatcher;
@@ -49,11 +48,6 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
     private final Map<TrackingType, Class<? extends TrackingConfig>> configTypes = configTypes();
 
     /**
-     * 跟踪类型与运行态模型类型映射。
-     */
-    private final Map<TrackingType, Class<? extends TrackingRuntime>> runtimeTypes = runtimeTypes();
-
-    /**
      * 配置和运行态 JSON 序列化器。
      */
     private final ObjectMapper objectMapper = JsonUtils.shanghaiTimeDisplayMapperBuilder()
@@ -81,11 +75,13 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
     private TrackingResultRepositoryDispatcher trackingResultRepositoryDispatcher;
 
     /**
-     * 当前仓储负责过程跟踪和批次跟踪。
+     * 当前仓储负责已完整接入的跟踪类型。
      */
     @Override
     public boolean support(TrackingType trackingType) {
-        return TrackingType.PROCESS == trackingType || TrackingType.BATCH == trackingType;
+        return TrackingType.PROCESS == trackingType
+                || TrackingType.BATCH == trackingType
+                || TrackingType.STATUS == trackingType;
     }
 
     /**
@@ -97,7 +93,7 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
     }
 
     /**
-     * 从本地缓存读取运行态，本地未命中时从 Redis 恢复。
+     * 从本地缓存读取运行态；进程启动后不从 Redis 恢复历史运行态。
      */
     @Override
     public Optional<TrackingRuntime> findRuntime(String unitCode, TrackingType trackingType) {
@@ -105,7 +101,7 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
     }
 
     /**
-     * 从本地缓存读取模板实例运行态，本地未命中时从 Redis 恢复。
+     * 从本地缓存读取模板实例运行态；进程启动后不从 Redis 恢复历史运行态。
      */
     @Override
     public Optional<TrackingRuntime> findRuntime(String unitCode,
@@ -113,21 +109,11 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
                                                   String templateCode) {
         validateTemplateCode(trackingType, templateCode);
         String key = runtimeKey(unitCode, trackingType, templateCode);
-        TrackingRuntime cached = runtimeCache.get(key);
-        if (cached != null) {
-            return Optional.of(cached);
-        }
-        String json = stringRedisTemplate.opsForValue().get(key);
-        if (json == null || json.trim().isEmpty()) {
-            return Optional.empty();
-        }
-        TrackingRuntime runtime = readRuntime(unitCode, trackingType, templateCode, json);
-        TrackingRuntime existing = runtimeCache.putIfAbsent(key, runtime);
-        return Optional.of(existing == null ? runtime : existing);
+        return Optional.ofNullable(runtimeCache.get(key));
     }
 
     /**
-     * 将运行态写入 Redis，并整体替换本地缓存。
+     * 先整体替换本地运行态，再同步写入 Redis 供外部查看。
      */
     @Override
     public void saveRuntime(TrackingRuntime runtime) {
@@ -136,9 +122,12 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
         }
         validateTemplateCode(runtime.getTrackingType(), runtime.getTemplateCode());
         String key = runtimeKey(runtime.getUnitCode(), runtime.getTrackingType(), runtime.getTemplateCode());
+        runtimeCache.put(key, runtime);
         try {
-            stringRedisTemplate.opsForValue().set(key, JsonUtils.toPrettyJson(objectMapper, runtime));
-            runtimeCache.put(key, runtime);
+            String json = TrackingType.STATUS == runtime.getTrackingType()
+                    ? JsonUtils.toPrettyJsonWithInlineArrays(objectMapper, runtime)
+                    : JsonUtils.toPrettyJson(objectMapper, runtime);
+            stringRedisTemplate.opsForValue().set(key, json);
         } catch (IOException e) {
             throw new TrackingException("写入跟踪运行态到 Redis 失败: " + key, e);
         }
@@ -239,45 +228,13 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
     }
 
     /**
-     * 根据跟踪类型读取运行态。
-     */
-    private TrackingRuntime readRuntime(String unitCode,
-                                        TrackingType trackingType,
-                                        String templateCode,
-                                        String json) {
-        Class<? extends TrackingRuntime> runtimeType = runtimeTypes.get(trackingType);
-        if (runtimeType == null) {
-            throw new TrackingException("不支持的跟踪运行态类型: " + trackingType);
-        }
-        try {
-            TrackingRuntime runtime = objectMapper.readValue(json, runtimeType);
-            runtime.setUnitCode(unitCode);
-            runtime.setTrackingType(trackingType);
-            runtime.setTemplateCode(templateCode);
-            return runtime;
-        } catch (IOException e) {
-            throw new TrackingException("读取跟踪运行态失败: "
-                    + runtimeKey(unitCode, trackingType, templateCode), e);
-        }
-    }
-
-    /**
      * 注册各跟踪类型对应的配置模型类型。
      */
     private Map<TrackingType, Class<? extends TrackingConfig>> configTypes() {
         Map<TrackingType, Class<? extends TrackingConfig>> types = new EnumMap<>(TrackingType.class);
         types.put(TrackingType.PROCESS, ProcessTrackingConfig.class);
         types.put(TrackingType.BATCH, BatchTrackingConfig.class);
-        return types;
-    }
-
-    /**
-     * 注册各跟踪类型对应的运行态模型类型。
-     */
-    private Map<TrackingType, Class<? extends TrackingRuntime>> runtimeTypes() {
-        Map<TrackingType, Class<? extends TrackingRuntime>> types = new EnumMap<>(TrackingType.class);
-        types.put(TrackingType.PROCESS, ProcessTrackingRuntime.class);
-        types.put(TrackingType.BATCH, BatchTrackingRuntime.class);
+        types.put(TrackingType.STATUS, StatusTrackingConfig.class);
         return types;
     }
 

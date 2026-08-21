@@ -1,0 +1,33 @@
+{
+  "enable": true,
+  "mqtt_topic": "fcl1_status_tracking",
+  "tracking": {
+    "point_prefix": "/aygg_tracking/fcl1/status/tracking/",
+    "start_condition": { "point": { "name": "center_speed_pv", "type": "short" }, "threshold": 0 },
+    "sample_count": 4,
+    "min_length_change": 0.5,
+    "monotonicity_check_enabled": false,
+    "points": [
+      {
+        "code": "por1", "name": "1#开卷机", "side": "uncoiler",
+        "coil_no": { "name": "por1_coil_no", "type": "string" },
+        "remaining_length": { "name": "por1_length", "type": "float" }
+      },
+      {
+        "code": "por2", "name": "2#开卷机", "side": "uncoiler",
+        "coil_no": { "name": "por2_coil_no", "type": "string" },
+        "remaining_length": { "name": "por2_length", "type": "float" }
+      },
+      {
+        "code": "tr1", "name": "1#卷取机", "side": "coiler",
+        "coil_no": { "name": "tr1_coil_no", "type": "string" },
+        "remaining_length": { "name": "tr1_length", "type": "float" }
+      },
+      {
+        "code": "tr2", "name": "2#卷取机", "side": "coiler",
+        "coil_no": { "name": "tr2_coil_no", "type": "string" },
+        "remaining_length": { "name": "tr2_length", "type": "float" }
+      }
+    ]
+  }
+}

@@ -3,6 +3,7 @@ package com.wisdri.tracking.infrastructure.service.mqtt;
 import com.wisdri.tracking.domain.model.config.batch.BatchTrackingConfig;
 import com.wisdri.tracking.domain.model.config.batch.TemplateConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
+import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.infrastructure.properties.MqttConfig;
 import com.wisdri.tracking.infrastructure.dto.mqtt.TrackingSubscription;
@@ -67,6 +68,23 @@ class MqttSubscriptionRegistryTest {
         registry.register(config);
 
         TrackingSubscription subscription = registry.find("cp1_process_tracking")
+                .orElseThrow(AssertionError::new);
+        assertThat(subscription.getConfig()).isSameAs(config);
+        assertThat(subscription.getTemplateCode()).isNull();
+    }
+
+    @Test
+    void registersStatusAsOrdinaryNonTemplateSubscription() {
+        StatusTrackingConfig config = StatusTrackingConfig.builder()
+                .unitCode("CP1")
+                .trackingType(TrackingType.STATUS)
+                .enable(true)
+                .mqttTopic("cp1_status_tracking")
+                .build();
+
+        registry.register(config);
+
+        TrackingSubscription subscription = registry.find("cp1_status_tracking")
                 .orElseThrow(AssertionError::new);
         assertThat(subscription.getConfig()).isSameAs(config);
         assertThat(subscription.getTemplateCode()).isNull();

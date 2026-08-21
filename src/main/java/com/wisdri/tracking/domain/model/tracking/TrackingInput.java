@@ -1,6 +1,7 @@
 package com.wisdri.tracking.domain.model.tracking;
 
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
+import com.wisdri.tracking.domain.model.tracking.status.StatusTrackingContext;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -40,6 +41,12 @@ public class TrackingInput {
      * 上一条点位快照。
      */
     private PointSnapshot previousSnapshot;
+
+    /**
+     * 任务生产时固化的开卷机、卷取机钢卷状态。
+     */
+    private StatusTrackingContext statusContext;
+
     /**
      * 从跟踪任务转换为算法输入。
      */
@@ -50,6 +57,7 @@ public class TrackingInput {
                 .templateCode(task.getTemplateCode())
                 .latestSnapshot(task.getLatestSnapshot())
                 .previousSnapshot(task.getPreviousSnapshot())
+                .statusContext(task.getStatusContext())
                 .build();
     }
 }

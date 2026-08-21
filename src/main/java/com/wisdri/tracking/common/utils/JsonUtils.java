@@ -100,6 +100,14 @@ public final class JsonUtils {
         return objectMapper.writer(arrayLineFeedPrinter()).writeValueAsString(value);
     }
 
+    /**
+     * 序列化为对象换行、数组保持单行的格式化 JSON。
+     */
+    public static String toPrettyJsonWithInlineArrays(ObjectMapper objectMapper, Object value)
+            throws JsonProcessingException {
+        return objectMapper.writer(arrayInlinePrinter()).writeValueAsString(value);
+    }
+
     private static ObjectMapper prettyJsonMapper() {
         return shanghaiTimeDisplayMapper();
     }
@@ -112,6 +120,16 @@ public final class JsonUtils {
         DefaultIndenter indenter = new DefaultIndenter("  ", System.lineSeparator());
         printer.indentObjectsWith(indenter);
         printer.indentArraysWith(indenter);
+        return printer;
+    }
+
+    /**
+     * 创建对象字段换行、数组元素单行展示的 pretty printer。
+     */
+    public static DefaultPrettyPrinter arrayInlinePrinter() {
+        DefaultPrettyPrinter printer = new DefaultPrettyPrinter();
+        DefaultIndenter indenter = new DefaultIndenter("  ", System.lineSeparator());
+        printer.indentObjectsWith(indenter);
         return printer;
     }
 

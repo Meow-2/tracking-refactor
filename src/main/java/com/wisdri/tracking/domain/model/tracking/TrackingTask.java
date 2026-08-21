@@ -1,6 +1,7 @@
 package com.wisdri.tracking.domain.model.tracking;
 
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
+import com.wisdri.tracking.domain.model.tracking.status.StatusTrackingContext;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -42,6 +43,11 @@ public class TrackingTask {
      * 上一条点位快照。
      */
     private PointSnapshot previousSnapshot;
+
+    /**
+     * 任务生产时固化的开卷机、卷取机钢卷状态。
+     */
+    private StatusTrackingContext statusContext;
 
     /**
      * 任务发布时间。

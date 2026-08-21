@@ -3,6 +3,7 @@ package com.wisdri.tracking.application.usecase.tracking;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingResult;
 import com.wisdri.tracking.domain.model.tracking.TrackingTask;
+import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithmDispatcher;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +38,11 @@ public class TrackingTaskConsumerUseCase {
      */
     public void consume(TrackingTask task) {
         if (task == null) {
+            return;
+        }
+        if (TrackingType.STATUS == task.getTrackingType()) {
+            log.info("忽略消费侧 status 跟踪任务，status 已迁移到生产侧同步计算，机组编码={}",
+                    task.getUnitCode());
             return;
         }
         List<TrackingResult> results = trackingAlgorithmDispatcher.calculate(TrackingInput.of(task));

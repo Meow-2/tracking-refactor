@@ -3,9 +3,14 @@ package com.wisdri.tracking.infrastructure.repository.runtime;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.batch.BatchTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
+import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.runtime.batch.BatchTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessSegmentRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
+import com.wisdri.tracking.domain.model.config.status.DeviceSide;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepositoryDispatcher;
 import com.wisdri.tracking.infrastructure.service.feign.gateway.CubeApiGateway;
@@ -21,6 +26,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -51,7 +57,7 @@ class TrackingRuntimeRepositoryImplTest {
     }
 
     @Test
-    void savesSnakeCaseJsonAndRestoresRuntimeFromRedis() {
+    void savesSnakeCaseJsonWithoutRestoringRuntimeIntoNewProcessCache() {
         TrackingRuntimeRepositoryImpl repository = repository();
         ProcessSegmentRuntime segment = ProcessSegmentRuntime.builder()
                 .segmentCode("S1")
@@ -76,15 +82,16 @@ class TrackingRuntimeRepositoryImplTest {
         assertTrue(json.contains("\"start_condition_point_value\" : 1"));
         assertFalse(json.contains("template_code"));
 
-        TrackingRuntimeRepositoryImpl restartedRepository = repository();
-        ProcessTrackingRuntime restored = restartedRepository.findRuntimeAs(
+        ProcessTrackingRuntime cached = repository.findRuntimeAs(
                 "CP1", TrackingType.PROCESS, ProcessTrackingRuntime.class
         ).orElseThrow(AssertionError::new);
-        assertEquals("C001", restored.getSegments().get("S1").getCoilNo());
-        assertEquals(new BigDecimal("12.30"), restored.getSegments().get("S1").getHeadLength());
-        assertEquals(new BigDecimal("2.5"), restored.getSpeedPointValue());
-        assertEquals(BigDecimal.ONE, restored.getStartConditionPointValue());
-        assertEquals(Instant.parse("2026-07-05T12:00:00Z"), restored.getUpdatedAt());
+        assertEquals("C001", cached.getSegments().get("S1").getCoilNo());
+        assertEquals(new BigDecimal("12.30"), cached.getSegments().get("S1").getHeadLength());
+        assertEquals(new BigDecimal("2.5"), cached.getSpeedPointValue());
+        assertEquals(BigDecimal.ONE, cached.getStartConditionPointValue());
+        assertEquals(Instant.parse("2026-07-05T12:00:00Z"), cached.getUpdatedAt());
+        assertFalse(repository().findRuntimeAs(
+                "CP1", TrackingType.PROCESS, ProcessTrackingRuntime.class).isPresent());
     }
 
     @Test
@@ -98,13 +105,14 @@ class TrackingRuntimeRepositoryImplTest {
 
         assertTrue(redis.containsKey("tracking:baf1:batch:fb1:runtime"));
         assertTrue(redis.containsKey("tracking:baf1:batch:fb2:runtime"));
-        TrackingRuntimeRepositoryImpl restartedRepository = repository();
-        BatchTrackingRuntime restored = restartedRepository.findRuntimeAs(
+        BatchTrackingRuntime cached = repository.findRuntimeAs(
                 "BAF1", TrackingType.BATCH, "fb1", BatchTrackingRuntime.class
         ).orElseThrow(AssertionError::new);
-        assertEquals("fb1", restored.getTemplateCode());
-        assertEquals(new BigDecimal("1"), restored.getProductionStatus());
-        assertEquals("N001", restored.getCoilNos().get("north"));
+        assertEquals("fb1", cached.getTemplateCode());
+        assertEquals(new BigDecimal("1"), cached.getProductionStatus());
+        assertEquals("N001", cached.getCoilNos().get("north"));
+        assertFalse(repository().findRuntimeAs(
+                "BAF1", TrackingType.BATCH, "fb1", BatchTrackingRuntime.class).isPresent());
     }
 
     @Test
@@ -123,6 +131,47 @@ class TrackingRuntimeRepositoryImplTest {
         assertEquals("C002", repository.findRuntimeAs(
                 "CP2", TrackingType.PROCESS, ProcessTrackingRuntime.class
         ).orElseThrow(AssertionError::new).getSegments().get("S1").getCoilNo());
+    }
+
+    @Test
+    void savesAndRestoresStatusCandidateWindowsAndCurrentState() {
+        TrackingRuntimeRepositoryImpl repository = repository();
+        StatusCandidateRuntime candidate = StatusCandidateRuntime.builder()
+                .coilNo("C001")
+                .lengths(Arrays.asList(new BigDecimal("100"), new BigDecimal("95")))
+                .build();
+        StatusCurrentRuntime current = StatusCurrentRuntime.builder()
+                .side(DeviceSide.UNCOILER)
+                .running(true)
+                .deviceCode("U1")
+                .coilNo("C001")
+                .remainingLength(new BigDecimal("95"))
+                .build();
+        StatusTrackingRuntime status = StatusTrackingRuntime.builder()
+                .unitCode("CP1")
+                .trackingType(TrackingType.STATUS)
+                .startConditionPointValue(BigDecimal.ONE)
+                .candidates(Collections.singletonMap("U1", candidate))
+                .current(Collections.singletonMap(DeviceSide.UNCOILER, current))
+                .build();
+
+        repository.saveRuntime(status);
+
+        assertTrue(redis.containsKey("tracking:cp1:status:runtime"));
+        assertFalse(redis.get("tracking:cp1:status:runtime").contains("updated_at"));
+        assertTrue(redis.get("tracking:cp1:status:runtime").contains(
+                "\"lengths\" : [ 100, 95 ]"));
+        StatusTrackingRuntime cached = repository.findRuntimeAs(
+                "CP1", TrackingType.STATUS, StatusTrackingRuntime.class
+        ).orElseThrow(AssertionError::new);
+        assertEquals("C001", cached.getCandidates().get("U1").getCoilNo());
+        assertEquals(Arrays.asList(new BigDecimal("100"), new BigDecimal("95")),
+                cached.getCandidates().get("U1").getLengths());
+        assertTrue(cached.getCurrent().get(DeviceSide.UNCOILER).getRunning());
+        assertEquals(new BigDecimal("95"),
+                cached.getCurrent().get(DeviceSide.UNCOILER).getRemainingLength());
+        assertFalse(repository().findRuntimeAs(
+                "CP1", TrackingType.STATUS, StatusTrackingRuntime.class).isPresent());
     }
 
     @Test
@@ -161,7 +210,7 @@ class TrackingRuntimeRepositoryImplTest {
     }
 
     @Test
-    void synchronizesProcessAndBatchConfigsAfterBatchSupportIsActivated() {
+    void synchronizesAllSupportedTrackingConfigs() {
         TrackingRuntimeRepositoryImpl repository = repository();
         CubeApiGateway cubeApiGateway = mock(CubeApiGateway.class);
         TrackingResultRepositoryDispatcher dispatcher = mock(TrackingResultRepositoryDispatcher.class);
@@ -178,20 +227,28 @@ class TrackingRuntimeRepositoryImplTest {
                 .trackingType(TrackingType.BATCH)
                 .enable(true)
                 .build();
+        StatusTrackingConfig status = StatusTrackingConfig.builder()
+                .unitCode("BAF1")
+                .trackingType(TrackingType.STATUS)
+                .enable(true)
+                .build();
         Map<TrackingType, TrackingConfig> fetched = new EnumMap<>(TrackingType.class);
         fetched.put(TrackingType.PROCESS, process);
         fetched.put(TrackingType.BATCH, batch);
+        fetched.put(TrackingType.STATUS, status);
         when(cubeApiGateway.fetchTrackingConfigs()).thenReturn(fetched);
 
         repository.refreshConfig();
 
         assertTrue(redis.containsKey("tracking:baf1:process:config"));
         assertTrue(redis.containsKey("tracking:baf1:batch:config"));
+        assertTrue(redis.containsKey("tracking:baf1:status:config"));
         assertTrue(repository.findConfigAs(
                 "BAF1", TrackingType.BATCH, BatchTrackingConfig.class
         ).isPresent());
         verify(dispatcher).createTable(process);
         verify(dispatcher).createTable(batch);
+        verify(dispatcher).createTable(status);
     }
 
     private TrackingRuntimeRepositoryImpl repository() {
