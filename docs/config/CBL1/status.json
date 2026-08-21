@@ -3,25 +3,55 @@
   "mqtt_topic": "cbl1_status_tracking",
   "tracking": {
     "point_prefix": "/aygg_tracking/cbl1/status/tracking/",
-    "start_condition": { "point": { "name": "line_speed_pv", "type": "short" }, "threshold": 0 },
+    "start_condition": {
+      "point": {
+        "name": "line_speed_pv",
+        "type": "short"
+      },
+      "threshold": 0
+    },
     "sample_count": 4,
-    "min_length_change": 0.5,
+    "min_length_change": 0.01,
     "monotonicity_check_enabled": false,
     "points": [
       {
-        "code": "por1", "name": "1#引带卷开卷机", "side": "uncoiler",
-        "coil_no": { "name": "por1_coil_no", "type": "string" },
-        "remaining_length": { "name": "thread_por_length", "type": "float" }
+        "code": "por1",
+        "name": "1#引带卷开卷机",
+        "side": "uncoiler",
+        "coil_no": {
+          "name": "por1_coil_no",
+          "type": "string"
+        },
+        "remaining_length": {
+          "name": "thread_por_length",
+          "type": "float"
+        }
       },
       {
-        "code": "por2", "name": "2#正常卷开卷机", "side": "uncoiler",
-        "coil_no": { "name": "por2_coil_no", "type": "string" },
-        "remaining_length": { "name": "normal_por_length", "type": "float" }
+        "code": "por2",
+        "name": "2#正常卷开卷机",
+        "side": "uncoiler",
+        "coil_no": {
+          "name": "por2_coil_no",
+          "type": "string"
+        },
+        "remaining_length": {
+          "name": "normal_por_length",
+          "type": "float"
+        }
       },
       {
-        "code": "tr1", "name": "1#卷取机", "side": "coiler",
-        "coil_no": { "name": "tr1_coil_no", "type": "string" },
-        "remaining_length": { "name": "exit_tr_length", "type": "float" }
+        "code": "tr1",
+        "name": "1#卷取机",
+        "side": "coiler",
+        "coil_no": {
+          "name": "tr1_coil_no",
+          "type": "string"
+        },
+        "remaining_length": {
+          "name": "exit_tr_length",
+          "type": "float"
+        }
       }
     ]
   }

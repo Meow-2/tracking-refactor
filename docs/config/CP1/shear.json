@@ -1,0 +1,137 @@
+{
+  "enable": true,
+  "mqtt_topic": "cp1_shear_tracking",
+  "tracking": {
+    "point_prefix": "/aygg_tracking/cp1/shear/tracking/",
+    "mode": "continuous",
+    "tail_experience": "50",
+    "coiler": {
+      "shear_point": [
+        {
+          "name": "is_upper_cut",
+          "type": "boolean",
+          "normal_pos": true,
+          "por_code": "por1",
+          "shear_settings": {
+            "head":{
+              "number": {
+                "name": "upper_head_cut_number",
+                "type": "int"
+              },
+              "length": {
+                "name": "upper_head_length",
+                "type": "float"
+              }
+            },
+            "tail": {
+              "number": {
+                "name": "upper_tail_cut_number",
+                "type": "int"
+              },
+              "length": {
+                "name": "upper_tail_length",
+                "type": "float"
+              }
+            },
+            "slice": {
+              "number": {
+                "default": 0
+              },
+              "length": {
+                "default": 0.0
+              }
+            }
+          },
+          "color_point": {
+            "name": "color_code_front_of_shear1",
+            "type": "short"
+          }
+        },
+        {
+          "name": "is_lower_cut",
+          "type": "boolean",
+          "normal_pos": true,
+          "por_code": "por2",
+          "shear_settings": {
+            "head":{
+              "number": {
+                "name": "lower_head_cut_number",
+                "type": "int"
+              },
+              "length": {
+                "name": "lower_head_length",
+                "type": "float"
+              }
+            },
+            "tail": {
+              "number": {
+                "name": "lower_tail_cut_number",
+                "type": "int"
+              },
+              "length": {
+                "name": "lower_tail_length",
+                "type": "float"
+              }
+            },
+            "slice": {
+              "number": {
+                "default": 0
+              },
+              "length": {
+                "default": 0.0
+              }
+            }
+          },
+          "color_point": {
+            "name": "color_code_front_of_shear2",
+            "type": "short"
+          }
+        }
+      ]
+    },
+    "uncoiler":{
+      "shear_point": [
+        {
+          "name": "exit_shear_cut",
+          "type": "boolean",
+          "normal_pos": true,
+          "por_code": "tr1",
+          "shear_settings": {
+            "front_welder": {
+              "sample_pieces": {
+                "name": "exit_shear_front_sample_pieces",
+                "type": "int"
+              },
+              "scrap_pieces": {
+                "name": "exit_shear_front_scrap_pieces",
+                "type": "int"
+              },
+              "length": {
+                "name": "exit_shear_length",
+                "type": "float"
+              }
+            },
+            "behind_welder": {
+              "sample_pieces": {
+                "name": "exit_shear_rear_sample_pieces",
+                "type": "int"
+              },
+              "scrap_pieces": {
+                "name": "exit_shear_rear_scrap_pieces",
+                "type": "int"
+              },
+              "length": {
+                "name": "exit_shear_length",
+                "type": "float"
+              }
+            }
+          },
+          "color_point": {
+            "name": "seg159_hmi20",
+            "type": "short"
+          }
+        }
+      ]
+    }
+  }
+}

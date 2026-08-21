@@ -1,0 +1,152 @@
+{
+  "enable": true,
+  "mqtt_topic": "cbl1_shear_tracking",
+  "tracking": {
+    "point_prefix": "/aygg_tracking/cbl1/shear/tracking/",
+    "mode": "discontinuous",
+    "tail_experience": "50",
+    "coiler": {
+      "shear_point": [
+        {
+          "name": "thread_entry_shear_cut",
+          "type": "boolean",
+          "normal_pos": true,
+          "por_code": "por1",
+          "shear_settings": {
+            "head":{
+              "number": {
+                "name": "thread_entry_shear_head_cut_number",
+                "type": "int"
+              },
+              "length": {
+                "name": "thread_entry_shear_head_length",
+                "type": "float"
+              }
+            },
+            "tail": {
+              "number": {
+                "name": "thread_entry_shear_tail_cut_number",
+                "type": "int"
+              },
+              "length": {
+                "name": "thread_entry_shear_tail_length",
+                "type": "float"
+              }
+            },
+            "slice": {
+              "number": {
+                "default": 0
+              },
+              "length": {
+                "default": 0.0
+              }
+            }
+          },
+          "grating_points": [
+            {
+              "name": "thread_por_grating1_position_status",
+              "type": "boolean",
+              "has_coil": true
+            },
+            {
+              "name": "thread_por_grating2_position_status",
+              "type": "boolean",
+              "has_coil": false
+            },
+            {
+              "name": "thread_por_grating3_position_status",
+              "type": "boolean",
+              "has_coil": false
+            }
+          ]
+        },
+        {
+          "name": "normal_entry_shear_cut",
+          "type": "boolean",
+          "normal_pos": true,
+          "por_code": "por2",
+          "shear_settings": {
+            "head":{
+              "number": {
+                "name": "normal_entry_shear_head_cut_number",
+                "type": "int"
+              },
+              "length": {
+                "name": "normal_entry_shear_head_length",
+                "type": "float"
+              }
+            },
+            "tail": {
+              "number": {
+                "name": "normal_entry_shear_tail_cut_number",
+                "type": "int"
+              },
+              "length": {
+                "name": "normal_entry_shear_tail_length",
+                "type": "float"
+              }
+            },
+            "slice": {
+              "number": {
+                "default": 1
+              },
+              "length": {
+                "default": 0.0
+              }
+            }
+          },
+          "grating_points": [
+            {
+              "name": "normal_por_grating1_position_status",
+              "type": "boolean",
+              "has_coil": true
+            },
+            {
+              "name": "normal_por_grating2_position_status",
+              "type": "boolean",
+              "has_coil": false
+            },
+            {
+              "name": "normal_por_grating3_position_status",
+              "type": "boolean",
+              "has_coil": false
+            }
+          ]
+        }
+      ]
+    },
+    "uncoiler":{
+      "shear_point": [
+        {
+          "name": "exit_shear_cut",
+          "type": "boolean",
+          "normal_pos": true,
+          "por_code": "tr1",
+          "shear_settings": {
+            "default": "slice",
+            "slice": {
+              "number": {
+                "default": 0
+              },
+              "length": {
+                "default": 0.0
+              }
+            }
+          },
+          "grating_points": [
+            {
+              "name": "tr_grating1_position_status",
+              "type": "boolean",
+              "has_coil": true
+            },
+            {
+              "name": "tr_grating2_position_status",
+              "type": "boolean",
+              "has_coil": false
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

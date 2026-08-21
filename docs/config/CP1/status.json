@@ -11,7 +11,7 @@
       "threshold": 0
     },
     "sample_count": 4,
-    "min_length_change": 0.5,
+    "min_length_change": 0.01,
     "monotonicity_check_enabled": false,
     "points": [
       {
@@ -25,6 +25,10 @@
         "remaining_length": {
           "name": "por1_length",
           "type": "float"
+        },
+        "color_no":{
+          "name": "color_code_por1",
+          "type": "short"
         }
       },
       {
@@ -38,6 +42,10 @@
         "remaining_length": {
           "name": "por2_length",
           "type": "float"
+        },
+        "color_no":{
+          "name": "color_code_por2",
+          "type": "short"
         }
       },
       {
@@ -51,6 +59,10 @@
         "remaining_length": {
           "name": "tr1_length",
           "type": "float"
+        },
+        "color_no": {
+          "name": "color_code_tension_reel1",
+          "type": "short"
         }
       }
     ]
