@@ -7,7 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 单台开卷机或卷取机的卷号、剩余长度点位组合。
+ * 单台开卷机或卷取机的卷号、可选色号、剩余长度点位组合。
  */
 @Data
 @Builder
@@ -18,5 +18,6 @@ public class StatusPointGroup {
     private String name;
     private DeviceSide side;
     private PointConfig coilNo;
+    private PointConfig colorNo;
     private PointConfig remainingLength;
 }

@@ -63,6 +63,9 @@ public class StatusCubeApiTrackingConfigConverter extends AbstractCubeApiTrackin
                     || invalidPoint(group.getCoilNo()) || invalidPoint(group.getRemainingLength())) {
                 throw new TrackingException("status.points 设备组合配置无效");
             }
+            if (group.getColorNo() != null && invalidPoint(group.getColorNo())) {
+                throw new TrackingException("status.points 色号点位配置无效: " + group.getCode());
+            }
             if (!codes.add(group.getCode().toLowerCase(Locale.ROOT))) {
                 throw new TrackingException("status.points 设备编码重复: " + group.getCode());
             }

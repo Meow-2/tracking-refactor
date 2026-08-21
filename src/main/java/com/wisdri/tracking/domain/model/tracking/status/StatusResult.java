@@ -22,5 +22,6 @@ public class StatusResult extends TrackingResult {
     private String deviceCode;
     private String deviceName;
     private String coilNo;
+    private String colorNo;
     private BigDecimal remainingLength;
 }

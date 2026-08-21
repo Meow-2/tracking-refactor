@@ -18,5 +18,6 @@ import java.util.List;
 @AllArgsConstructor
 public class StatusCandidateRuntime {
     private String coilNo;
+    private String colorNo;
     private List<BigDecimal> lengths = new ArrayList<>();
 }

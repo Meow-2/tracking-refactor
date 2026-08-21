@@ -71,12 +71,15 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(results.get(0).getRunning()).isTrue();
         assertThat(results.get(0).getDeviceCode()).isEqualTo("U2");
         assertThat(results.get(0).getCoilNo()).isEqualTo("COIL-U2");
+        assertThat(results.get(0).getColorNo()).isEqualTo("U2-COLOR");
         assertThat(results.get(0).getRemainingLength()).isEqualByComparingTo("188");
         assertThat(results.get(1).getRunning()).isTrue();
         assertThat(results.get(1).getDeviceCode()).isEqualTo("C1");
         assertThat(results.get(1).getRemainingLength()).isEqualByComparingTo("17");
         assertThat(runtime.get().getCandidates().get("U2").getLengths())
                 .containsExactly(new BigDecimal("200"), new BigDecimal("194"), new BigDecimal("188"));
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getColorNo())
+                .isEqualTo("U2-COLOR");
     }
 
     @Test
@@ -88,6 +91,21 @@ class StatusTrackingAlgorithmImplTest {
                 "C1", "COIL-C1", "16");
 
         assertThat(results.get(0).getDeviceCode()).isEqualTo("U1");
+    }
+
+    @Test
+    void selectsCandidateWhenWindowRangeReachesThresholdAlthoughEndpointsDoNot() {
+        calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "2598.77",
+                "C1", "COIL-C1", "10");
+        calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "2604.40",
+                "C1", "COIL-C1", "10");
+
+        List<StatusResult> results = calculate(true, "U1", "COIL-U1", "100",
+                "U2", "COIL-U2", "2598.86", "C1", "COIL-C1", "10");
+
+        assertThat(results.get(0).getRunning()).isTrue();
+        assertThat(results.get(0).getDeviceCode()).isEqualTo("U2");
+        assertThat(results.get(0).getRemainingLength()).isEqualByComparingTo("2598.86");
     }
 
     @Test
@@ -158,6 +176,7 @@ class StatusTrackingAlgorithmImplTest {
         for (int index = 0; index < groups.length; index += 3) {
             String code = groups[index];
             values.put("/status/" + code.toLowerCase() + "_coil", groups[index + 1]);
+            values.put("/status/" + code.toLowerCase() + "_color", code + "-COLOR");
             values.put("/status/" + code.toLowerCase() + "_length", groups[index + 2]);
         }
         return values;
@@ -197,6 +216,7 @@ class StatusTrackingAlgorithmImplTest {
                 .name(code + " device")
                 .side(side)
                 .coilNo(point(code.toLowerCase() + "_coil"))
+                .colorNo(point(code.toLowerCase() + "_color"))
                 .remainingLength(point(code.toLowerCase() + "_length"))
                 .build();
     }

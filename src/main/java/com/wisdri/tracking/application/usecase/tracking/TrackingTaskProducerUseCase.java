@@ -7,6 +7,7 @@ import com.wisdri.tracking.common.utils.JsonUtils;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
@@ -24,7 +25,11 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -126,7 +131,7 @@ public class TrackingTaskProducerUseCase {
     }
 
     /**
-     * 复制当前状态运行态并固化到任务，避免消费时读取到另一帧状态。
+     * 深拷贝当前状态运行态并固化到任务，避免消费时读取到另一帧状态。
      */
     private StatusTrackingContext statusContext(String unitCode) {
         Optional<StatusTrackingRuntime> runtimeOptional = runtimeRepositoryDispatcher.findRuntimeAs(
@@ -137,17 +142,52 @@ public class TrackingTaskProducerUseCase {
         StatusTrackingRuntime runtime = runtimeOptional.get();
         return StatusTrackingContext.builder()
                 .receivedAt(runtime.getReceivedAt())
-                .uncoilerCoilNo(coilNo(runtime, DeviceSide.UNCOILER))
-                .coilerCoilNo(coilNo(runtime, DeviceSide.COILER))
+                .startConditionPointValue(runtime.getStartConditionPointValue())
+                .candidates(copyCandidates(runtime.getCandidates()))
+                .current(copyCurrent(runtime.getCurrent()))
                 .build();
     }
 
-    private String coilNo(StatusTrackingRuntime runtime, DeviceSide side) {
-        if (runtime.getCurrent() == null) {
-            return null;
+    private Map<String, StatusCandidateRuntime> copyCandidates(
+            Map<String, StatusCandidateRuntime> source) {
+        Map<String, StatusCandidateRuntime> copied = new LinkedHashMap<>();
+        if (source == null) {
+            return copied;
         }
-        StatusCurrentRuntime current = runtime.getCurrent().get(side);
-        return current == null ? null : current.getCoilNo();
+        source.forEach((code, candidate) -> {
+            if (candidate != null) {
+                List<BigDecimal> lengths = candidate.getLengths() == null
+                        ? new ArrayList<>() : new ArrayList<>(candidate.getLengths());
+                copied.put(code, StatusCandidateRuntime.builder()
+                        .coilNo(candidate.getCoilNo())
+                        .colorNo(candidate.getColorNo())
+                        .lengths(lengths)
+                        .build());
+            }
+        });
+        return copied;
+    }
+
+    private Map<DeviceSide, StatusCurrentRuntime> copyCurrent(
+            Map<DeviceSide, StatusCurrentRuntime> source) {
+        Map<DeviceSide, StatusCurrentRuntime> copied = new LinkedHashMap<>();
+        if (source == null) {
+            return copied;
+        }
+        source.forEach((side, current) -> {
+            if (current != null) {
+                copied.put(side, StatusCurrentRuntime.builder()
+                        .side(current.getSide())
+                        .running(current.getRunning())
+                        .deviceCode(current.getDeviceCode())
+                        .deviceName(current.getDeviceName())
+                        .coilNo(current.getCoilNo())
+                        .colorNo(current.getColorNo())
+                        .remainingLength(current.getRemainingLength())
+                        .build());
+            }
+        });
+        return copied;
     }
 
     /**

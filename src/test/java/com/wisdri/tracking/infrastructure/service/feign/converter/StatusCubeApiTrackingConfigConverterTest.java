@@ -26,6 +26,8 @@ class StatusCubeApiTrackingConfigConverterTest {
         assertThat(config.getTracking().getMonotonicityCheckEnabled()).isFalse();
         assertThat(config.getTracking().getPoints()).hasSize(2);
         assertThat(config.getTracking().getPoints().get(0).getSide()).isEqualTo(DeviceSide.UNCOILER);
+        assertThat(config.getTracking().getPoints().get(0).getColorNo().getName())
+                .isEqualTo("u1_color");
     }
 
     @Test
@@ -65,6 +67,7 @@ class StatusCubeApiTrackingConfigConverterTest {
                 + "\"points\":["
                 + "{\"code\":\"U1\",\"name\":\"开卷机1\",\"side\":\"uncoiler\","
                 + "\"coil_no\":{\"name\":\"u1_coil\"},"
+                + "\"color_no\":{\"name\":\"u1_color\"},"
                 + "\"remaining_length\":{\"name\":\"u1_length\"}},"
                 + "{\"code\":\"C1\",\"name\":\"卷取机1\",\"side\":\"coiler\","
                 + "\"coil_no\":{\"name\":\"c1_coil\"},"

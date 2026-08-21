@@ -5,6 +5,7 @@ import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingTask;
@@ -20,6 +21,8 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
@@ -69,10 +72,19 @@ class TrackingTaskProducerUseCaseTest {
         assertThat(task.getTemplateCode()).isEqualTo("fb1");
         assertThat(task.getPreviousSnapshot()).isSameAs(previous);
         assertThat(task.getLatestSnapshot().getValues()).containsEntry("frame", "latest");
-        assertThat(task.getStatusContext().getUncoilerCoilNo()).isEqualTo("U001");
-        assertThat(task.getStatusContext().getCoilerCoilNo()).isEqualTo("C001");
         assertThat(task.getStatusContext().getReceivedAt())
                 .isEqualTo(Instant.parse("2026-07-17T08:00:01Z"));
+        assertThat(task.getStatusContext().getStartConditionPointValue()).isEqualByComparingTo("1");
+        assertThat(task.getStatusContext().getCandidates().get("U1").getColorNo()).isEqualTo("12");
+        assertThat(task.getStatusContext().getCurrent().get(DeviceSide.UNCOILER))
+                .satisfies(current -> {
+                    assertThat(current.getRunning()).isTrue();
+                    assertThat(current.getDeviceCode()).isEqualTo("U1");
+                    assertThat(current.getColorNo()).isEqualTo("12");
+                    assertThat(current.getRemainingLength()).isEqualByComparingTo("88.5");
+                });
+        assertThat(task.getStatusContext().getCurrent().get(DeviceSide.COILER).getCoilNo())
+                .isEqualTo("C001");
         verify(snapshotRepository).save("BAF1", TrackingType.BATCH, "fb1", task.getLatestSnapshot());
     }
 
@@ -113,7 +125,10 @@ class TrackingTaskProducerUseCaseTest {
         current.put(DeviceSide.UNCOILER, StatusCurrentRuntime.builder()
                 .side(DeviceSide.UNCOILER)
                 .running(true)
+                .deviceCode("U1")
                 .coilNo("U001")
+                .colorNo("12")
+                .remainingLength(new BigDecimal("88.5"))
                 .build());
         current.put(DeviceSide.COILER, StatusCurrentRuntime.builder()
                 .side(DeviceSide.COILER)
@@ -124,6 +139,12 @@ class TrackingTaskProducerUseCaseTest {
                 .unitCode("BAF1")
                 .trackingType(TrackingType.STATUS)
                 .receivedAt(Instant.parse("2026-07-17T08:00:01Z"))
+                .startConditionPointValue(BigDecimal.ONE)
+                .candidates(Collections.singletonMap("U1", StatusCandidateRuntime.builder()
+                        .coilNo("U001")
+                        .colorNo("12")
+                        .lengths(Arrays.asList(new BigDecimal("90"), new BigDecimal("88.5")))
+                        .build()))
                 .current(current)
                 .build();
     }

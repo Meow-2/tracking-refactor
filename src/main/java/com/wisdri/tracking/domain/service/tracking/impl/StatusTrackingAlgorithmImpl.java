@@ -108,6 +108,8 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         for (StatusPointGroup group : tracking.getPoints()) {
             String coilNo = trimInvisible(PointReader.stringValue(input.getLatestSnapshot(),
                     pointPath(tracking, group.getCoilNo())));
+            String colorNo = trimInvisible(PointReader.stringValue(input.getLatestSnapshot(),
+                    pointPath(tracking, group.getColorNo())));
             BigDecimal length = decimalValue(input.getLatestSnapshot(),
                     pointPath(tracking, group.getRemainingLength()));
             if (coilNo == null || coilNo.isEmpty() || length == null) {
@@ -129,12 +131,14 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             }
             StatusCandidateRuntime candidate = StatusCandidateRuntime.builder()
                     .coilNo(coilNo)
+                    .colorNo(colorNo)
                     .lengths(lengths)
                     .build();
             updated.put(group.getCode(), candidate);
             trackingStepLogger.log(input, "设备窗口更新", group.getCode(), TrackingStepLogger.details(
                     "side", group.getSide(),
                     "coilNo", coilNo,
+                    "colorNo", colorNo,
                     "lengths", lengths));
         }
         return updated;
@@ -154,7 +158,9 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             BigDecimal first = lengths.get(0);
             BigDecimal latest = lengths.get(lengths.size() - 1);
             BigDecimal signedChange = latest.subtract(first);
-            BigDecimal absoluteChange = signedChange.abs();
+            BigDecimal min = lengths.stream().min(BigDecimal::compareTo).orElse(first);
+            BigDecimal max = lengths.stream().max(BigDecimal::compareTo).orElse(first);
+            BigDecimal absoluteChange = max.subtract(min);
             boolean monotonicityCheckEnabled = Boolean.TRUE.equals(tracking.getMonotonicityCheckEnabled());
             boolean directionMatched = group.getSide() == DeviceSide.UNCOILER
                     ? signedChange.signum() < 0
@@ -165,6 +171,9 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     "firstLength", first,
                     "latestLength", latest,
                     "change", signedChange,
+                    "minLength", min,
+                    "maxLength", max,
+                    "range", absoluteChange,
                     "monotonicityCheckEnabled", monotonicityCheckEnabled,
                     "directionMatched", directionMatched,
                     "thresholdMatched", thresholdMatched));
@@ -174,7 +183,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             SelectedCandidate existing = selected.get(group.getSide());
             if (existing == null || absoluteChange.compareTo(existing.getAbsoluteChange()) > 0) {
                 selected.put(group.getSide(), new SelectedCandidate(
-                        group, runtime.getCoilNo(), latest, absoluteChange));
+                        group, runtime.getCoilNo(), runtime.getColorNo(), latest, absoluteChange));
             }
         }
         return selected;
@@ -198,6 +207,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     .deviceCode(candidate == null ? null : candidate.getGroup().getCode())
                     .deviceName(candidate == null ? null : candidate.getGroup().getName())
                     .coilNo(candidate == null ? null : candidate.getCoilNo())
+                    .colorNo(candidate == null ? null : candidate.getColorNo())
                     .remainingLength(candidate == null ? null : candidate.getRemainingLength())
                     .build();
             results.add(result);
@@ -205,6 +215,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     "running", result.getRunning(),
                     "deviceCode", result.getDeviceCode(),
                     "coilNo", result.getCoilNo(),
+                    "colorNo", result.getColorNo(),
                     "remainingLength", result.getRemainingLength()));
         }
         return results;
@@ -219,6 +230,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     .deviceCode(result.getDeviceCode())
                     .deviceName(result.getDeviceName())
                     .coilNo(result.getCoilNo())
+                    .colorNo(result.getColorNo())
                     .remainingLength(result.getRemainingLength())
                     .build());
         }
@@ -295,6 +307,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
     private static class SelectedCandidate {
         private final StatusPointGroup group;
         private final String coilNo;
+        private final String colorNo;
         private final BigDecimal remainingLength;
         private final BigDecimal absoluteChange;
     }

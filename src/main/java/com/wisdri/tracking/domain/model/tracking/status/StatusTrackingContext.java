@@ -1,14 +1,20 @@
 package com.wisdri.tracking.domain.model.tracking.status;
 
+import com.wisdri.tracking.domain.model.config.status.DeviceSide;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
- * 生产跟踪任务时固化的开卷机、卷取机钢卷状态上下文。
+ * 生产跟踪任务时固化的状态运行态上下文。
  */
 @Data
 @Builder
@@ -21,12 +27,20 @@ public class StatusTrackingContext {
     private Instant receivedAt;
 
     /**
-     * 当前开卷机钢卷号；未识别到运行钢卷时为空。
+     * 状态计算时的启动条件点位值。
      */
-    private String uncoilerCoilNo;
+    private BigDecimal startConditionPointValue;
 
     /**
-     * 当前卷取机钢卷号；未识别到运行钢卷时为空。
+     * 各设备的连续采样窗口快照。
      */
-    private String coilerCoilNo;
+    @Builder.Default
+    private Map<String, StatusCandidateRuntime> candidates = new LinkedHashMap<>();
+
+    /**
+     * 当前开卷、卷取两端的完整识别状态。
+     */
+    @Builder.Default
+    private Map<DeviceSide, StatusCurrentRuntime> current = new LinkedHashMap<>();
+
 }
