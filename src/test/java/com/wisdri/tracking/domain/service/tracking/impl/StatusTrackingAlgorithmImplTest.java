@@ -78,8 +78,38 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(results.get(1).getRemainingLength()).isEqualByComparingTo("17");
         assertThat(runtime.get().getCandidates().get("U2").getLengths())
                 .containsExactly(new BigDecimal("200"), new BigDecimal("194"), new BigDecimal("188"));
+        assertThat(runtime.get().getCandidates().get("U2").getMaxLength())
+                .isEqualByComparingTo("200");
+        assertThat(runtime.get().getCandidates().get("C1").getMaxLength())
+                .isEqualByComparingTo("17");
         assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getColorNo())
                 .isEqualTo("U2-COLOR");
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getMaxLength())
+                .isEqualByComparingTo("200");
+        assertThat(runtime.get().getCurrent().get(DeviceSide.COILER).getMaxLength())
+                .isEqualByComparingTo("17");
+    }
+
+    @Test
+    void keepsMaximumLengthAfterItLeavesSampleWindowAndResetsItForNewCoil() {
+        calculate(true, "U1", "COIL-U1", "120", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
+        calculate(true, "U1", "COIL-U1", "110", "U2", "COIL-U2", "190", "C1", "COIL-C1", "20");
+        calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "180", "C1", "COIL-C1", "30");
+        calculate(true, "U1", "COIL-U1", "90", "U2", "COIL-U2", "170", "C1", "COIL-C1", "25");
+
+        assertThat(runtime.get().getCandidates().get("U1").getLengths())
+                .containsExactly(new BigDecimal("110"), new BigDecimal("100"), new BigDecimal("90"));
+        assertThat(runtime.get().getCandidates().get("U1").getMaxLength())
+                .isEqualByComparingTo("120");
+        assertThat(runtime.get().getCandidates().get("C1").getMaxLength())
+                .isEqualByComparingTo("30");
+
+        calculate(true, "U1", "COIL-U1-NEW", "80", "U2", "COIL-U2", "160", "C1", "COIL-C1-NEW", "5");
+
+        assertThat(runtime.get().getCandidates().get("U1").getMaxLength())
+                .isEqualByComparingTo("80");
+        assertThat(runtime.get().getCandidates().get("C1").getMaxLength())
+                .isEqualByComparingTo("5");
     }
 
     @Test
@@ -148,6 +178,7 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(results.get(0).getRunning()).isFalse();
         assertThat(runtime.get().getCandidates().get("U1").getCoilNo()).isEqualTo("U1-new");
         assertThat(runtime.get().getCandidates().get("U1").getLengths()).containsExactly(new BigDecimal("90"));
+        assertThat(runtime.get().getCandidates().get("U1").getMaxLength()).isEqualByComparingTo("90");
         assertThat(runtime.get().getCandidates()).doesNotContainKey("U2");
     }
 
@@ -163,7 +194,8 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(runtime.get().getCandidates()).isEmpty();
         assertThat(runtime.get().getCurrent().values())
                 .allMatch(current -> Boolean.FALSE.equals(current.getRunning())
-                        && current.getCoilNo() == null && current.getRemainingLength() == null);
+                        && current.getCoilNo() == null && current.getRemainingLength() == null
+                        && current.getMaxLength() == null);
     }
 
     private List<StatusResult> calculate(boolean started, String... values) {

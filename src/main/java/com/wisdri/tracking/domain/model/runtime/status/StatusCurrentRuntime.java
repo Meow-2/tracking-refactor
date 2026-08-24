@@ -23,4 +23,5 @@ public class StatusCurrentRuntime {
     private String coilNo;
     private String colorNo;
     private BigDecimal remainingLength;
+    private BigDecimal maxLength;
 }

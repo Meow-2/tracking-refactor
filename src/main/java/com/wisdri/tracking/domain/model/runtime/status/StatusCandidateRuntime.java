@@ -19,5 +19,9 @@ import java.util.List;
 public class StatusCandidateRuntime {
     private String coilNo;
     private String colorNo;
+    /**
+     * 当前钢卷在该设备上已采集到的最大长度。
+     */
+    private BigDecimal maxLength;
     private List<BigDecimal> lengths = new ArrayList<>();
 }

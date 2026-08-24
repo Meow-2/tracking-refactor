@@ -161,6 +161,7 @@ public class TrackingTaskProducerUseCase {
                 copied.put(code, StatusCandidateRuntime.builder()
                         .coilNo(candidate.getCoilNo())
                         .colorNo(candidate.getColorNo())
+                        .maxLength(candidate.getMaxLength())
                         .lengths(lengths)
                         .build());
             }
@@ -184,6 +185,7 @@ public class TrackingTaskProducerUseCase {
                         .coilNo(current.getCoilNo())
                         .colorNo(current.getColorNo())
                         .remainingLength(current.getRemainingLength())
+                        .maxLength(current.getMaxLength())
                         .build());
             }
         });

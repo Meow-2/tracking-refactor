@@ -138,6 +138,7 @@ class TrackingRuntimeRepositoryImplTest {
         TrackingRuntimeRepositoryImpl repository = repository();
         StatusCandidateRuntime candidate = StatusCandidateRuntime.builder()
                 .coilNo("C001")
+                .maxLength(new BigDecimal("100"))
                 .lengths(Arrays.asList(new BigDecimal("100"), new BigDecimal("95")))
                 .build();
         StatusCurrentRuntime current = StatusCurrentRuntime.builder()
@@ -146,6 +147,7 @@ class TrackingRuntimeRepositoryImplTest {
                 .deviceCode("U1")
                 .coilNo("C001")
                 .remainingLength(new BigDecimal("95"))
+                .maxLength(new BigDecimal("100"))
                 .build();
         StatusTrackingRuntime status = StatusTrackingRuntime.builder()
                 .unitCode("CP1")
@@ -165,11 +167,14 @@ class TrackingRuntimeRepositoryImplTest {
                 "CP1", TrackingType.STATUS, StatusTrackingRuntime.class
         ).orElseThrow(AssertionError::new);
         assertEquals("C001", cached.getCandidates().get("U1").getCoilNo());
+        assertEquals(new BigDecimal("100"), cached.getCandidates().get("U1").getMaxLength());
         assertEquals(Arrays.asList(new BigDecimal("100"), new BigDecimal("95")),
                 cached.getCandidates().get("U1").getLengths());
         assertTrue(cached.getCurrent().get(DeviceSide.UNCOILER).getRunning());
         assertEquals(new BigDecimal("95"),
                 cached.getCurrent().get(DeviceSide.UNCOILER).getRemainingLength());
+        assertEquals(new BigDecimal("100"),
+                cached.getCurrent().get(DeviceSide.UNCOILER).getMaxLength());
         assertFalse(repository().findRuntimeAs(
                 "CP1", TrackingType.STATUS, StatusTrackingRuntime.class).isPresent());
     }

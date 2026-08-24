@@ -79,7 +79,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 : new LinkedHashMap<>();
         Instant generatedAt = Instant.now();
         List<StatusResult> results = results(config, input, selected, generatedAt);
-        Map<DeviceSide, StatusCurrentRuntime> current = current(results);
+        Map<DeviceSide, StatusCurrentRuntime> current = current(results, selected);
 
         runtimeRepositoryDispatcher.saveRuntime(StatusTrackingRuntime.builder()
                 .unitCode(input.getUnitCode())
@@ -122,8 +122,12 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
 
             StatusCandidateRuntime old = previous == null ? null : previous.get(group.getCode());
             List<BigDecimal> lengths = new ArrayList<>();
-            if (old != null && coilNo.equals(old.getCoilNo()) && old.getLengths() != null) {
-                lengths.addAll(old.getLengths());
+            BigDecimal maxLength = length;
+            if (old != null && coilNo.equals(old.getCoilNo())) {
+                if (old.getLengths() != null) {
+                    lengths.addAll(old.getLengths());
+                }
+                maxLength = maxLength(old, length);
             }
             lengths.add(length);
             while (lengths.size() > tracking.getSampleCount()) {
@@ -132,6 +136,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             StatusCandidateRuntime candidate = StatusCandidateRuntime.builder()
                     .coilNo(coilNo)
                     .colorNo(colorNo)
+                    .maxLength(maxLength)
                     .lengths(lengths)
                     .build();
             updated.put(group.getCode(), candidate);
@@ -139,9 +144,21 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     "side", group.getSide(),
                     "coilNo", coilNo,
                     "colorNo", colorNo,
+                    "maxLength", maxLength,
                     "lengths", lengths));
         }
         return updated;
+    }
+
+    private BigDecimal maxLength(StatusCandidateRuntime old, BigDecimal length) {
+        BigDecimal previousMax = old.getMaxLength();
+        if (previousMax == null && old.getLengths() != null) {
+            previousMax = old.getLengths().stream()
+                    .filter(item -> item != null)
+                    .max(BigDecimal::compareTo)
+                    .orElse(null);
+        }
+        return previousMax != null && previousMax.compareTo(length) > 0 ? previousMax : length;
     }
 
     private Map<DeviceSide, SelectedCandidate> selectCandidates(TrackingInput input,
@@ -183,7 +200,8 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             SelectedCandidate existing = selected.get(group.getSide());
             if (existing == null || absoluteChange.compareTo(existing.getAbsoluteChange()) > 0) {
                 selected.put(group.getSide(), new SelectedCandidate(
-                        group, runtime.getCoilNo(), runtime.getColorNo(), latest, absoluteChange));
+                        group, runtime.getCoilNo(), runtime.getColorNo(), latest,
+                        runtime.getMaxLength(), absoluteChange));
             }
         }
         return selected;
@@ -221,9 +239,12 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         return results;
     }
 
-    private Map<DeviceSide, StatusCurrentRuntime> current(List<StatusResult> results) {
+    private Map<DeviceSide, StatusCurrentRuntime> current(
+            List<StatusResult> results,
+            Map<DeviceSide, SelectedCandidate> selected) {
         Map<DeviceSide, StatusCurrentRuntime> current = new LinkedHashMap<>();
         for (StatusResult result : results) {
+            SelectedCandidate candidate = selected.get(result.getSide());
             current.put(result.getSide(), StatusCurrentRuntime.builder()
                     .side(result.getSide())
                     .running(result.getRunning())
@@ -232,6 +253,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     .coilNo(result.getCoilNo())
                     .colorNo(result.getColorNo())
                     .remainingLength(result.getRemainingLength())
+                    .maxLength(candidate == null ? null : candidate.getMaxLength())
                     .build());
         }
         return current;
@@ -309,6 +331,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         private final String coilNo;
         private final String colorNo;
         private final BigDecimal remainingLength;
+        private final BigDecimal maxLength;
         private final BigDecimal absoluteChange;
     }
 }
