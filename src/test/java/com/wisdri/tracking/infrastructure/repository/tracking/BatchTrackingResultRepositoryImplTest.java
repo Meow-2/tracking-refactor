@@ -11,7 +11,7 @@ import com.wisdri.tracking.infrastructure.dto.feign.timeseries.TimeSeriesDataReq
 import com.wisdri.tracking.infrastructure.dto.feign.timeseries.TimeSeriesDataValue;
 import com.wisdri.tracking.infrastructure.dto.feign.timeseries.TimeSeriesTableRequest;
 import com.wisdri.tracking.infrastructure.dto.feign.timeseries.TimeSeriesTableRule;
-import com.wisdri.tracking.infrastructure.properties.TimeSeriesStorageProperties;
+import com.wisdri.tracking.infrastructure.properties.feign.TimeSeriesStorageProperties;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import com.wisdri.tracking.infrastructure.service.feign.gateway.TimeSeriesStorageGateway;
 import org.junit.jupiter.api.BeforeEach;

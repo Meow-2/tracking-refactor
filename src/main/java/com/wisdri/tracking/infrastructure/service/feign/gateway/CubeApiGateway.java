@@ -5,10 +5,10 @@ import com.wisdri.tracking.common.response.R;
 import com.wisdri.tracking.infrastructure.service.feign.converter.CubeApiTrackingConfigConverterDispatcher;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeRequest;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeResponse;
+import com.wisdri.tracking.infrastructure.properties.feign.CubeApiProperties;
 import com.wisdri.tracking.infrastructure.service.feign.client.CubeApiFeignClient;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -34,15 +34,16 @@ public class CubeApiGateway {
     /**
      * Cube API 配置树根路径。
      */
-    @Value("${cube-api.tree-root:/aygg_tracking}")
-    private String cubeApiTreeRoot;
+    @Resource
+    private CubeApiProperties cubeApiProperties;
 
     /**
      * 拉取并转换跟踪配置。
      */
     public Map<TrackingType, TrackingConfig> fetchTrackingConfigs() {
         R<CubeApiTreeResponse> response =
-                cubeApiFeignClient.fetchConfigTree(CubeApiTreeRequest.defaultRequest(cubeApiTreeRoot));
+                cubeApiFeignClient.fetchConfigTree(
+                        CubeApiTreeRequest.defaultRequest(cubeApiProperties.getTreeRoot()));
         if (!R.isSuccess(response)) {
             throw new ExternalServiceException("Cube API 配置树查询失败");
         }

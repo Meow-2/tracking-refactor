@@ -7,7 +7,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepository;
 import com.wisdri.tracking.infrastructure.dto.feign.timeseries.*;
-import com.wisdri.tracking.infrastructure.properties.TimeSeriesStorageProperties;
+import com.wisdri.tracking.infrastructure.properties.feign.TimeSeriesStorageProperties;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import com.wisdri.tracking.infrastructure.service.feign.gateway.TimeSeriesStorageGateway;
 import org.springframework.stereotype.Repository;

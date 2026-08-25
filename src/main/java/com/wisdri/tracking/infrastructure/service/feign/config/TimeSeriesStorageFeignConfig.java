@@ -1,6 +1,6 @@
 package com.wisdri.tracking.infrastructure.service.feign.config;
 
-import com.wisdri.tracking.infrastructure.properties.TimeSeriesStorageProperties;
+import com.wisdri.tracking.infrastructure.properties.feign.TimeSeriesStorageProperties;
 import feign.Request;
 import org.springframework.context.annotation.Bean;
 
