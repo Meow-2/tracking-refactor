@@ -13,11 +13,12 @@ class StatusTrackingResultRepositoryImplTest {
     @Test
     void acceptsStatusConfigAndResultsWithoutPersistence() {
         StatusTrackingResultRepositoryImpl repository = new StatusTrackingResultRepositoryImpl();
+
         assertThatCode(() -> {
             repository.createTable(StatusTrackingConfig.builder()
                     .unitCode("CP1").trackingType(TrackingType.STATUS).build());
             repository.save(Collections.singletonList(StatusResult.builder()
-                    .unitCode("CP1").trackingType(TrackingType.STATUS).build()));
+                    .unitCode("CP1").trackingType(TrackingType.STATUS).productNo(1).build()));
         }).doesNotThrowAnyException();
     }
 }

@@ -160,6 +160,7 @@ public class TrackingTaskProducerUseCase {
                         ? new ArrayList<>() : new ArrayList<>(candidate.getLengths());
                 copied.put(code, StatusCandidateRuntime.builder()
                         .coilNo(candidate.getCoilNo())
+                        .productNo(candidate.getProductNo())
                         .colorNo(candidate.getColorNo())
                         .maxLength(candidate.getMaxLength())
                         .lengths(lengths)
@@ -183,6 +184,7 @@ public class TrackingTaskProducerUseCase {
                         .deviceCode(current.getDeviceCode())
                         .deviceName(current.getDeviceName())
                         .coilNo(current.getCoilNo())
+                        .productNo(current.getProductNo())
                         .colorNo(current.getColorNo())
                         .remainingLength(current.getRemainingLength())
                         .maxLength(current.getMaxLength())

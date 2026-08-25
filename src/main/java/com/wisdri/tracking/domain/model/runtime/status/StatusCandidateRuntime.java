@@ -18,6 +18,10 @@ import java.util.List;
 @AllArgsConstructor
 public class StatusCandidateRuntime {
     private String coilNo;
+    /**
+     * 当前钢卷重复生产次数。
+     */
+    private Integer productNo;
     private String colorNo;
     /**
      * 当前钢卷在该设备上已采集到的最大长度。

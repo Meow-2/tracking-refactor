@@ -13,12 +13,14 @@ import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.status.StatusResult;
+import com.wisdri.tracking.domain.repository.quality.QualityRepository;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
 import com.wisdri.tracking.domain.service.tracking.trace.TrackingStepLogger;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -35,6 +37,7 @@ import java.util.Optional;
  * 根据连续多帧剩余长度变化识别当前运行的开卷机和卷取机。
  */
 @Component
+@Slf4j
 public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResult> {
     private static final List<DeviceSide> RESULT_ORDER = Arrays.asList(
             DeviceSide.UNCOILER, DeviceSide.COILER);
@@ -44,6 +47,9 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
 
     @Resource
     private TrackingStepLogger trackingStepLogger;
+
+    @Resource
+    private QualityRepository qualityRepository;
 
     @Override
     public boolean support(TrackingType trackingType) {
@@ -77,9 +83,9 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         Map<DeviceSide, SelectedCandidate> selected = started
                 ? selectCandidates(input, tracking, candidates)
                 : new LinkedHashMap<>();
+        Map<DeviceSide, StatusCurrentRuntime> current = current(input, selected);
         Instant generatedAt = Instant.now();
-        List<StatusResult> results = results(config, input, selected, generatedAt);
-        Map<DeviceSide, StatusCurrentRuntime> current = current(results, selected);
+        List<StatusResult> results = results(config, input, current, generatedAt);
 
         runtimeRepositoryDispatcher.saveRuntime(StatusTrackingRuntime.builder()
                 .unitCode(input.getUnitCode())
@@ -94,6 +100,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 "started", started,
                 "uncoiler", current.get(DeviceSide.UNCOILER),
                 "coiler", current.get(DeviceSide.COILER),
+                "currentCount", current.size(),
                 "resultCount", results.size()));
         return results;
     }
@@ -121,9 +128,13 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             }
 
             StatusCandidateRuntime old = previous == null ? null : previous.get(group.getCode());
+            boolean sameCoil = old != null && coilNo.equals(old.getCoilNo());
+            Integer productNo = sameCoil
+                    ? old.getProductNo()
+                    : queryProductNo(input, group, coilNo);
             List<BigDecimal> lengths = new ArrayList<>();
             BigDecimal maxLength = length;
-            if (old != null && coilNo.equals(old.getCoilNo())) {
+            if (sameCoil) {
                 if (old.getLengths() != null) {
                     lengths.addAll(old.getLengths());
                 }
@@ -135,6 +146,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             }
             StatusCandidateRuntime candidate = StatusCandidateRuntime.builder()
                     .coilNo(coilNo)
+                    .productNo(productNo)
                     .colorNo(colorNo)
                     .maxLength(maxLength)
                     .lengths(lengths)
@@ -143,11 +155,30 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             trackingStepLogger.log(input, "设备窗口更新", group.getCode(), TrackingStepLogger.details(
                     "side", group.getSide(),
                     "coilNo", coilNo,
+                    "productNo", productNo,
                     "colorNo", colorNo,
                     "maxLength", maxLength,
                     "lengths", lengths));
         }
         return updated;
+    }
+
+    private Integer queryProductNo(TrackingInput input, StatusPointGroup group, String coilNo) {
+        try {
+            Integer productNo = qualityRepository.queryProductNo(coilNo);
+            trackingStepLogger.log(input, "重复生产次数查询", group.getCode(), TrackingStepLogger.details(
+                    "coilNo", coilNo,
+                    "productNo", productNo));
+            return productNo;
+        } catch (RuntimeException e) {
+            log.warn("查询钢卷重复生产次数失败，机组编码={}，设备编码={}，钢卷号={}",
+                    input.getUnitCode(), group.getCode(), coilNo, e);
+            trackingStepLogger.log(input, "重复生产次数查询", group.getCode(), TrackingStepLogger.details(
+                    "coilNo", coilNo,
+                    "productNo", null,
+                    "reason", "查询失败"));
+            return null;
+        }
     }
 
     private BigDecimal maxLength(StatusCandidateRuntime old, BigDecimal length) {
@@ -200,63 +231,58 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             SelectedCandidate existing = selected.get(group.getSide());
             if (existing == null || absoluteChange.compareTo(existing.getAbsoluteChange()) > 0) {
                 selected.put(group.getSide(), new SelectedCandidate(
-                        group, runtime.getCoilNo(), runtime.getColorNo(), latest,
+                        group, runtime.getCoilNo(), runtime.getProductNo(), runtime.getColorNo(), latest,
                         runtime.getMaxLength(), absoluteChange));
             }
         }
         return selected;
     }
 
-    private List<StatusResult> results(StatusTrackingConfig config,
-                                       TrackingInput input,
-                                       Map<DeviceSide, SelectedCandidate> selected,
-                                       Instant generatedAt) {
-        List<StatusResult> results = new ArrayList<>();
+    private Map<DeviceSide, StatusCurrentRuntime> current(
+            TrackingInput input,
+            Map<DeviceSide, SelectedCandidate> selected) {
+        Map<DeviceSide, StatusCurrentRuntime> current = new LinkedHashMap<>();
         for (DeviceSide side : RESULT_ORDER) {
             SelectedCandidate candidate = selected.get(side);
-            StatusResult result = StatusResult.builder()
-                    .unitCode(config.getUnitCode())
-                    .trackingType(TrackingType.STATUS)
-                    .generatedAt(generatedAt)
-                    .receivedAt(input.getLatestSnapshot() == null
-                            ? null : input.getLatestSnapshot().getReceivedAt())
+            StatusCurrentRuntime runtime = StatusCurrentRuntime.builder()
                     .side(side)
                     .running(candidate != null)
                     .deviceCode(candidate == null ? null : candidate.getGroup().getCode())
                     .deviceName(candidate == null ? null : candidate.getGroup().getName())
                     .coilNo(candidate == null ? null : candidate.getCoilNo())
+                    .productNo(candidate == null ? null : candidate.getProductNo())
                     .colorNo(candidate == null ? null : candidate.getColorNo())
                     .remainingLength(candidate == null ? null : candidate.getRemainingLength())
-                    .build();
-            results.add(result);
-            trackingStepLogger.log(input, "设备端结果生成", side.getCode(), TrackingStepLogger.details(
-                    "running", result.getRunning(),
-                    "deviceCode", result.getDeviceCode(),
-                    "coilNo", result.getCoilNo(),
-                    "colorNo", result.getColorNo(),
-                    "remainingLength", result.getRemainingLength()));
-        }
-        return results;
-    }
-
-    private Map<DeviceSide, StatusCurrentRuntime> current(
-            List<StatusResult> results,
-            Map<DeviceSide, SelectedCandidate> selected) {
-        Map<DeviceSide, StatusCurrentRuntime> current = new LinkedHashMap<>();
-        for (StatusResult result : results) {
-            SelectedCandidate candidate = selected.get(result.getSide());
-            current.put(result.getSide(), StatusCurrentRuntime.builder()
-                    .side(result.getSide())
-                    .running(result.getRunning())
-                    .deviceCode(result.getDeviceCode())
-                    .deviceName(result.getDeviceName())
-                    .coilNo(result.getCoilNo())
-                    .colorNo(result.getColorNo())
-                    .remainingLength(result.getRemainingLength())
                     .maxLength(candidate == null ? null : candidate.getMaxLength())
-                    .build());
+                    .build();
+            current.put(side, runtime);
+            trackingStepLogger.log(input, "设备端状态生成", side.getCode(), TrackingStepLogger.details(
+                    "running", runtime.getRunning(),
+                    "deviceCode", runtime.getDeviceCode(),
+                    "coilNo", runtime.getCoilNo(),
+                    "productNo", runtime.getProductNo(),
+                    "colorNo", runtime.getColorNo(),
+                    "remainingLength", runtime.getRemainingLength(),
+                    "maxLength", runtime.getMaxLength()));
         }
         return current;
+    }
+
+    private List<StatusResult> results(StatusTrackingConfig config,
+                                       TrackingInput input,
+                                       Map<DeviceSide, StatusCurrentRuntime> current,
+                                       Instant generatedAt) {
+        List<StatusResult> results = new ArrayList<>();
+        Instant receivedAt = input.getLatestSnapshot() == null
+                ? null : input.getLatestSnapshot().getReceivedAt();
+        for (DeviceSide side : RESULT_ORDER) {
+            StatusResult result = StatusResult.from(
+                    current.get(side), config.getUnitCode(), generatedAt, receivedAt);
+            if (result != null) {
+                results.add(result);
+            }
+        }
+        return results;
     }
 
     private BigDecimal startConditionValue(PointSnapshot snapshot, StatusTrackingSection tracking) {
@@ -329,6 +355,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
     private static class SelectedCandidate {
         private final StatusPointGroup group;
         private final String coilNo;
+        private final Integer productNo;
         private final String colorNo;
         private final BigDecimal remainingLength;
         private final BigDecimal maxLength;

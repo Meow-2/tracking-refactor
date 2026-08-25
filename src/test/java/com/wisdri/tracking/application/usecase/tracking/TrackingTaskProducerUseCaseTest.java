@@ -76,18 +76,22 @@ class TrackingTaskProducerUseCaseTest {
                 .isEqualTo(Instant.parse("2026-07-17T08:00:01Z"));
         assertThat(task.getStatusContext().getStartConditionPointValue()).isEqualByComparingTo("1");
         assertThat(task.getStatusContext().getCandidates().get("U1").getColorNo()).isEqualTo("12");
+        assertThat(task.getStatusContext().getCandidates().get("U1").getProductNo()).isEqualTo(3);
         assertThat(task.getStatusContext().getCandidates().get("U1").getMaxLength())
                 .isEqualByComparingTo("90");
         assertThat(task.getStatusContext().getCurrent().get(DeviceSide.UNCOILER))
                 .satisfies(current -> {
                     assertThat(current.getRunning()).isTrue();
                     assertThat(current.getDeviceCode()).isEqualTo("U1");
+                    assertThat(current.getProductNo()).isEqualTo(3);
                     assertThat(current.getColorNo()).isEqualTo("12");
                     assertThat(current.getRemainingLength()).isEqualByComparingTo("88.5");
                     assertThat(current.getMaxLength()).isEqualByComparingTo("90");
                 });
         assertThat(task.getStatusContext().getCurrent().get(DeviceSide.COILER).getCoilNo())
                 .isEqualTo("C001");
+        assertThat(task.getStatusContext().getCurrent().get(DeviceSide.COILER).getProductNo())
+                .isEqualTo(4);
         verify(snapshotRepository).save("BAF1", TrackingType.BATCH, "fb1", task.getLatestSnapshot());
     }
 
@@ -130,6 +134,7 @@ class TrackingTaskProducerUseCaseTest {
                 .running(true)
                 .deviceCode("U1")
                 .coilNo("U001")
+                .productNo(3)
                 .colorNo("12")
                 .remainingLength(new BigDecimal("88.5"))
                 .maxLength(new BigDecimal("90"))
@@ -138,6 +143,7 @@ class TrackingTaskProducerUseCaseTest {
                 .side(DeviceSide.COILER)
                 .running(true)
                 .coilNo("C001")
+                .productNo(4)
                 .build());
         return StatusTrackingRuntime.builder()
                 .unitCode("BAF1")
@@ -146,6 +152,7 @@ class TrackingTaskProducerUseCaseTest {
                 .startConditionPointValue(BigDecimal.ONE)
                 .candidates(Collections.singletonMap("U1", StatusCandidateRuntime.builder()
                         .coilNo("U001")
+                        .productNo(3)
                         .colorNo("12")
                         .maxLength(new BigDecimal("90"))
                         .lengths(Arrays.asList(new BigDecimal("90"), new BigDecimal("88.5")))

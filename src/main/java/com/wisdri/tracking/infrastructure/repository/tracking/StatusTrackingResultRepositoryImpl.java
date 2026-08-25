@@ -21,11 +21,11 @@ public class StatusTrackingResultRepositoryImpl
 
     @Override
     public void createTable(StatusTrackingConfig config) {
-        // 状态结果仅输出算法步骤日志，不创建时序表。
+        // 状态结果不创建时序表。
     }
 
     @Override
     public void save(List<StatusResult> results) {
-        // 状态结果仅输出算法步骤日志，不写入时序数据库。
+        // 状态结果不写入时序数据库。
     }
 }

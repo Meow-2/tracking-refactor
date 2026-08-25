@@ -8,10 +8,12 @@ import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingSection;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.status.StatusResult;
+import com.wisdri.tracking.domain.repository.quality.QualityRepository;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.tracking.trace.TrackingStepLogger;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,14 +31,18 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class StatusTrackingAlgorithmImplTest {
     private final AtomicReference<StatusTrackingRuntime> runtime = new AtomicReference<>();
     private StatusTrackingAlgorithmImpl algorithm;
     private StatusTrackingConfig statusConfig;
+    private QualityRepository qualityRepository;
 
     @BeforeEach
     void setUp() {
@@ -52,8 +58,11 @@ class StatusTrackingAlgorithmImplTest {
         }).when(repository).saveRuntime(any(TrackingRuntime.class));
 
         algorithm = new StatusTrackingAlgorithmImpl();
+        qualityRepository = mock(QualityRepository.class);
+        when(qualityRepository.queryProductNo(anyString())).thenReturn(1);
         ReflectionTestUtils.setField(algorithm, "runtimeRepositoryDispatcher", repository);
         ReflectionTestUtils.setField(algorithm, "trackingStepLogger", mock(TrackingStepLogger.class));
+        ReflectionTestUtils.setField(algorithm, "qualityRepository", qualityRepository);
     }
 
     @Test
@@ -63,19 +72,19 @@ class StatusTrackingAlgorithmImplTest {
         assertEmptySides(calculate(true, "U1", "COIL-U1", "102", "U2", "COIL-U2", "194",
                 "C1", "COIL-C1", "8"));
 
-        List<StatusResult> results = calculate(true, "U1", "COIL-U1", "95", "U2", "COIL-U2", "188",
+        Map<DeviceSide, StatusCurrentRuntime> current = calculate(true, "U1", "COIL-U1", "95", "U2", "COIL-U2", "188",
                 "C1", "COIL-C1", "17");
 
-        assertThat(results).extracting(StatusResult::getSide)
-                .containsExactly(DeviceSide.UNCOILER, DeviceSide.COILER);
-        assertThat(results.get(0).getRunning()).isTrue();
-        assertThat(results.get(0).getDeviceCode()).isEqualTo("U2");
-        assertThat(results.get(0).getCoilNo()).isEqualTo("COIL-U2");
-        assertThat(results.get(0).getColorNo()).isEqualTo("U2-COLOR");
-        assertThat(results.get(0).getRemainingLength()).isEqualByComparingTo("188");
-        assertThat(results.get(1).getRunning()).isTrue();
-        assertThat(results.get(1).getDeviceCode()).isEqualTo("C1");
-        assertThat(results.get(1).getRemainingLength()).isEqualByComparingTo("17");
+        assertThat(current.keySet()).containsExactly(DeviceSide.UNCOILER, DeviceSide.COILER);
+        assertThat(current.get(DeviceSide.UNCOILER).getRunning()).isTrue();
+        assertThat(current.get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("U2");
+        assertThat(current.get(DeviceSide.UNCOILER).getCoilNo()).isEqualTo("COIL-U2");
+        assertThat(current.get(DeviceSide.UNCOILER).getProductNo()).isEqualTo(1);
+        assertThat(current.get(DeviceSide.UNCOILER).getColorNo()).isEqualTo("U2-COLOR");
+        assertThat(current.get(DeviceSide.UNCOILER).getRemainingLength()).isEqualByComparingTo("188");
+        assertThat(current.get(DeviceSide.COILER).getRunning()).isTrue();
+        assertThat(current.get(DeviceSide.COILER).getDeviceCode()).isEqualTo("C1");
+        assertThat(current.get(DeviceSide.COILER).getRemainingLength()).isEqualByComparingTo("17");
         assertThat(runtime.get().getCandidates().get("U2").getLengths())
                 .containsExactly(new BigDecimal("200"), new BigDecimal("194"), new BigDecimal("188"));
         assertThat(runtime.get().getCandidates().get("U2").getMaxLength())
@@ -88,6 +97,27 @@ class StatusTrackingAlgorithmImplTest {
                 .isEqualByComparingTo("200");
         assertThat(runtime.get().getCurrent().get(DeviceSide.COILER).getMaxLength())
                 .isEqualByComparingTo("17");
+    }
+
+    @Test
+    void returnsStatusResultsConvertedFromCurrentRuntime() {
+        calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
+        calculate(true, "U1", "COIL-U1", "95", "U2", "COIL-U2", "195", "C1", "COIL-C1", "15");
+
+        List<StatusResult> results = algorithm.calculate(input(values(
+                true, "U1", "COIL-U1", "90", "U2", "COIL-U2", "190", "C1", "COIL-C1", "20")));
+
+        assertThat(results).hasSize(2);
+        assertThat(results).extracting(StatusResult::getSide)
+                .containsExactly(DeviceSide.UNCOILER, DeviceSide.COILER);
+        StatusCurrentRuntime uncoiler = runtime.get().getCurrent().get(DeviceSide.UNCOILER);
+        assertThat(results.get(0).getDeviceCode()).isEqualTo(uncoiler.getDeviceCode());
+        assertThat(results.get(0).getCoilNo()).isEqualTo(uncoiler.getCoilNo());
+        assertThat(results.get(0).getProductNo()).isEqualTo(uncoiler.getProductNo());
+        assertThat(results.get(0).getColorNo()).isEqualTo(uncoiler.getColorNo());
+        assertThat(results.get(0).getRemainingLength()).isEqualByComparingTo(uncoiler.getRemainingLength());
+        assertThat(results.get(0).getMaxLength()).isEqualByComparingTo(uncoiler.getMaxLength());
+        assertThat(results.get(0).getTrackingType()).isEqualTo(TrackingType.STATUS);
     }
 
     @Test
@@ -117,10 +147,10 @@ class StatusTrackingAlgorithmImplTest {
         calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
         calculate(true, "U1", "COIL-U1", "98", "U2", "COIL-U2", "198", "C1", "COIL-C1", "12");
 
-        List<StatusResult> results = calculate(true, "U1", "COIL-U1", "94", "U2", "COIL-U2", "194",
+        Map<DeviceSide, StatusCurrentRuntime> current = calculate(true, "U1", "COIL-U1", "94", "U2", "COIL-U2", "194",
                 "C1", "COIL-C1", "16");
 
-        assertThat(results.get(0).getDeviceCode()).isEqualTo("U1");
+        assertThat(current.get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("U1");
     }
 
     @Test
@@ -130,12 +160,12 @@ class StatusTrackingAlgorithmImplTest {
         calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "2604.40",
                 "C1", "COIL-C1", "10");
 
-        List<StatusResult> results = calculate(true, "U1", "COIL-U1", "100",
+        Map<DeviceSide, StatusCurrentRuntime> current = calculate(true, "U1", "COIL-U1", "100",
                 "U2", "COIL-U2", "2598.86", "C1", "COIL-C1", "10");
 
-        assertThat(results.get(0).getRunning()).isTrue();
-        assertThat(results.get(0).getDeviceCode()).isEqualTo("U2");
-        assertThat(results.get(0).getRemainingLength()).isEqualByComparingTo("2598.86");
+        assertThat(current.get(DeviceSide.UNCOILER).getRunning()).isTrue();
+        assertThat(current.get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("U2");
+        assertThat(current.get(DeviceSide.UNCOILER).getRemainingLength()).isEqualByComparingTo("2598.86");
     }
 
     @Test
@@ -143,15 +173,15 @@ class StatusTrackingAlgorithmImplTest {
         calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "20");
         calculate(true, "U1", "COIL-U1", "103", "U2", "COIL-U2", "198", "C1", "COIL-C1", "17");
 
-        List<StatusResult> results = calculate(true, "U1", "COIL-U1", "106", "U2", "COIL-U2", "196",
+        Map<DeviceSide, StatusCurrentRuntime> current = calculate(true, "U1", "COIL-U1", "106", "U2", "COIL-U2", "196",
                 "C1", "COIL-C1", "14");
 
-        assertThat(results.get(0).getRunning()).isTrue();
-        assertThat(results.get(0).getDeviceCode()).isEqualTo("U1");
-        assertThat(results.get(0).getRemainingLength()).isEqualByComparingTo("106");
-        assertThat(results.get(1).getRunning()).isTrue();
-        assertThat(results.get(1).getDeviceCode()).isEqualTo("C1");
-        assertThat(results.get(1).getRemainingLength()).isEqualByComparingTo("14");
+        assertThat(current.get(DeviceSide.UNCOILER).getRunning()).isTrue();
+        assertThat(current.get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("U1");
+        assertThat(current.get(DeviceSide.UNCOILER).getRemainingLength()).isEqualByComparingTo("106");
+        assertThat(current.get(DeviceSide.COILER).getRunning()).isTrue();
+        assertThat(current.get(DeviceSide.COILER).getDeviceCode()).isEqualTo("C1");
+        assertThat(current.get(DeviceSide.COILER).getRemainingLength()).isEqualByComparingTo("14");
     }
 
     @Test
@@ -160,10 +190,10 @@ class StatusTrackingAlgorithmImplTest {
         calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "20");
         calculate(true, "U1", "COIL-U1", "103", "U2", "COIL-U2", "202", "C1", "COIL-C1", "17");
 
-        List<StatusResult> results = calculate(true, "U1", "COIL-U1", "106", "U2", "COIL-U2", "204",
+        Map<DeviceSide, StatusCurrentRuntime> current = calculate(true, "U1", "COIL-U1", "106", "U2", "COIL-U2", "204",
                 "C1", "COIL-C1", "14");
 
-        assertEmptySides(results);
+        assertEmptySides(current);
     }
 
     @Test
@@ -173,9 +203,9 @@ class StatusTrackingAlgorithmImplTest {
 
         Map<String, Object> values = values(true, "U1", "U1-new", "90", "U2", "COIL-U2", "bad",
                 "C1", "COIL-C1", "20");
-        List<StatusResult> results = algorithm.calculate(input(values));
+        algorithm.calculate(input(values));
 
-        assertThat(results.get(0).getRunning()).isFalse();
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getRunning()).isFalse();
         assertThat(runtime.get().getCandidates().get("U1").getCoilNo()).isEqualTo("U1-new");
         assertThat(runtime.get().getCandidates().get("U1").getLengths()).containsExactly(new BigDecimal("90"));
         assertThat(runtime.get().getCandidates().get("U1").getMaxLength()).isEqualByComparingTo("90");
@@ -186,20 +216,65 @@ class StatusTrackingAlgorithmImplTest {
     void stoppedLineClearsHistoryAndReturnsTwoEmptyStates() {
         calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
 
-        List<StatusResult> results = calculate(false, "U1", "COIL-U1", "90", "U2", "COIL-U2", "190",
+        Map<DeviceSide, StatusCurrentRuntime> current = calculate(false, "U1", "COIL-U1", "90", "U2", "COIL-U2", "190",
                 "C1", "COIL-C1", "20");
 
-        assertEmptySides(results);
+        assertEmptySides(current);
         assertThat(runtime.get().getStartConditionPointValue()).isEqualByComparingTo("0");
         assertThat(runtime.get().getCandidates()).isEmpty();
         assertThat(runtime.get().getCurrent().values())
-                .allMatch(current -> Boolean.FALSE.equals(current.getRunning())
-                        && current.getCoilNo() == null && current.getRemainingLength() == null
-                        && current.getMaxLength() == null);
+                .allMatch(item -> Boolean.FALSE.equals(item.getRunning())
+                        && item.getCoilNo() == null && item.getRemainingLength() == null
+                        && item.getMaxLength() == null);
     }
 
-    private List<StatusResult> calculate(boolean started, String... values) {
-        return algorithm.calculate(input(values(started, values)));
+    @Test
+    void queriesProductNoOnlyWhenCoilChanges() {
+        calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
+        calculate(true, "U1", "COIL-U1", "95", "U2", "COIL-U2", "195", "C1", "COIL-C1", "15");
+
+        verify(qualityRepository, times(1)).queryProductNo("COIL-U1");
+        assertThat(runtime.get().getCandidates().get("U1").getProductNo()).isEqualTo(1);
+
+        calculate(true, "U1", "COIL-U1-NEW", "90", "U2", "COIL-U2", "190", "C1", "COIL-C1", "20");
+
+        verify(qualityRepository, times(1)).queryProductNo("COIL-U1-NEW");
+        assertThat(runtime.get().getCandidates().get("U1").getProductNo()).isEqualTo(1);
+    }
+
+    @Test
+    void keepsCalculatingWhenProductNoQueryFails() {
+        when(qualityRepository.queryProductNo("COIL-U1")).thenThrow(new IllegalStateException("unavailable"));
+
+        calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
+        calculate(true, "U1", "COIL-U1", "95", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
+        Map<DeviceSide, StatusCurrentRuntime> current = calculate(
+                true, "U1", "COIL-U1", "90", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
+
+        assertThat(runtime.get().getCandidates().get("U1").getProductNo()).isNull();
+        assertThat(current.get(DeviceSide.UNCOILER).getRunning()).isTrue();
+        assertThat(current.get(DeviceSide.UNCOILER).getProductNo()).isNull();
+        verify(qualityRepository, times(1)).queryProductNo("COIL-U1");
+    }
+
+    @Test
+    void keepsCalculatingWhenProductNoQueryReturnsNull() {
+        when(qualityRepository.queryProductNo("COIL-U1")).thenReturn(null);
+
+        calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
+        calculate(true, "U1", "COIL-U1", "95", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
+        Map<DeviceSide, StatusCurrentRuntime> current = calculate(
+                true, "U1", "COIL-U1", "90", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
+
+        assertThat(runtime.get().getCandidates().get("U1").getProductNo()).isNull();
+        assertThat(current.get(DeviceSide.UNCOILER).getRunning()).isTrue();
+        assertThat(current.get(DeviceSide.UNCOILER).getProductNo()).isNull();
+        verify(qualityRepository, times(1)).queryProductNo("COIL-U1");
+    }
+
+    private Map<DeviceSide, StatusCurrentRuntime> calculate(boolean started, String... values) {
+        algorithm.calculate(input(values(started, values)));
+        return runtime.get().getCurrent();
     }
 
     private Map<String, Object> values(boolean started, String... groups) {
@@ -257,12 +332,11 @@ class StatusTrackingAlgorithmImplTest {
         return PointConfig.builder().name(name).build();
     }
 
-    private void assertEmptySides(List<StatusResult> results) {
-        assertThat(results).hasSize(2);
-        assertThat(results).extracting(StatusResult::getSide)
-                .containsExactly(DeviceSide.UNCOILER, DeviceSide.COILER);
-        assertThat(results).allMatch(result -> Boolean.FALSE.equals(result.getRunning())
-                && result.getDeviceCode() == null && result.getDeviceName() == null
-                && result.getCoilNo() == null && result.getRemainingLength() == null);
+    private void assertEmptySides(Map<DeviceSide, StatusCurrentRuntime> current) {
+        assertThat(current.keySet()).containsExactly(DeviceSide.UNCOILER, DeviceSide.COILER);
+        assertThat(current.values()).allMatch(item -> Boolean.FALSE.equals(item.getRunning())
+                && item.getDeviceCode() == null && item.getDeviceName() == null
+                && item.getCoilNo() == null && item.getProductNo() == null
+                && item.getRemainingLength() == null);
     }
 }

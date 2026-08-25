@@ -21,6 +21,7 @@ public class StatusCurrentRuntime {
     private String deviceCode;
     private String deviceName;
     private String coilNo;
+    private Integer productNo;
     private String colorNo;
     private BigDecimal remainingLength;
     private BigDecimal maxLength;
