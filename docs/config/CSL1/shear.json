@@ -1,97 +1,57 @@
 {
-  "enable": true,
-  "mqtt_topic": "cbl1_shear_tracking",
+  "enable": false,
+  "mqtt_topic": "csl1_shear_tracking",
   "tracking": {
-    "point_prefix": "/aygg_tracking/cbl1/shear/tracking/",
+    "point_prefix": "/aygg_tracking/csl1/shear/tracking/",
     "mode": "discontinuous",
     "tail_experience": "50",
     "shear_experience": "100",
     "uncoiler_shear_point": [
       {
-        "name": "thread_entry_shear_cut",
+        "name": "entry_shear_cut",
         "type": "boolean",
+        "type_codes": {
+          "head": 101,
+          "slice": 105,
+          "tail": 109
+        },
         "normal_pos": true,
         "por_tr_code": "por1",
         "shear_settings": {
           "head": {
             "number": {
-              "name": "thread_entry_shear_head_cut_number",
+              "name": "entry_shear_head_cut_number",
               "type": "int"
             },
             "length": {
-              "name": "thread_entry_shear_head_length",
+              "name": "entry_shear_head_length",
               "type": "float"
             }
           },
           "tail": {
             "number": {
-              "name": "thread_entry_shear_tail_cut_number",
+              "name": "entry_shear_tail_cut_number",
               "type": "int"
             },
             "length": {
-              "name": "thread_entry_shear_tail_length",
+              "name": "entry_shear_tail_length",
               "type": "float"
             }
           }
         },
         "grating_points": [
           {
-            "name": "thread_por_grating1_position_status",
+            "name": "por_grating1_position_status",
             "type": "boolean",
             "has_coil": true
           },
           {
-            "name": "thread_por_grating2_position_status",
+            "name": "por_grating2_position_status",
             "type": "boolean",
             "has_coil": false
           },
           {
-            "name": "thread_por_grating3_position_status",
-            "type": "boolean",
-            "has_coil": false
-          }
-        ]
-      },
-      {
-        "name": "normal_entry_shear_cut",
-        "type": "boolean",
-        "normal_pos": true,
-        "por_tr_code": "por2",
-        "shear_settings": {
-          "head": {
-            "number": {
-              "name": "normal_entry_shear_head_cut_number",
-              "type": "int"
-            },
-            "length": {
-              "name": "normal_entry_shear_head_length",
-              "type": "float"
-            }
-          },
-          "tail": {
-            "number": {
-              "name": "normal_entry_shear_tail_cut_number",
-              "type": "int"
-            },
-            "length": {
-              "name": "normal_entry_shear_tail_length",
-              "type": "float"
-            }
-          }
-        },
-        "grating_points": [
-          {
-            "name": "normal_por_grating1_position_status",
-            "type": "boolean",
-            "has_coil": true
-          },
-          {
-            "name": "normal_por_grating2_position_status",
-            "type": "boolean",
-            "has_coil": false
-          },
-          {
-            "name": "normal_por_grating3_position_status",
+            "name": "por_grating3_position_status",
             "type": "boolean",
             "has_coil": false
           }
@@ -102,10 +62,34 @@
       {
         "name": "exit_shear_cut",
         "type": "boolean",
+        "type_codes": {
+          "head": 901,
+          "slice": 905,
+          "tail": 909
+        },
         "normal_pos": true,
         "por_tr_code": "tr1",
         "shear_settings": {
-          "default": "slice"
+          "head": {
+            "number": {
+              "name": "exit_shear_head_sample_pieces",
+              "type": "int"
+            },
+            "length": {
+              "name": "exit_shear_sample_length",
+              "type": "float"
+            }
+          },
+          "tail": {
+            "number": {
+              "name": "exit_shear_tail_scrap_pieces",
+              "type": "int"
+            },
+            "length": {
+              "name": "exit_shear_sample_length",
+              "type": "float"
+            }
+          }
         },
         "grating_points": [
           {
