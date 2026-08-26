@@ -1,16 +1,14 @@
 package com.wisdri.tracking.domain.model.runtime.shear;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 /**
- * 通用剪切跟踪运行态。
+ * 单个 por_tr_code 对应的一把剪刀运行态。
  */
 @Data
 @SuperBuilder
@@ -18,8 +16,14 @@ import java.util.Map;
 @EqualsAndHashCode(callSuper = true)
 public class ShearTrackingRuntime extends TrackingRuntime {
     /**
-     * 各剪刀的计数运行态；键为 ShearPointConfig.name，不在不同剪刀间共享刀次。
+     * 当前运行态对应的开卷机或卷取机代码，同时作为 Redis 目录下的末级 key。
      */
-    @lombok.Builder.Default
-    private Map<String, ShearPointRuntime> points = new LinkedHashMap<>();
+    @JsonIgnore
+    private String porTrCode;
+
+    /** 算法推理出的当前开卷机状态。 */
+    private ShearDeviceRuntime uncoiler;
+
+    /** 算法推理出的当前卷取机状态。 */
+    private ShearDeviceRuntime coiler;
 }

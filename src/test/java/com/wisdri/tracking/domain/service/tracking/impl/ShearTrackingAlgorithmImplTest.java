@@ -11,6 +11,9 @@ import com.wisdri.tracking.domain.model.config.shear.ShearTrackingSection;
 import com.wisdri.tracking.domain.model.config.shear.ShearTypeCodes;
 import com.wisdri.tracking.domain.model.config.shear.WelderShearSettings;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
+import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
+import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
+import com.wisdri.tracking.domain.model.config.status.StatusTrackingSection;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.shear.ShearTrackingRuntime;
@@ -35,17 +38,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class ShearTrackingAlgorithmImplTest {
     private static final String UNIT = "LINE-X";
-    private final AtomicReference<ShearTrackingRuntime> runtime = new AtomicReference<>();
+    private final Map<String, ShearTrackingRuntime> runtimes = new LinkedHashMap<>();
     private ShearTrackingAlgorithmImpl algorithm;
     private ShearTrackingConfig config;
     private TrackingProperties properties;
@@ -56,10 +60,16 @@ class ShearTrackingAlgorithmImplTest {
         config = config();
         when(repository.findConfigAs(UNIT, TrackingType.SHEAR, ShearTrackingConfig.class))
                 .thenReturn(Optional.of(config));
-        when(repository.findRuntimeAs(UNIT, TrackingType.SHEAR, ShearTrackingRuntime.class))
-                .thenAnswer(invocation -> Optional.ofNullable(runtime.get()));
+        when(repository.findConfigAs(UNIT, TrackingType.STATUS, StatusTrackingConfig.class))
+                .thenReturn(Optional.of(statusConfig()));
+        when(repository.findRuntimeAs(eq(UNIT), eq(TrackingType.SHEAR), anyString(),
+                eq(ShearTrackingRuntime.class))).thenAnswer(invocation -> {
+            String porTrCode = invocation.getArgument(2);
+            return Optional.ofNullable(runtimes.get(porTrCode));
+        });
         doAnswer(invocation -> {
-            runtime.set((ShearTrackingRuntime) invocation.getArgument(0));
+            ShearTrackingRuntime saved = invocation.getArgument(0);
+            runtimes.put(saved.getPorTrCode(), saved);
             return null;
         }).when(repository).saveRuntime(any(TrackingRuntime.class));
 
@@ -76,6 +86,7 @@ class ShearTrackingAlgorithmImplTest {
                 entryValues(false, "10.0", "2.5"), context("10", "20", "500")));
 
         assertThat(first.getShearPointCode()).isEqualTo("entry-cut-x");
+        assertThat(first.getPorTrCode()).isEqualTo("feed-device-x");
         assertThat(first.getShearKind()).isEqualTo(ShearKind.HEAD);
         assertThat(first.getShearType()).isEqualTo(711);
         assertThat(first.getShearTypeName()).isEqualTo("feed-device-x_head");
@@ -83,9 +94,9 @@ class ShearTrackingAlgorithmImplTest {
         assertThat(first.getCutNo()).isEqualTo(1);
         assertThat(first.getShearLength()).isEqualByComparingTo("0");
         assertThat(first.getSetNumber()).isNull();
+        assertThat(runtimes.get("feed-device-x").getUncoiler()
+                .getHead().getCutNo()).isEqualTo(1);
 
-        algorithm.afterPersist(input(entryValues(true, "10", "2.5"),
-                entryValues(false, "10", "2.5"), context("10", "20", "500")), Arrays.asList(first));
         ShearResult second = only(calculate(entryValues(true, "10", "2.5"),
                 entryValues(false, "10", "2.5"), context("10", "20", "450")));
 
@@ -102,8 +113,6 @@ class ShearTrackingAlgorithmImplTest {
         assertThat(tail.getShearKind()).isEqualTo(ShearKind.TAIL);
         assertThat(tail.getShearType()).isEqualTo(719);
         assertThat(tail.getInMatNo()).isEqualTo("TAKE-COIL");
-        algorithm.afterPersist(input(entryValues(true, "10", "2.5"),
-                entryValues(false, "10", "2.5"), context("10", "10", "50")), Arrays.asList(tail));
         ShearResult secondTail = only(calculate(entryValues(true, "10", "2.5"),
                 entryValues(false, "10", "2.5"), context("10", "10", "40")));
         assertThat(secondTail.getShearLength()).isEqualByComparingTo("3.5");
@@ -124,8 +133,6 @@ class ShearTrackingAlgorithmImplTest {
         assertThat(tail.getShearKind()).isEqualTo(ShearKind.TAIL);
         assertThat(tail.getShearType()).isEqualTo(939);
         assertThat(tail.getSetNumber()).isNull();
-        algorithm.afterPersist(input(previous, latest, context("10", "20", "500")), Arrays.asList(tail));
-
         ShearResult head = only(calculate(previous, latest, context("10", "20", "450")));
         assertThat(head.getShearKind()).isEqualTo(ShearKind.HEAD);
         assertThat(head.getShearType()).isEqualTo(931);
@@ -141,8 +148,6 @@ class ShearTrackingAlgorithmImplTest {
         previous.put("/line-x/shear/welder-pieces", 5);
         latest.put("/line-x/shear/welder-pieces", 5);
         ShearResult first = only(calculate(previous, latest, context("10", "20", "500")));
-        algorithm.afterPersist(input(previous, latest, context("10", "20", "500")), Arrays.asList(first));
-
         ShearResult second = only(calculate(previous, latest, context("10", "20", "450")));
 
         assertThat(second.getShearKind()).isEqualTo(ShearKind.TAIL);
@@ -180,10 +185,8 @@ class ShearTrackingAlgorithmImplTest {
         latest.put("/line-x/shear/scrap-piece-length", new BigDecimal("0.8"));
 
         ShearResult first = only(calculate(previous, latest, context("10", "20", "500")));
-        algorithm.afterPersist(input(previous, latest, context("10", "20", "500")), Arrays.asList(first));
         ShearResult sample = only(calculate(previous, latest, context("10", "20", "450")));
         assertThat(sample.getShearLength()).isEqualByComparingTo("4.2");
-        algorithm.afterPersist(input(previous, latest, context("10", "20", "450")), Arrays.asList(sample));
 
         ShearResult scrap = only(calculate(previous, latest, context("10", "20", "400")));
         assertThat(scrap.getShearLength()).isEqualByComparingTo("0.8");
@@ -241,12 +244,56 @@ class ShearTrackingAlgorithmImplTest {
     }
 
     @Test
+    void synchronizesDeviceShapedRuntimeOnFirstFrameWithoutShearTrigger() {
+        List<ShearResult> results = algorithm.calculate(TrackingInput.builder()
+                .unitCode(UNIT)
+                .trackingType(TrackingType.SHEAR)
+                .latestSnapshot(snapshot(entryValues(false, "10", "2.5")))
+                .statusContext(context("10", "20", "500"))
+                .build());
+
+        assertThat(results).isEmpty();
+        ShearTrackingRuntime runtime = runtimes.get("feed-device-x");
+        assertThat(runtime).isNotNull();
+        assertThat(runtime.getUncoiler().getDeviceCode()).isEqualTo("feed-device-x");
+        assertThat(runtime.getUncoiler().getDeviceName()).isEqualTo("1#开卷机");
+        assertThat(runtime.getUncoiler().getProductNo()).isEqualTo(3);
+        assertThat(runtime.getUncoiler().getHead()).isNotNull();
+        assertThat(runtime.getUncoiler().getSlice()).isNotNull();
+        assertThat(runtime.getUncoiler().getTail()).isNull();
+        assertThat(runtime.getCoiler().getDeviceCode()).isEqualTo("take-device-x");
+        assertThat(runtime.getCoiler().getDeviceName()).isEqualTo("2#卷取机");
+        assertThat(runtime.getCoiler().getTail()).isNotNull();
+        assertThat(runtime.getCoiler().getHead()).isNull();
+    }
+
+    @Test
+    void keepsCountersIndependentForEachConfiguredPorTrCode() {
+        Map<String, Object> previous = exitValues(true, "30", "0", "0", "1.2", "1.8");
+        Map<String, Object> latest = exitValues(false, "30", "0", "0", "1.2", "1.8");
+        StatusTrackingContext firstContext = context("10", "20", "500");
+        firstContext.getCurrent().get(DeviceSide.COILER).setDeviceCode("take-device-y");
+
+        ShearResult first = only(calculate(previous, latest, firstContext));
+        assertThat(runtimes.get("take-device-y").getCoiler().getTail().getCutNo()).isEqualTo(1);
+
+        StatusTrackingContext secondContext = context("10", "20", "450");
+        secondContext.getCurrent().get(DeviceSide.COILER).setDeviceCode(null);
+        ShearResult second = only(calculate(previous, latest, secondContext));
+
+        assertThat(first.getPorTrCode()).isEqualTo("take-device-y");
+        assertThat(second.getPorTrCode()).isEqualTo("take-device-x");
+        assertThat(first.getCutNo()).isEqualTo(1);
+        assertThat(second.getCutNo()).isEqualTo(1);
+        assertThat(runtimes).containsKeys("feed-device-x", "take-device-y", "take-device-x");
+        assertThat(runtimes.get("take-device-x").getCoiler().getTail().getCutNo()).isEqualTo(1);
+    }
+
+    @Test
     void equalExperienceStartsNewCompleteShear() {
         Map<String, Object> previous = entryValues(true, "10", "2.5");
         Map<String, Object> latest = entryValues(false, "10", "2.5");
         ShearResult first = only(calculate(previous, latest, context("10", "20", "500")));
-        algorithm.afterPersist(input(previous, latest, context("10", "20", "500")), Arrays.asList(first));
-
         ShearResult next = only(calculate(previous, latest, context("10", "20", "400")));
         assertThat(next.getShearNo()).isEqualTo(2);
         assertThat(next.getCutNo()).isEqualTo(1);
@@ -275,10 +322,7 @@ class ShearTrackingAlgorithmImplTest {
         Map<String, Object> latest = entryValues(false, "10", "2.5");
         ShearResult result = only(calculate(previous, latest, context("10", "20", "500")));
 
-        algorithm.afterPersist(input(previous, latest, context("10", "20", "500")),
-                Arrays.asList(result));
-
-        assertThat(runtime.get()).isNull();
+        assertThat(runtimes).isEmpty();
     }
 
     private List<ShearResult> calculate(Map<String, Object> previous,
@@ -315,11 +359,13 @@ class ShearTrackingAlgorithmImplTest {
                 .lengths(Arrays.asList(new BigDecimal("200"))).maxLength(new BigDecimal("800")).build());
         Map<DeviceSide, StatusCurrentRuntime> current = new LinkedHashMap<>();
         current.put(DeviceSide.UNCOILER, StatusCurrentRuntime.builder()
-                .side(DeviceSide.UNCOILER).deviceCode("feed-device-x")
+                .side(DeviceSide.UNCOILER).running(true)
+                .deviceCode("feed-device-x").deviceName("1#开卷机")
                 .coilNo("FEED-COIL").productNo(3).colorNo(feedColor)
                 .remainingLength(new BigDecimal(feedLength)).maxLength(new BigDecimal("1000")).build());
         current.put(DeviceSide.COILER, StatusCurrentRuntime.builder()
-                .side(DeviceSide.COILER).deviceCode("take-device-x")
+                .side(DeviceSide.COILER).running(true)
+                .deviceCode("take-device-x").deviceName("2#卷取机")
                 .coilNo("TAKE-COIL").productNo(4).colorNo(takeColor)
                 .remainingLength(new BigDecimal("200")).maxLength(new BigDecimal("800")).build());
         return StatusTrackingContext.builder().candidates(candidates).current(current).build();
@@ -398,6 +444,22 @@ class ShearTrackingAlgorithmImplTest {
                         .shearExperience(new BigDecimal("100"))
                         .uncoilerShearPoint(Arrays.asList(entry))
                         .coilerShearPoint(Arrays.asList(exit))
+                        .build())
+                .build();
+    }
+
+    private StatusTrackingConfig statusConfig() {
+        return StatusTrackingConfig.builder()
+                .unitCode(UNIT)
+                .trackingType(TrackingType.STATUS)
+                .tracking(StatusTrackingSection.builder()
+                        .points(Arrays.asList(
+                                StatusPointGroup.builder().code("feed-device-x")
+                                        .name("1#开卷机").side(DeviceSide.UNCOILER).build(),
+                                StatusPointGroup.builder().code("take-device-y")
+                                        .name("1#卷取机").side(DeviceSide.COILER).build(),
+                                StatusPointGroup.builder().code("take-device-x")
+                                        .name("2#卷取机").side(DeviceSide.COILER).build()))
                         .build())
                 .build();
     }

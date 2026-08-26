@@ -14,6 +14,7 @@ public final class RedisKeys {
     private static final String TRACKING_CONFIG_PATTERN = "tracking:%s:%s:config";
     private static final String TRACKING_RUNTIME_PATTERN = "tracking:%s:%s:runtime";
     private static final String TEMPLATE_TRACKING_RUNTIME_PATTERN = "tracking:%s:%s:%s:runtime";
+    private static final String SHEAR_TRACKING_RUNTIME_PATTERN = "tracking:%s:%s:runtime:%s";
     private static final String LAST_POINT_SNAPSHOT_PATTERN = "tracking:%s:%s:lastdata";
     private static final String TEMPLATE_LAST_POINT_SNAPSHOT_PATTERN = "tracking:%s:%s:%s:lastdata";
 
@@ -39,6 +40,10 @@ public final class RedisKeys {
                                          String templateCode) {
         if (templateCode == null || templateCode.trim().isEmpty()) {
             return trackingRuntime(unitCode, trackingType);
+        }
+        if (TrackingType.SHEAR == trackingType) {
+            return String.format(SHEAR_TRACKING_RUNTIME_PATTERN,
+                    normalize(unitCode), normalize(trackingType.getCode()), normalize(templateCode));
         }
         return String.format(TEMPLATE_TRACKING_RUNTIME_PATTERN,
                 normalize(unitCode), normalize(trackingType.getCode()), normalize(templateCode));

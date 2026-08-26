@@ -1,6 +1,14 @@
 package com.wisdri.tracking.application.usecase.tracking;
 
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
+import com.wisdri.tracking.domain.model.config.shear.ShearPointConfig;
+import com.wisdri.tracking.domain.model.config.shear.ShearTrackingConfig;
+import com.wisdri.tracking.domain.model.config.status.DeviceSide;
+import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
+import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
+import com.wisdri.tracking.domain.model.runtime.shear.ShearCounterRuntime;
+import com.wisdri.tracking.domain.model.runtime.shear.ShearDeviceRuntime;
+import com.wisdri.tracking.domain.model.runtime.shear.ShearTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
@@ -8,6 +16,10 @@ import com.wisdri.tracking.infrastructure.service.mqtt.MqttSubscriptionRegistry;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -47,7 +59,109 @@ public class PointSubscriptionUseCase {
                     trackingProperties.getUnit(),
                     trackingType
             );
-            configOptional.ifPresent(config -> mqttSubscriptionRegistry.register(config));
+            configOptional.ifPresent(config -> {
+                initializeShearRuntimes(config);
+                mqttSubscriptionRegistry.register(config);
+            });
         }
+    }
+
+    /**
+     * shear 开始监控时为每个 por_tr_code 创建独立空运行态，不等待首次剪切信号。
+     */
+    private void initializeShearRuntimes(TrackingConfig config) {
+        if (!(config instanceof ShearTrackingConfig)
+                || !Boolean.TRUE.equals(config.getEnable())
+                || !trackingProperties.shearStorageEnabled()) {
+            return;
+        }
+        ShearTrackingConfig shearConfig = (ShearTrackingConfig) config;
+        if (shearConfig.getTracking() == null) {
+            return;
+        }
+        Map<String, String> deviceNames = statusDeviceNames(config.getUnitCode());
+        Map<String, ShearTrackingRuntime> runtimes = new LinkedHashMap<>();
+        collectShearRuntimes(runtimes, shearConfig.getTracking().getUncoilerShearPoint(),
+                true, config.getUnitCode(), deviceNames);
+        collectShearRuntimes(runtimes, shearConfig.getTracking().getCoilerShearPoint(),
+                false, config.getUnitCode(), deviceNames);
+        for (Map.Entry<String, ShearTrackingRuntime> entry : runtimes.entrySet()) {
+            String porTrCode = entry.getKey();
+            if (trackingRuntimeRepositoryDispatcher.findRuntimeAs(
+                    config.getUnitCode(), TrackingType.SHEAR, porTrCode,
+                    ShearTrackingRuntime.class).isPresent()) {
+                continue;
+            }
+            trackingRuntimeRepositoryDispatcher.saveRuntime(entry.getValue());
+        }
+    }
+
+    private void collectShearRuntimes(Map<String, ShearTrackingRuntime> runtimes,
+                                      List<ShearPointConfig> points,
+                                      boolean uncoilerSide,
+                                      String unitCode,
+                                      Map<String, String> deviceNames) {
+        if (points == null) {
+            return;
+        }
+        for (ShearPointConfig point : points) {
+            if (point == null) {
+                continue;
+            }
+            List<String> codes = point.getPorTrCodes() == null || point.getPorTrCodes().isEmpty()
+                    ? Collections.singletonList(point.getPorTrCode()) : point.getPorTrCodes();
+            for (String code : codes) {
+                if (code != null && !code.trim().isEmpty()) {
+                    runtimes.put(code, emptyShearRuntime(
+                            unitCode, code, deviceNames.get(code), uncoilerSide));
+                }
+            }
+        }
+    }
+
+    private ShearTrackingRuntime emptyShearRuntime(String unitCode,
+                                                   String porTrCode,
+                                                   String deviceName,
+                                                   boolean uncoilerSide) {
+        ShearDeviceRuntime uncoiler = ShearDeviceRuntime.builder()
+                .side(DeviceSide.UNCOILER)
+                .running(false)
+                .deviceCode(uncoilerSide ? porTrCode : null)
+                .deviceName(uncoilerSide ? deviceName : null)
+                .head(ShearCounterRuntime.builder().build())
+                .slice(uncoilerSide ? ShearCounterRuntime.builder().build() : null)
+                .build();
+        ShearDeviceRuntime coiler = ShearDeviceRuntime.builder()
+                .side(DeviceSide.COILER)
+                .running(false)
+                .deviceCode(uncoilerSide ? null : porTrCode)
+                .deviceName(uncoilerSide ? null : deviceName)
+                .slice(uncoilerSide ? null : ShearCounterRuntime.builder().build())
+                .tail(ShearCounterRuntime.builder().build())
+                .build();
+        return ShearTrackingRuntime.builder()
+                .unitCode(unitCode)
+                .trackingType(TrackingType.SHEAR)
+                .porTrCode(porTrCode)
+                .uncoiler(uncoiler)
+                .coiler(coiler)
+                .build();
+    }
+
+    private Map<String, String> statusDeviceNames(String unitCode) {
+        Map<String, String> names = new LinkedHashMap<>();
+        trackingRuntimeRepositoryDispatcher.findConfigAs(
+                unitCode, TrackingType.STATUS, StatusTrackingConfig.class)
+                .map(StatusTrackingConfig::getTracking)
+                .ifPresent(tracking -> {
+                    if (tracking.getPoints() != null) {
+                        for (StatusPointGroup point : tracking.getPoints()) {
+                            if (point != null && point.getCode() != null) {
+                                names.put(point.getCode(), point.getName());
+                            }
+                        }
+                    }
+                });
+        return names;
     }
 }

@@ -7,6 +7,9 @@ import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.runtime.batch.BatchTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessSegmentRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.shear.ShearCounterRuntime;
+import com.wisdri.tracking.domain.model.runtime.shear.ShearDeviceRuntime;
+import com.wisdri.tracking.domain.model.runtime.shear.ShearTrackingRuntime;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
@@ -131,6 +134,50 @@ class TrackingRuntimeRepositoryImplTest {
         assertEquals("C002", repository.findRuntimeAs(
                 "CP2", TrackingType.PROCESS, ProcessTrackingRuntime.class
         ).orElseThrow(AssertionError::new).getSegments().get("S1").getCoilNo());
+    }
+
+    @Test
+    void storesEachShearRuntimeBelowDirectoryByPorTrCode() {
+        TrackingRuntimeRepositoryImpl repository = repository();
+        ShearTrackingRuntime runtime = ShearTrackingRuntime.builder()
+                .unitCode("CP1")
+                .trackingType(TrackingType.SHEAR)
+                .porTrCode("TR-A")
+                .uncoiler(ShearDeviceRuntime.builder()
+                        .side(DeviceSide.UNCOILER)
+                        .running(true)
+                        .deviceCode("POR-1")
+                        .productNo(1)
+                        .head(ShearCounterRuntime.builder().build())
+                        .build())
+                .coiler(ShearDeviceRuntime.builder()
+                        .side(DeviceSide.COILER)
+                        .running(true)
+                        .deviceCode("TR-A")
+                        .productNo(1)
+                        .slice(ShearCounterRuntime.builder().build())
+                        .tail(ShearCounterRuntime.builder().build())
+                        .build())
+                .build();
+
+        repository.saveRuntime(runtime);
+
+        String key = "tracking:cp1:shear:runtime:tr-a";
+        assertTrue(redis.containsKey(key));
+        assertFalse(redis.containsKey("tracking:cp1:shear:runtime"));
+        assertEquals(key, RedisKeys.trackingRuntime("CP1", TrackingType.SHEAR, "TR-A"));
+        assertTrue(redis.get(key).contains("\"uncoiler\""));
+        assertTrue(redis.get(key).contains("\"coiler\""));
+        assertTrue(redis.get(key).contains("\"HEAD\""));
+        assertTrue(redis.get(key).contains("\"SLICE\""));
+        assertTrue(redis.get(key).contains("\"TAIL\""));
+        assertFalse(redis.get(key).contains("por_tr_code"));
+        ShearTrackingRuntime cached = repository.findRuntimeAs(
+                "CP1", TrackingType.SHEAR, "TR-A", ShearTrackingRuntime.class)
+                .orElseThrow(AssertionError::new);
+        assertEquals("TR-A", cached.getPorTrCode());
+        assertEquals("POR-1", cached.getUncoiler().getDeviceCode());
+        assertEquals("TR-A", cached.getCoiler().getDeviceCode());
     }
 
     @Test

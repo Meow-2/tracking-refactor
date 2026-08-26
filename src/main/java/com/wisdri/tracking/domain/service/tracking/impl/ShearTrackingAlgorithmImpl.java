@@ -8,10 +8,11 @@ import com.wisdri.tracking.domain.model.config.shear.ShearTrackingConfig;
 import com.wisdri.tracking.domain.model.config.shear.ShearTrackingSection;
 import com.wisdri.tracking.domain.model.config.shear.WelderShearSettings;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
+import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
+import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.runtime.shear.ShearCounterRuntime;
-import com.wisdri.tracking.domain.model.runtime.shear.ShearMaterialRuntime;
-import com.wisdri.tracking.domain.model.runtime.shear.ShearPointRuntime;
+import com.wisdri.tracking.domain.model.runtime.shear.ShearDeviceRuntime;
 import com.wisdri.tracking.domain.model.runtime.shear.ShearTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
@@ -36,6 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -46,11 +48,11 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
     /** 非点位来源的首刀或首次分切长度。 */
     private static final BigDecimal ZERO = BigDecimal.ZERO;
 
-    /** 读取 shear/status 配置与运行态，并在持久化成功后保存 shear runtime。 */
+    /** 读取 shear/status 配置与运行态，并在结果入库前保存算法算出的 shear runtime。 */
     @Resource
     private TrackingRuntimeRepositoryDispatcher runtimeRepositoryDispatcher;
 
-    /** 输出触发、上下文、判型、刀次、长度、写库和 runtime 提交步骤日志。 */
+    /** 输出触发、上下文、判型、刀次、长度和 runtime 提交步骤日志。 */
     @Resource
     private TrackingStepLogger trackingStepLogger;
 
@@ -76,12 +78,6 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                     "reason", "剪切配置不存在"));
             return results;
         }
-        if (input.getPreviousSnapshot() == null) {
-            trackingStepLogger.log(input, "剪切触发沿检查", TrackingStepLogger.details(
-                    "previousAvailable", false,
-                    "triggered", false));
-            return results;
-        }
         StatusTrackingContext context = input.getStatusContext();
         if (context == null) {
             trackingStepLogger.log(input, "剪切事件跳过", TrackingStepLogger.details(
@@ -89,32 +85,43 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
             return results;
         }
         ShearTrackingSection tracking = configOptional.get().getTracking();
-        // 计算阶段只修改运行态副本；数据库成功前不会覆盖 Redis 展示态。
-        ShearTrackingRuntime workingRuntime = runtime(input.getUnitCode());
-        calculatePoints(input, tracking, context, workingRuntime,
+        synchronizeRuntimes(input, tracking, context);
+        if (input.getPreviousSnapshot() == null) {
+            trackingStepLogger.log(input, "剪切触发沿检查", TrackingStepLogger.details(
+                    "previousAvailable", false,
+                    "triggered", false));
+            return results;
+        }
+        Map<String, ShearTrackingRuntime> workingRuntimes = new LinkedHashMap<>();
+        calculatePoints(input, tracking, context, workingRuntimes,
                 tracking.getUncoilerShearPoint(), true, results);
-        calculatePoints(input, tracking, context, workingRuntime,
+        calculatePoints(input, tracking, context, workingRuntimes,
                 tracking.getCoilerShearPoint(), false, results);
+        saveCalculatedRuntimes(input, workingRuntimes, results);
         return results;
     }
 
-    @Override
-    public void afterPersist(TrackingInput input, List<ShearResult> results) {
-        if (input == null || results == null || results.isEmpty()
-                || !trackingProperties.shearStorageEnabled()) {
+    /** 算法算出刀次后立即提交运行态，随后结果才进入数据库持久化流程。 */
+    private void saveCalculatedRuntimes(TrackingInput input,
+                                        Map<String, ShearTrackingRuntime> workingRuntimes,
+                                        List<ShearResult> results) {
+        if (!trackingProperties.shearStorageEnabled() || results.isEmpty()) {
             return;
         }
-        ShearTrackingRuntime runtime = runtime(input.getUnitCode());
-        trackingStepLogger.log(input, "剪切记录写入", TrackingStepLogger.details(
-                "resultCount", results.size()));
+        Map<String, ShearTrackingRuntime> changed = new LinkedHashMap<>();
         for (ShearResult result : results) {
-            applyResult(runtime, result);
+            ShearTrackingRuntime runtime = workingRuntimes.get(result.getPorTrCode());
+            if (runtime != null) {
+                changed.put(result.getPorTrCode(), runtime);
+            }
         }
-        runtime.setUpdatedAt(Instant.now());
-        runtimeRepositoryDispatcher.saveRuntime(runtime);
+        for (ShearTrackingRuntime runtime : changed.values()) {
+            runtime.setUpdatedAt(Instant.now());
+            runtimeRepositoryDispatcher.saveRuntime(runtime);
+        }
         trackingStepLogger.log(input, "剪切运行态提交", TrackingStepLogger.details(
                 "resultCount", results.size(),
-                "pointCount", runtime.getPoints().size()));
+                "runtimeCount", changed.size()));
     }
 
     /**
@@ -124,7 +131,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
     private void calculatePoints(TrackingInput input,
                                  ShearTrackingSection tracking,
                                  StatusTrackingContext context,
-                                 ShearTrackingRuntime runtime,
+                                 Map<String, ShearTrackingRuntime> workingRuntimes,
                                  List<ShearPointConfig> points,
                                  boolean uncoilerSide,
                                  List<ShearResult> results) {
@@ -153,7 +160,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                     continue;
                 }
                 ShearResult result = calculatePoint(
-                        input, tracking, context, runtime, point, uncoilerSide);
+                        input, tracking, context, workingRuntimes, point, uncoilerSide);
                 if (result != null) {
                     results.add(result);
                 }
@@ -168,16 +175,19 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
 
     /**
      * 对一个有效触发沿完成设备解析、连续线判型、物料归属、刀次和长度计算。
-     * 返回值只携带待持久化结果和待提交 runtime 数据，不在本方法写数据库或 Redis。
+     * 返回值携带待持久化结果；runtime 先写入计算态，由 calculate 在返回结果前统一保存。
      */
     private ShearResult calculatePoint(TrackingInput input,
                                        ShearTrackingSection tracking,
                                        StatusTrackingContext context,
-                                       ShearTrackingRuntime runtime,
+                                       Map<String, ShearTrackingRuntime> workingRuntimes,
                                        ShearPointConfig point,
                                        boolean uncoilerSide) {
         DeviceSide associatedSide = uncoilerSide ? DeviceSide.UNCOILER : DeviceSide.COILER;
         AssociatedEndpoint associated = associatedEndpoint(context, point, associatedSide);
+        // 每个 por_tr_code 使用独立副本，完成本帧计算后再统一覆盖正式 runtime。
+        ShearTrackingRuntime runtime = workingRuntimes.computeIfAbsent(
+                associated.deviceCode, code -> runtime(input.getUnitCode(), code, uncoilerSide));
         StatusCurrentRuntime opposite = context.getCurrent() == null ? null
                 : context.getCurrent().get(uncoilerSide ? DeviceSide.COILER : DeviceSide.UNCOILER);
         if (opposite == null) {
@@ -206,7 +216,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                     : classifyCoiler(input, tracking, runtime, point, por, tr, shearColor);
         }
         Endpoint material = material(kind, uncoilerSide, por, tr);
-        CounterDecision decision = counter(runtime, point.getName(), material, kind,
+        CounterDecision decision = counter(runtime, kind, uncoilerSide,
                 por.remainingLength, tracking.getShearExperience(), true);
         LengthDecision lengthDecision = shearLength(
                 input.getLatestSnapshot(), tracking, point, kind, uncoilerSide, decision);
@@ -242,6 +252,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 .generatedAt(Instant.now())
                 .receivedAt(receivedAt)
                 .shearPointCode(point.getName())
+                .porTrCode(associated.deviceCode)
                 .shearKind(kind)
                 .inMatNo(material.coilNo)
                 .inMatNoProdNo(material.productNo)
@@ -300,7 +311,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
         int frontWelderPieces = welderPieces(
                 input.getLatestSnapshot(), tracking, point.getShearSettings()) / 2;
         int tailLimit = samplePieces + scrapPieces + frontWelderPieces + 1;
-        CounterDecision nextTail = counter(runtime, point.getName(), tr, ShearKind.TAIL,
+        CounterDecision nextTail = counter(runtime, ShearKind.TAIL, false,
                 por.remainingLength, tracking.getShearExperience(), false);
         return nextTail.counter.getCutNo() <= tailLimit ? ShearKind.TAIL : ShearKind.HEAD;
     }
@@ -392,28 +403,21 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
 
     /**
      * 计算下一刀计数。apply=false 仅用于卷取机侧预判下一刀类型，不写入计算态 runtime；
-     * apply=true 写入的仍是 calculate 阶段副本，持久化成功后才由 afterPersist 正式提交。
+     * apply=true 写入 calculate 阶段副本，并在 calculate 返回结果前正式提交。
      */
     private CounterDecision counter(ShearTrackingRuntime runtime,
-                                    String pointCode,
-                                    Endpoint material,
                                     ShearKind kind,
+                                    boolean uncoilerSide,
                                     BigDecimal porRemainLength,
                                     BigDecimal experience,
                                     boolean apply) {
-        ShearPointRuntime pointRuntime = runtime.getPoints().computeIfAbsent(
-                pointCode, key -> ShearPointRuntime.builder().build());
-        String materialKey = materialKey(material.coilNo, material.productNo);
-        ShearMaterialRuntime materialRuntime = pointRuntime.getMaterials().computeIfAbsent(
-                materialKey, key -> ShearMaterialRuntime.builder()
-                        .coilNo(material.coilNo)
-                        .productNo(material.productNo)
-                        .build());
-        ShearCounterRuntime previous = materialRuntime.getCounters().get(kind);
+        ShearDeviceRuntime materialRuntime = materialRuntime(runtime, kind, uncoilerSide);
+        ShearCounterRuntime previous = materialRuntime.counter(kind);
         BigDecimal previousRemain = previous == null ? null : previous.getLastPorRemainLength();
         BigDecimal delta = previousRemain == null ? null : previousRemain.subtract(porRemainLength);
         ShearCounterRuntime next;
-        if (previous == null) {
+        if (previous == null || previous.getShearNo() == null || previous.getCutNo() == null
+                || previous.getLastPorRemainLength() == null) {
             next = ShearCounterRuntime.builder().shearNo(1).cutNo(1)
                     .lastPorRemainLength(porRemainLength).build();
         } else if (delta.signum() >= 0 && delta.compareTo(experience) < 0) {
@@ -424,71 +428,236 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                     .cutNo(1).lastPorRemainLength(porRemainLength).build();
         }
         if (apply) {
-            materialRuntime.getCounters().put(kind, next);
+            materialRuntime.setCounter(kind, next);
         }
         return new CounterDecision(next, previousRemain, delta);
     }
 
-    /** 将一条已持久化结果还原成计数状态，并合并到待保存的正式 runtime。 */
-    private void applyResult(ShearTrackingRuntime runtime, ShearResult result) {
-        ShearPointRuntime point = runtime.getPoints().computeIfAbsent(
-                result.getShearPointCode(), key -> ShearPointRuntime.builder().build());
-        String materialKey = materialKey(result.getInMatNo(), result.getInMatNoProdNo());
-        ShearMaterialRuntime material = point.getMaterials().computeIfAbsent(
-                materialKey, key -> ShearMaterialRuntime.builder()
-                        .coilNo(result.getInMatNo())
-                        .productNo(result.getInMatNoProdNo())
-                        .build());
-        material.getCounters().put(result.getShearKind(), ShearCounterRuntime.builder()
-                .shearNo(result.getShearNo())
-                .cutNo(result.getCutNo())
-                .lastPorRemainLength(result.getPorRemainLength())
-                .build());
+    private ShearDeviceRuntime materialRuntime(ShearTrackingRuntime runtime,
+                                                ShearKind kind,
+                                                boolean uncoilerSide) {
+        boolean belongsToUncoiler = uncoilerSide
+                ? kind != ShearKind.TAIL : kind == ShearKind.HEAD;
+        ShearDeviceRuntime material = belongsToUncoiler
+                ? runtime.getUncoiler() : runtime.getCoiler();
+        if (material == null) {
+            throw new IllegalStateException("剪切运行态设备绑定不存在: "
+                    + (belongsToUncoiler ? "uncoiler" : "coiler"));
+        }
+        return material;
     }
 
-    /** 获取当前机组 runtime 的深拷贝；服务重启且无内存态时从空计数开始。 */
-    private ShearTrackingRuntime runtime(String unitCode) {
+    /** 每帧刷新所有配置代码的两侧设备绑定，即使本帧没有剪切触发。 */
+    private void synchronizeRuntimes(TrackingInput input,
+                                     ShearTrackingSection tracking,
+                                     StatusTrackingContext context) {
+        if (!trackingProperties.shearStorageEnabled()) {
+            return;
+        }
+        Map<String, String> deviceNames = statusDeviceNames(input.getUnitCode());
+        synchronizePoints(input, context, tracking.getUncoilerShearPoint(),
+                true, deviceNames);
+        synchronizePoints(input, context, tracking.getCoilerShearPoint(),
+                false, deviceNames);
+    }
+
+    private void synchronizePoints(TrackingInput input,
+                                   StatusTrackingContext context,
+                                   List<ShearPointConfig> points,
+                                   boolean uncoilerSide,
+                                   Map<String, String> deviceNames) {
+        if (points == null) {
+            return;
+        }
+        for (ShearPointConfig point : points) {
+            for (String porTrCode : deviceCodes(point)) {
+                ShearTrackingRuntime runtime = runtime(
+                        input.getUnitCode(), porTrCode, uncoilerSide);
+                ShearDeviceRuntime previousUncoiler = runtime.getUncoiler();
+                ShearDeviceRuntime previousCoiler = runtime.getCoiler();
+                StatusCurrentRuntime opposite = context.getCurrent() == null ? null
+                        : context.getCurrent().get(uncoilerSide
+                                ? DeviceSide.COILER : DeviceSide.UNCOILER);
+                ShearDeviceRuntime uncoiler = uncoilerSide
+                        ? configuredDevice(context, DeviceSide.UNCOILER, porTrCode,
+                                deviceNames.get(porTrCode), previousUncoiler, true)
+                        : currentDevice(DeviceSide.UNCOILER, opposite, previousUncoiler, false);
+                ShearDeviceRuntime coiler = uncoilerSide
+                        ? currentDevice(DeviceSide.COILER, opposite, previousCoiler, false)
+                        : configuredDevice(context, DeviceSide.COILER, porTrCode,
+                                deviceNames.get(porTrCode), previousCoiler, true);
+                if (Objects.equals(previousUncoiler, uncoiler)
+                        && Objects.equals(previousCoiler, coiler)) {
+                    continue;
+                }
+                runtime.setUncoiler(uncoiler);
+                runtime.setCoiler(coiler);
+                runtime.setUpdatedAt(Instant.now());
+                runtimeRepositoryDispatcher.saveRuntime(runtime);
+            }
+        }
+    }
+
+    private ShearDeviceRuntime configuredDevice(StatusTrackingContext context,
+                                                 DeviceSide side,
+                                                 String deviceCode,
+                                                 String deviceName,
+                                                 ShearDeviceRuntime previous,
+                                                 boolean sliceEnabled) {
+        StatusCurrentRuntime current = context.getCurrent() == null
+                ? null : context.getCurrent().get(side);
+        if (current != null && deviceCode.equals(current.getDeviceCode())) {
+            return device(side, current.getRunning(), deviceCode,
+                    current.getDeviceName() == null ? deviceName : current.getDeviceName(),
+                    current.getCoilNo(), current.getProductNo(), current.getColorNo(),
+                    current.getRemainingLength(), current.getMaxLength(), previous, sliceEnabled);
+        }
+        StatusCandidateRuntime candidate = context.getCandidates() == null
+                ? null : context.getCandidates().get(deviceCode);
+        if (candidate == null) {
+            return device(side, false, deviceCode, deviceName,
+                    null, null, null, null, null, previous, sliceEnabled);
+        }
+        return device(side, Boolean.TRUE.equals(candidate.getDataComplete()), deviceCode, deviceName,
+                candidate.getCoilNo(), candidate.getProductNo(), candidate.getColorNo(),
+                last(candidate.getLengths()), candidate.getMaxLength(), previous, sliceEnabled);
+    }
+
+    private ShearDeviceRuntime currentDevice(DeviceSide side,
+                                              StatusCurrentRuntime current,
+                                              ShearDeviceRuntime previous,
+                                              boolean sliceEnabled) {
+        if (current == null) {
+            return device(side, false, null, null,
+                    null, null, null, null, null, previous, sliceEnabled);
+        }
+        return device(side, current.getRunning(), current.getDeviceCode(), current.getDeviceName(),
+                current.getCoilNo(), current.getProductNo(), current.getColorNo(),
+                current.getRemainingLength(), current.getMaxLength(), previous, sliceEnabled);
+    }
+
+    private ShearDeviceRuntime device(DeviceSide side,
+                                      Boolean running,
+                                      String deviceCode,
+                                      String deviceName,
+                                      String coilNo,
+                                      Integer productNo,
+                                      String colorNo,
+                                      BigDecimal remainingLength,
+                                      BigDecimal maxLength,
+                                      ShearDeviceRuntime previous,
+                                      boolean sliceEnabled) {
+        boolean sameMaterial = previous != null
+                && Objects.equals(previous.getDeviceCode(), deviceCode)
+                && Objects.equals(previous.getCoilNo(), coilNo)
+                && Objects.equals(previous.getProductNo(), productNo);
+        return ShearDeviceRuntime.builder()
+                .side(side)
+                .running(Boolean.TRUE.equals(running))
+                .deviceCode(deviceCode)
+                .deviceName(deviceName)
+                .coilNo(coilNo)
+                .productNo(productNo)
+                .colorNo(normalizedColor(colorNo))
+                .remainingLength(remainingLength)
+                .maxLength(maxLength)
+                .head(side == DeviceSide.UNCOILER
+                        ? retainedCounter(previous, ShearKind.HEAD, sameMaterial) : null)
+                .slice(sliceEnabled
+                        ? retainedCounter(previous, ShearKind.SLICE, sameMaterial) : null)
+                .tail(side == DeviceSide.COILER
+                        ? retainedCounter(previous, ShearKind.TAIL, sameMaterial) : null)
+                .build();
+    }
+
+    private ShearCounterRuntime retainedCounter(ShearDeviceRuntime previous,
+                                                ShearKind kind,
+                                                boolean sameMaterial) {
+        ShearCounterRuntime counter = sameMaterial && previous != null
+                ? previous.counter(kind) : null;
+        return counter == null ? ShearCounterRuntime.builder().build() : copyCounter(counter);
+    }
+
+    private Map<String, String> statusDeviceNames(String unitCode) {
+        Map<String, String> names = new LinkedHashMap<>();
+        runtimeRepositoryDispatcher.findConfigAs(
+                unitCode, TrackingType.STATUS, StatusTrackingConfig.class)
+                .map(StatusTrackingConfig::getTracking)
+                .ifPresent(tracking -> {
+                    if (tracking.getPoints() != null) {
+                        for (StatusPointGroup point : tracking.getPoints()) {
+                            if (point != null && point.getCode() != null) {
+                                names.put(point.getCode(), point.getName());
+                            }
+                        }
+                    }
+                });
+        return names;
+    }
+
+    /** 获取指定 por_tr_code runtime 的深拷贝；不存在时创建该剪刀的空计数态。 */
+    private ShearTrackingRuntime runtime(String unitCode, String porTrCode, boolean uncoilerSide) {
         return runtimeRepositoryDispatcher.findRuntimeAs(
-                unitCode, TrackingType.SHEAR, ShearTrackingRuntime.class)
+                unitCode, TrackingType.SHEAR, porTrCode, ShearTrackingRuntime.class)
                 .map(this::copyRuntime)
-                .orElseGet(() -> ShearTrackingRuntime.builder()
-                        .unitCode(unitCode)
-                        .trackingType(TrackingType.SHEAR)
-                        .points(new LinkedHashMap<>())
-                        .build());
+                .orElseGet(() -> emptyRuntime(unitCode, porTrCode, null, uncoilerSide));
+    }
+
+    private ShearTrackingRuntime emptyRuntime(String unitCode,
+                                               String porTrCode,
+                                               String deviceName,
+                                               boolean uncoilerSide) {
+        ShearDeviceRuntime uncoiler = device(DeviceSide.UNCOILER, false,
+                uncoilerSide ? porTrCode : null, uncoilerSide ? deviceName : null,
+                null, null, null, null, null, null, uncoilerSide);
+        ShearDeviceRuntime coiler = device(DeviceSide.COILER, false,
+                uncoilerSide ? null : porTrCode, uncoilerSide ? null : deviceName,
+                null, null, null, null, null, null, !uncoilerSide);
+        return ShearTrackingRuntime.builder()
+                .unitCode(unitCode)
+                .trackingType(TrackingType.SHEAR)
+                .porTrCode(porTrCode)
+                .uncoiler(uncoiler)
+                .coiler(coiler)
+                .build();
     }
 
     private ShearTrackingRuntime copyRuntime(ShearTrackingRuntime source) {
-        Map<String, ShearPointRuntime> points = new LinkedHashMap<>();
-        if (source.getPoints() != null) {
-            source.getPoints().forEach((pointCode, pointRuntime) -> {
-                Map<String, ShearMaterialRuntime> materials = new LinkedHashMap<>();
-                if (pointRuntime != null && pointRuntime.getMaterials() != null) {
-                    pointRuntime.getMaterials().forEach((materialKey, material) -> {
-                        Map<ShearKind, ShearCounterRuntime> counters = new LinkedHashMap<>();
-                        if (material != null && material.getCounters() != null) {
-                            material.getCounters().forEach((kind, counter) -> counters.put(kind,
-                                    ShearCounterRuntime.builder()
-                                            .shearNo(counter.getShearNo())
-                                            .cutNo(counter.getCutNo())
-                                            .lastPorRemainLength(counter.getLastPorRemainLength())
-                                            .build()));
-                        }
-                        materials.put(materialKey, ShearMaterialRuntime.builder()
-                                .coilNo(material.getCoilNo())
-                                .productNo(material.getProductNo())
-                                .counters(counters)
-                                .build());
-                    });
-                }
-                points.put(pointCode, ShearPointRuntime.builder().materials(materials).build());
-            });
-        }
         return ShearTrackingRuntime.builder()
                 .unitCode(source.getUnitCode())
                 .trackingType(TrackingType.SHEAR)
+                .porTrCode(source.getPorTrCode())
                 .updatedAt(source.getUpdatedAt())
-                .points(points)
+                .uncoiler(copyDevice(source.getUncoiler()))
+                .coiler(copyDevice(source.getCoiler()))
+                .build();
+    }
+
+    private ShearDeviceRuntime copyDevice(ShearDeviceRuntime source) {
+        if (source == null) {
+            return null;
+        }
+        return ShearDeviceRuntime.builder()
+                .side(source.getSide())
+                .running(source.getRunning())
+                .deviceCode(source.getDeviceCode())
+                .deviceName(source.getDeviceName())
+                .coilNo(source.getCoilNo())
+                .productNo(source.getProductNo())
+                .colorNo(source.getColorNo())
+                .remainingLength(source.getRemainingLength())
+                .maxLength(source.getMaxLength())
+                .head(copyCounter(source.getHead()))
+                .slice(copyCounter(source.getSlice()))
+                .tail(copyCounter(source.getTail()))
+                .build();
+    }
+
+    private ShearCounterRuntime copyCounter(ShearCounterRuntime source) {
+        return source == null ? null : ShearCounterRuntime.builder()
+                .shearNo(source.getShearNo())
+                .cutNo(source.getCutNo())
+                .lastPorRemainLength(source.getLastPorRemainLength())
                 .build();
     }
 
@@ -626,10 +795,6 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 || Character.isSpaceChar(value)
                 || Character.isISOControl(value)
                 || Character.getType(value) == Character.FORMAT;
-    }
-
-    private String materialKey(String coilNo, String productNo) {
-        return coilNo.length() + ":" + coilNo + ":" + productNo;
     }
 
     private Boolean booleanValue(PointSnapshot snapshot, String pointPath) {

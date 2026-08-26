@@ -12,6 +12,7 @@ import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.config.shear.ShearTrackingConfig;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.shear.ShearTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepository;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepositoryDispatcher;
@@ -122,8 +123,9 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
         if (runtime == null || runtime.getUnitCode() == null || runtime.getTrackingType() == null) {
             throw new TrackingException("保存跟踪运行态失败: 缺少机组或跟踪类型");
         }
-        validateTemplateCode(runtime.getTrackingType(), runtime.getTemplateCode());
-        String key = runtimeKey(runtime.getUnitCode(), runtime.getTrackingType(), runtime.getTemplateCode());
+        String instanceCode = runtimeInstanceCode(runtime);
+        validateInstanceCode(runtime.getTrackingType(), instanceCode);
+        String key = runtimeKey(runtime.getUnitCode(), runtime.getTrackingType(), instanceCode);
         runtimeCache.put(key, runtime);
         try {
             String json = TrackingType.STATUS == runtime.getTrackingType()
@@ -208,6 +210,27 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
         if (TrackingType.BATCH == trackingType
                 && (templateCode == null || templateCode.trim().isEmpty())) {
             throw new TrackingException("读写批次跟踪运行态失败: templateCode 不能为空");
+        }
+    }
+
+    /**
+     * batch 以模板代码隔离，shear 以 por_tr_code 隔离，其他类型保持单实例。
+     */
+    private String runtimeInstanceCode(TrackingRuntime runtime) {
+        if (TrackingType.SHEAR == runtime.getTrackingType()) {
+            if (!(runtime instanceof ShearTrackingRuntime)) {
+                throw new TrackingException("保存剪切运行态失败: runtime 类型不匹配");
+            }
+            return ((ShearTrackingRuntime) runtime).getPorTrCode();
+        }
+        return runtime.getTemplateCode();
+    }
+
+    private void validateInstanceCode(TrackingType trackingType, String instanceCode) {
+        validateTemplateCode(trackingType, instanceCode);
+        if (TrackingType.SHEAR == trackingType
+                && (instanceCode == null || instanceCode.trim().isEmpty())) {
+            throw new TrackingException("读写剪切跟踪运行态失败: porTrCode 不能为空");
         }
     }
 
