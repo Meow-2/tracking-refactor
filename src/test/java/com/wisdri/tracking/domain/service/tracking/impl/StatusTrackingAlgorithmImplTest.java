@@ -8,6 +8,7 @@ import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingSection;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
@@ -197,7 +198,7 @@ class StatusTrackingAlgorithmImplTest {
     }
 
     @Test
-    void resetsCandidateWindowWhenCoilChangesOrLengthIsInvalid() {
+    void retainsEveryConfiguredCandidateButDoesNotSelectIncompleteData() {
         calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
         calculate(true, "U1", "COIL-U1", "95", "U2", "COIL-U2", "195", "C1", "COIL-C1", "15");
 
@@ -209,7 +210,31 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(runtime.get().getCandidates().get("U1").getCoilNo()).isEqualTo("U1-new");
         assertThat(runtime.get().getCandidates().get("U1").getLengths()).containsExactly(new BigDecimal("90"));
         assertThat(runtime.get().getCandidates().get("U1").getMaxLength()).isEqualByComparingTo("90");
-        assertThat(runtime.get().getCandidates()).doesNotContainKey("U2");
+        assertThat(runtime.get().getCandidates()).containsKeys("U1", "U2", "C1");
+        assertThat(runtime.get().getCandidates().get("U2").getDataComplete()).isFalse();
+        assertThat(runtime.get().getCandidates().get("U2").getLengths())
+                .containsExactly(new BigDecimal("200"), new BigDecimal("195"));
+        assertThat(runtime.get().getCandidates().get("U2").getMaxLength())
+                .isEqualByComparingTo("200");
+    }
+
+    @Test
+    void retainsCandidateWithMissingCoilNumberAndClearsItsAnonymousLengthWindow() {
+        calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
+        calculate(true, "U1", "COIL-U1", "95", "U2", "COIL-U2", "195", "C1", "COIL-C1", "15");
+
+        Map<String, Object> values = values(true, "U1", "", "90", "U2", "COIL-U2", "190",
+                "C1", "COIL-C1", "20");
+        algorithm.calculate(input(values));
+
+        StatusCandidateRuntime candidate = runtime.get().getCandidates().get("U1");
+        assertThat(runtime.get().getCandidates()).containsKeys("U1", "U2", "C1");
+        assertThat(candidate.getDataComplete()).isFalse();
+        assertThat(candidate.getCoilNo()).isEmpty();
+        assertThat(candidate.getProductNo()).isNull();
+        assertThat(candidate.getLengths()).isEmpty();
+        assertThat(candidate.getMaxLength()).isNull();
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("U2");
     }
 
     @Test

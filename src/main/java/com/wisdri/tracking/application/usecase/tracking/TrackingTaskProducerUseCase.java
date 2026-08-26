@@ -159,6 +159,7 @@ public class TrackingTaskProducerUseCase {
                 List<BigDecimal> lengths = candidate.getLengths() == null
                         ? new ArrayList<>() : new ArrayList<>(candidate.getLengths());
                 copied.put(code, StatusCandidateRuntime.builder()
+                        .dataComplete(candidate.getDataComplete())
                         .coilNo(candidate.getCoilNo())
                         .productNo(candidate.getProductNo())
                         .colorNo(candidate.getColorNo())

@@ -119,32 +119,30 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     pointPath(tracking, group.getColorNo())));
             BigDecimal length = decimalValue(input.getLatestSnapshot(),
                     pointPath(tracking, group.getRemainingLength()));
-            if (coilNo == null || coilNo.isEmpty() || length == null) {
-                trackingStepLogger.log(input, "设备窗口更新", group.getCode(), TrackingStepLogger.details(
-                        "reason", "卷号或剩余长度无效",
-                        "coilNo", coilNo,
-                        "remainingLength", length));
-                continue;
-            }
-
             StatusCandidateRuntime old = previous == null ? null : previous.get(group.getCode());
-            boolean sameCoil = old != null && coilNo.equals(old.getCoilNo());
-            Integer productNo = sameCoil
-                    ? old.getProductNo()
-                    : queryProductNo(input, group, coilNo);
+            boolean coilNoValid = coilNo != null && !coilNo.isEmpty();
+            boolean dataComplete = coilNoValid && length != null;
+            boolean sameCoil = coilNoValid && old != null && coilNo.equals(old.getCoilNo());
+            Integer productNo = !coilNoValid
+                    ? null
+                    : sameCoil ? old.getProductNo() : queryProductNo(input, group, coilNo);
             List<BigDecimal> lengths = new ArrayList<>();
-            BigDecimal maxLength = length;
+            BigDecimal maxLength = null;
             if (sameCoil) {
                 if (old.getLengths() != null) {
                     lengths.addAll(old.getLengths());
                 }
-                maxLength = maxLength(old, length);
+                maxLength = old.getMaxLength();
             }
-            lengths.add(length);
+            if (length != null && coilNoValid) {
+                maxLength = sameCoil ? maxLength(old, length) : length;
+                lengths.add(length);
+            }
             while (lengths.size() > tracking.getSampleCount()) {
                 lengths.remove(0);
             }
             StatusCandidateRuntime candidate = StatusCandidateRuntime.builder()
+                    .dataComplete(dataComplete)
                     .coilNo(coilNo)
                     .productNo(productNo)
                     .colorNo(colorNo)
@@ -158,7 +156,9 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     "productNo", productNo,
                     "colorNo", colorNo,
                     "maxLength", maxLength,
-                    "lengths", lengths));
+                    "lengths", lengths,
+                    "dataComplete", dataComplete,
+                    "reason", dataComplete ? null : "当前帧卷号或剩余长度无效"));
         }
         return updated;
     }
@@ -198,7 +198,8 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         Map<DeviceSide, SelectedCandidate> selected = new LinkedHashMap<>();
         for (StatusPointGroup group : tracking.getPoints()) {
             StatusCandidateRuntime runtime = candidates.get(group.getCode());
-            if (runtime == null || runtime.getLengths() == null
+            if (runtime == null || Boolean.FALSE.equals(runtime.getDataComplete())
+                    || runtime.getLengths() == null
                     || runtime.getLengths().size() < tracking.getSampleCount()) {
                 continue;
             }
