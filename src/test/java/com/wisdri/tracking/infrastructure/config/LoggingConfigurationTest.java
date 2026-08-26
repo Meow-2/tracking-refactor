@@ -18,7 +18,9 @@ class LoggingConfigurationTest {
                 new ClassPathResource("logback-spring.xml").getInputStream(), StandardCharsets.UTF_8);
 
         assertTrue(xml.contains("${LOG_DIR}/application.log"));
-        assertTrue(xml.contains("${LOG_DIR}/tracking-step.log"));
+        assertTrue(xml.contains("${LOG_DIR}/tracking-step-${trackingType}.log"));
+        assertTrue(xml.contains("MDCBasedDiscriminator"));
+        assertTrue(xml.contains("<key>trackingType</key>"));
         assertTrue(xml.contains("${LOG_DIR}/error.log"));
         assertTrue(xml.contains("conversionWord=\"clr\""));
         assertTrue(xml.contains("%clr(%5p)"));

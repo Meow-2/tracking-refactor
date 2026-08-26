@@ -52,19 +52,27 @@
         </filter>
     </appender>
 
-    <appender name="TRACKING_STEP_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_DIR}/tracking-step.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_DIR}/archive/tracking-step.%d{yyyy-MM-dd, Asia/Shanghai}.%i.log.gz</fileNamePattern>
-            <maxFileSize>40MB</maxFileSize>
-            <maxHistory>30</maxHistory>
-            <totalSizeCap>150MB</totalSizeCap>
-            <cleanHistoryOnStart>true</cleanHistoryOnStart>
-        </rollingPolicy>
-        <encoder>
-            <pattern>%msg%n</pattern>
-            <charset>UTF-8</charset>
-        </encoder>
+    <appender name="TRACKING_STEP_SIFT" class="ch.qos.logback.classic.sift.SiftingAppender">
+        <discriminator class="ch.qos.logback.classic.sift.MDCBasedDiscriminator">
+            <key>trackingType</key>
+            <defaultValue>unknown</defaultValue>
+        </discriminator>
+        <sift>
+            <appender name="TRACKING_STEP_FILE-${trackingType}" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                <file>${LOG_DIR}/tracking-step-${trackingType}.log</file>
+                <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                    <fileNamePattern>${LOG_DIR}/archive/tracking-step-${trackingType}.%d{yyyy-MM-dd, Asia/Shanghai}.%i.log.gz</fileNamePattern>
+                    <maxFileSize>40MB</maxFileSize>
+                    <maxHistory>30</maxHistory>
+                    <totalSizeCap>150MB</totalSizeCap>
+                    <cleanHistoryOnStart>true</cleanHistoryOnStart>
+                </rollingPolicy>
+                <encoder>
+                    <pattern>%msg%n</pattern>
+                    <charset>UTF-8</charset>
+                </encoder>
+            </appender>
+        </sift>
     </appender>
 
     <appender name="ASYNC_APPLICATION" class="ch.qos.logback.classic.AsyncAppender">
@@ -85,7 +93,7 @@
         <queueSize>8192</queueSize>
         <discardingThreshold>0</discardingThreshold>
         <neverBlock>false</neverBlock>
-        <appender-ref ref="TRACKING_STEP_FILE"/>
+        <appender-ref ref="TRACKING_STEP_SIFT"/>
     </appender>
 
     <logger name="tracking.step" level="INFO" additivity="false">

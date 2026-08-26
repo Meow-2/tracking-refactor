@@ -6,6 +6,7 @@ import com.wisdri.tracking.common.utils.JsonUtils;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -43,7 +44,14 @@ public class TrackingStepLogger {
                     .segmentCode(segmentCode)
                     .details(details == null ? Collections.emptyMap() : details)
                     .build();
-            STEP_LOG.info(objectMapper.writeValueAsString(event));
+            String trackingType = event.getTrackingType() == null
+                    ? "unknown" : event.getTrackingType().getCode();
+            MDC.put("trackingType", trackingType);
+            try {
+                STEP_LOG.info(objectMapper.writeValueAsString(event));
+            } finally {
+                MDC.remove("trackingType");
+            }
         } catch (JsonProcessingException | RuntimeException e) {
             FALLBACK_LOG.warn("输出跟踪算法步骤日志失败，stage={}", stage, e);
         }
