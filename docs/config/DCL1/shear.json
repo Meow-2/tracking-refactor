@@ -3,69 +3,145 @@
   "mqtt_topic": "dcl1_shear_tracking",
   "tracking": {
     "point_prefix": "/aygg_tracking/dcl1/shear/tracking/",
-    "mode": "continuous",
+    "mode": "CONTINUOUS",
     "tail_experience": "50",
     "shear_experience": "100",
     "uncoiler_shear_point": [
       {
         "name": "is_upper_cut",
         "type": "boolean",
-        "type_codes": { "head": 111, "slice": 115, "tail": 119 },
+        "type_codes": {
+          "head": 111,
+          "slice": 115,
+          "tail": 119
+        },
         "normal_pos": true,
         "por_tr_code": "por1",
         "shear_settings": {
           "head": {
-            "number": { "name": "upper_head_cut_number", "type": "int" },
-            "length": { "name": "upper_head_length", "type": "float" }
+            "number": {
+              "name": "upper_head_cut_number",
+              "type": "int"
+            },
+            "length": {
+              "name": "upper_head_length",
+              "type": "float"
+            }
           },
           "tail": {
-            "number": { "name": "upper_tail_cut_number", "type": "int" },
-            "length": { "name": "upper_tail_length", "type": "float" }
+            "number": {
+              "name": "upper_tail_cut_number",
+              "type": "int"
+            },
+            "length": {
+              "name": "upper_tail_length",
+              "type": "float"
+            }
           }
         },
-        "color_point": { "name": "color_code_front_of_shear1", "type": "short" }
+        "color_point": {
+          "name": "color_code_front_of_shear1",
+          "type": "short"
+        }
       },
       {
         "name": "is_lower_cut",
         "type": "boolean",
-        "type_codes": { "head": 191, "slice": 195, "tail": 199 },
+        "type_codes": {
+          "head": 191,
+          "slice": 195,
+          "tail": 199
+        },
         "normal_pos": true,
         "por_tr_code": "por2",
         "shear_settings": {
           "head": {
-            "number": { "name": "lower_head_cut_number", "type": "int" },
-            "length": { "name": "lower_head_length", "type": "float" }
+            "number": {
+              "name": "lower_head_cut_number",
+              "type": "int"
+            },
+            "length": {
+              "name": "lower_head_length",
+              "type": "float"
+            }
           },
           "tail": {
-            "number": { "name": "lower_tail_cut_number", "type": "int" },
-            "length": { "name": "lower_tail_length", "type": "float" }
+            "number": {
+              "name": "lower_tail_cut_number",
+              "type": "int"
+            },
+            "length": {
+              "name": "lower_tail_length",
+              "type": "float"
+            }
           }
         },
-        "color_point": { "name": "color_code_front_of_shear2", "type": "short" }
+        "color_point": {
+          "name": "color_code_front_of_shear2",
+          "type": "short"
+        }
       }
     ],
     "coiler_shear_point": [
       {
         "name": "is_shear_cut",
         "type": "boolean",
-        "type_codes": { "head": 901, "slice": 905, "tail": 909 },
+        "type_codes": {
+          "head": 901,
+          "slice": 905,
+          "tail": 909
+        },
         "normal_pos": true,
-        "por_tr_code": "tr1",
+        "por_tr_codes": [
+          "tr1",
+          "tr2"
+        ],
         "shear_settings": {
+          "welder_pieces": {
+            "name": "shear_weld_seam_scrap_pieces",
+            "type": "int"
+          },
           "front_welder": {
-            "sample_pieces": { "name": "shear_weld_seam_front_sample_pieces", "type": "int" },
-            "scrap_pieces": { "name": "shear_weld_seam_front_scrap_pieces", "type": "int" },
-            "sample_length": { "name": "shear_single_sample_length", "type": "float" },
-            "scrap_length": { "name": "shear_single_scrap_length", "type": "float" }
+            "sample_pieces": {
+              "name": "shear_weld_seam_front_sample_pieces",
+              "type": "int"
+            },
+            "scrap_pieces": {
+              "name": "shear_weld_seam_front_scrap_pieces",
+              "type": "int"
+            },
+            "sample_length": {
+              "name": "shear_single_sample_length",
+              "type": "float"
+            },
+            "scrap_length": {
+              "name": "shear_single_scrap_length",
+              "type": "float"
+            }
           },
           "behind_welder": {
-            "sample_pieces": { "name": "shear_weld_seam_rear_sample_pieces", "type": "int" },
-            "scrap_pieces": { "name": "shear_weld_seam_rear_scrap_pieces", "type": "int" },
-            "sample_length": { "name": "shear_single_sample_length", "type": "float" },
-            "scrap_length": { "name": "shear_single_scrap_length", "type": "float" }
+            "sample_pieces": {
+              "name": "shear_weld_seam_rear_sample_pieces",
+              "type": "int"
+            },
+            "scrap_pieces": {
+              "name": "shear_weld_seam_rear_scrap_pieces",
+              "type": "int"
+            },
+            "sample_length": {
+              "name": "shear_single_sample_length",
+              "type": "float"
+            },
+            "scrap_length": {
+              "name": "shear_single_scrap_length",
+              "type": "float"
+            }
           }
         },
-        "color_point": { "name": "seg040_exit_roll_of_elooper", "type": "short" }
+        "color_point": {
+          "name": "seg147_exit_roll_of_xlooper",
+          "type": "short"
+        }
       }
     ]
   }

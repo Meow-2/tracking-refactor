@@ -134,9 +134,11 @@ class ShearTrackingAlgorithmImplTest {
     }
 
     @Test
-    void storesFrontWelderSampleAndScrapSumWhenLengthComesFromPoint() {
+    void addsOddWelderPiecesToFrontSetNumberUsingIntegerSplit() {
         Map<String, Object> previous = exitValues(true, "30", "1", "1", "1.2", "1.8");
         Map<String, Object> latest = exitValues(false, "30", "1", "1", "1.2", "1.8");
+        previous.put("/line-x/shear/welder-pieces", 5);
+        latest.put("/line-x/shear/welder-pieces", 5);
         ShearResult first = only(calculate(previous, latest, context("10", "20", "500")));
         algorithm.afterPersist(input(previous, latest, context("10", "20", "500")), Arrays.asList(first));
 
@@ -144,7 +146,22 @@ class ShearTrackingAlgorithmImplTest {
 
         assertThat(second.getShearKind()).isEqualTo(ShearKind.TAIL);
         assertThat(second.getShearLength()).isEqualByComparingTo("1.2");
-        assertThat(second.getSetNumber()).isEqualTo(2);
+        assertThat(second.getSetNumber()).isEqualTo(4);
+    }
+
+    @Test
+    void assignsOddWelderPieceRemainderToBehindSetNumber() {
+        config.getTracking().getCoilerShearPoint().get(0)
+                .getShearSettings().setDefaultValue(ShearKind.HEAD);
+        Map<String, Object> previous = exitValues(true, "30", "1", "1", "1.2", "1.8");
+        Map<String, Object> latest = exitValues(false, "30", "1", "1", "1.2", "1.8");
+        previous.put("/line-x/shear/welder-pieces", 5);
+        latest.put("/line-x/shear/welder-pieces", 5);
+
+        ShearResult result = only(calculate(previous, latest, context("10", "20", "500")));
+
+        assertThat(result.getShearKind()).isEqualTo(ShearKind.HEAD);
+        assertThat(result.getSetNumber()).isEqualTo(8);
     }
 
     @Test
@@ -193,12 +210,30 @@ class ShearTrackingAlgorithmImplTest {
     @Test
     void skipsTriggeredShearWhenConfiguredCandidateIsIncompleteInCurrentFrame() {
         StatusTrackingContext context = context("10", "20", "500");
+        context.getCurrent().get(DeviceSide.UNCOILER).setDeviceCode(null);
         context.getCandidates().get("feed-device-x").setDataComplete(false);
 
         List<ShearResult> results = calculate(entryValues(true, "10", "2.5"),
                 entryValues(false, "10", "2.5"), context);
 
         assertThat(results).isEmpty();
+    }
+
+    @Test
+    void matchesConfiguredCodesAgainstCurrentAndFallsBackToLastCode() {
+        ShearPointConfig exit = config.getTracking().getCoilerShearPoint().get(0);
+        exit.setPorTrCodes(Arrays.asList("take-device-current", "take-device-x"));
+
+        StatusTrackingContext currentMatched = context("10", "20", "500");
+        currentMatched.getCurrent().get(DeviceSide.COILER).setDeviceCode("take-device-current");
+        assertThat(calculate(exitValues(true, "30", "0", "0", "1.2", "1.8"),
+                exitValues(false, "30", "0", "0", "1.2", "1.8"), currentMatched)).hasSize(1);
+
+        StatusTrackingContext fallback = context("10", "20", "500");
+        fallback.getCurrent().get(DeviceSide.COILER).setDeviceCode(null);
+        ShearResult result = only(calculate(exitValues(true, "30", "0", "0", "1.2", "1.8"),
+                exitValues(false, "30", "0", "0", "1.2", "1.8"), fallback));
+        assertThat(result.getTrCoilNo()).isEqualTo("TAKE-COIL");
     }
 
     @Test
@@ -267,17 +302,21 @@ class ShearTrackingAlgorithmImplTest {
     private StatusTrackingContext context(String feedColor, String takeColor, String feedLength) {
         Map<String, StatusCandidateRuntime> candidates = new LinkedHashMap<>();
         candidates.put("feed-device-x", StatusCandidateRuntime.builder()
+                .dataComplete(true)
                 .coilNo("FEED-COIL").productNo(3).colorNo(feedColor)
                 .lengths(Arrays.asList(new BigDecimal(feedLength))).maxLength(new BigDecimal("1000")).build());
         candidates.put("take-device-x", StatusCandidateRuntime.builder()
+                .dataComplete(true)
                 .coilNo("TAKE-COIL").productNo(4).colorNo(takeColor)
                 .lengths(Arrays.asList(new BigDecimal("200"))).maxLength(new BigDecimal("800")).build());
         Map<DeviceSide, StatusCurrentRuntime> current = new LinkedHashMap<>();
         current.put(DeviceSide.UNCOILER, StatusCurrentRuntime.builder()
-                .side(DeviceSide.UNCOILER).coilNo("FEED-COIL").productNo(3).colorNo(feedColor)
+                .side(DeviceSide.UNCOILER).deviceCode("feed-device-x")
+                .coilNo("FEED-COIL").productNo(3).colorNo(feedColor)
                 .remainingLength(new BigDecimal(feedLength)).maxLength(new BigDecimal("1000")).build());
         current.put(DeviceSide.COILER, StatusCurrentRuntime.builder()
-                .side(DeviceSide.COILER).coilNo("TAKE-COIL").productNo(4).colorNo(takeColor)
+                .side(DeviceSide.COILER).deviceCode("take-device-x")
+                .coilNo("TAKE-COIL").productNo(4).colorNo(takeColor)
                 .remainingLength(new BigDecimal("200")).maxLength(new BigDecimal("800")).build());
         return StatusTrackingContext.builder().candidates(candidates).current(current).build();
     }
@@ -308,6 +347,7 @@ class ShearTrackingAlgorithmImplTest {
         values.put("/line-x/shear/rear-sample", 2);
         values.put("/line-x/shear/rear-scrap", 3);
         values.put("/line-x/shear/rear-length", new BigDecimal(rearLength));
+        values.put("/line-x/shear/welder-pieces", 0);
         return values;
     }
 
@@ -331,10 +371,11 @@ class ShearTrackingAlgorithmImplTest {
                 .build();
         ShearPointConfig exit = ShearPointConfig.builder()
                 .name("exit-cut-x").type(PointDataType.BOOLEAN).normalPos(true)
-                .porTrCode("take-device-x")
+                .porTrCodes(Arrays.asList("take-device-y", "take-device-x"))
                 .typeCodes(ShearTypeCodes.builder().head(931).slice(935).tail(939).build())
                 .colorPoint(point("exit-color"))
                 .shearSettings(ShearSettings.builder()
+                        .welderPieces(point("welder-pieces"))
                         .frontWelder(WelderShearSettings.builder()
                                 .samplePieces(point("front-sample"))
                                 .scrapPieces(point("front-scrap"))

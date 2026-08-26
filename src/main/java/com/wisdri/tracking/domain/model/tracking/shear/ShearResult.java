@@ -30,7 +30,7 @@ public class ShearResult extends TrackingResult {
     /** 本刀剪切长度；单位与配置长度点和 status 剩余长度保持一致。 */
     private BigDecimal shearLength;
     /**
-     * 长度对应的设定数量：入口取 number 点，飞剪取 samplePieces + scrapPieces；
+     * 长度对应的设定数量：入口取 number 点，飞剪取 samplePieces + scrapPieces + 本侧焊缝片数；
      * 固定 0 或剩余长度差等非点位长度为 null。
      */
     private Integer setNumber;

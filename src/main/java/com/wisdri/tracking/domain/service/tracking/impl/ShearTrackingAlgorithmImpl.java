@@ -31,6 +31,7 @@ import javax.annotation.Resource;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -142,7 +143,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 trackingStepLogger.log(input, "剪切触发沿检查", point.getName(),
                         TrackingStepLogger.details(
                                 "deviceSide", uncoilerSide ? "UNCOILER" : "COILER",
-                                "porTrCode", point.getPorTrCode(),
+                                "porTrCodes", deviceCodes(point),
                                 "previous", previous,
                                 "latest", latest,
                                 "normalPos", point.getNormalPos(),
@@ -159,7 +160,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 trackingStepLogger.log(input, "剪切事件跳过", point == null ? null : point.getName(),
                         TrackingStepLogger.details(
                                 "reason", e.getMessage(),
-                                "porTrCode", point == null ? null : point.getPorTrCode()));
+                                "porTrCodes", point == null ? null : deviceCodes(point)));
             }
         }
     }
@@ -174,19 +175,15 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                                        ShearTrackingRuntime runtime,
                                        ShearPointConfig point,
                                        boolean uncoilerSide) {
-        // porTrCode 对应本剪刀所属设备；opposite 始终取生产线另一侧当前设备。
-        StatusCandidateRuntime candidate = context.getCandidates() == null
-                ? null : context.getCandidates().get(point.getPorTrCode());
+        DeviceSide associatedSide = uncoilerSide ? DeviceSide.UNCOILER : DeviceSide.COILER;
+        AssociatedEndpoint associated = associatedEndpoint(context, point, associatedSide);
         StatusCurrentRuntime opposite = context.getCurrent() == null ? null
                 : context.getCurrent().get(uncoilerSide ? DeviceSide.COILER : DeviceSide.UNCOILER);
-        if (candidate == null || opposite == null) {
+        if (opposite == null) {
             return skip(input, point, "对应设备或另一侧 current 不存在");
         }
-        if (Boolean.FALSE.equals(candidate.getDataComplete())) {
-            return skip(input, point, "对应设备当前帧卷号或剩余长度无效");
-        }
-        Endpoint por = uncoilerSide ? endpoint(candidate) : endpoint(opposite);
-        Endpoint tr = uncoilerSide ? endpoint(opposite) : endpoint(candidate);
+        Endpoint por = uncoilerSide ? associated.endpoint : endpoint(opposite);
+        Endpoint tr = uncoilerSide ? endpoint(opposite) : associated.endpoint;
         ShearKind kind = point.getShearSettings().getDefaultValue();
         if (!por.materialComplete() || !tr.materialComplete()) {
             return skip(input, point, "卷号、生产次数或剩余长度不完整");
@@ -215,7 +212,9 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
         Integer typeCode = typeCode(point, kind);
         trackingStepLogger.log(input, "连续线剪切类型判定", point.getName(),
                 TrackingStepLogger.details(
-                        "porTrCode", point.getPorTrCode(),
+                        "porTrCodes", deviceCodes(point),
+                        "selectedDeviceCode", associated.deviceCode,
+                        "deviceSource", associated.source,
                         "porCoilNo", por.coilNo,
                         "porColor", por.colorNo,
                         "trCoilNo", tr.coilNo,
@@ -296,7 +295,9 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
         WelderShearSettings front = point.getShearSettings().getFrontWelder();
         int samplePieces = integerValue(input.getLatestSnapshot(), tracking, front.getSamplePieces());
         int scrapPieces = integerValue(input.getLatestSnapshot(), tracking, front.getScrapPieces());
-        int tailLimit = samplePieces + scrapPieces + 1;
+        int frontWelderPieces = welderPieces(
+                input.getLatestSnapshot(), tracking, point.getShearSettings()) / 2;
+        int tailLimit = samplePieces + scrapPieces + frontWelderPieces + 1;
         CounterDecision nextTail = counter(runtime, point.getName(), tr, ShearKind.TAIL,
                 por.remainingLength, tracking.getShearExperience(), false);
         return nextTail.counter.getCutNo() <= tailLimit ? ShearKind.TAIL : ShearKind.HEAD;
@@ -342,9 +343,30 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
         }
         WelderShearSettings welder = kind == ShearKind.TAIL
                 ? settings.getFrontWelder() : settings.getBehindWelder();
+        int totalWelderPieces = welderPieces(snapshot, tracking, settings);
+        int frontWelderPieces = totalWelderPieces / 2;
+        int allocatedWelderPieces = kind == ShearKind.TAIL
+                ? frontWelderPieces : totalWelderPieces - frontWelderPieces;
         int setNumber = integerValue(snapshot, tracking, welder.getSamplePieces())
-                + integerValue(snapshot, tracking, welder.getScrapPieces());
+                + integerValue(snapshot, tracking, welder.getScrapPieces())
+                + allocatedWelderPieces;
         return new LengthDecision(welderLength(snapshot, tracking, welder, kind, decision), setNumber);
+    }
+
+    /**
+     * 读取焊缝废料总片数。未配置时按 0 兼容旧机组；负数视为无效点位值。
+     */
+    private int welderPieces(PointSnapshot snapshot,
+                             ShearTrackingSection tracking,
+                             ShearSettings settings) {
+        if (settings.getWelderPieces() == null) {
+            return 0;
+        }
+        int pieces = integerValue(snapshot, tracking, settings.getWelderPieces());
+        if (pieces < 0) {
+            throw new IllegalArgumentException("welder_pieces 不能小于 0");
+        }
+        return pieces;
     }
 
     /**
@@ -478,6 +500,46 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 normalizedColor(current.getColorNo()), current.getRemainingLength(), current.getMaxLength());
     }
 
+    /**
+     * 在配置设备范围内依次匹配该侧 current；没有任何匹配时固定回退到列表最后一个 candidate。
+     */
+    private AssociatedEndpoint associatedEndpoint(StatusTrackingContext context,
+                                                  ShearPointConfig point,
+                                                  DeviceSide side) {
+        List<String> codes = deviceCodes(point);
+        if (codes.isEmpty()) {
+            throw new IllegalArgumentException("por_tr_codes 为空");
+        }
+        StatusCurrentRuntime current = context.getCurrent() == null
+                ? null : context.getCurrent().get(side);
+        if (current != null) {
+            for (String code : codes) {
+                if (code.equals(current.getDeviceCode())) {
+                    return new AssociatedEndpoint(code, endpoint(current), "CURRENT");
+                }
+            }
+        }
+        String fallbackCode = codes.get(codes.size() - 1);
+        StatusCandidateRuntime fallback = context.getCandidates() == null
+                ? null : context.getCandidates().get(fallbackCode);
+        if (fallback == null) {
+            throw new IllegalArgumentException("回退设备 candidate 不存在: " + fallbackCode);
+        }
+        if (Boolean.FALSE.equals(fallback.getDataComplete())) {
+            throw new IllegalArgumentException("回退设备当前帧卷号或剩余长度无效: " + fallbackCode);
+        }
+        return new AssociatedEndpoint(fallbackCode, endpoint(fallback), "LAST_CONFIGURED_CANDIDATE");
+    }
+
+    /** 读取有序设备范围；复数配置优先，单数配置作为向后兼容。 */
+    private List<String> deviceCodes(ShearPointConfig point) {
+        if (point != null && point.getPorTrCodes() != null && !point.getPorTrCodes().isEmpty()) {
+            return point.getPorTrCodes();
+        }
+        return point == null || point.getPorTrCode() == null
+                ? Collections.emptyList() : Collections.singletonList(point.getPorTrCode());
+    }
+
     private BigDecimal last(List<BigDecimal> values) {
         return values == null || values.isEmpty() ? null : values.get(values.size() - 1);
     }
@@ -522,7 +584,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
     private ShearResult skip(TrackingInput input, ShearPointConfig point, String reason) {
         trackingStepLogger.log(input, "剪切事件跳过", point.getName(), TrackingStepLogger.details(
                 "reason", reason,
-                "porTrCode", point.getPorTrCode()));
+                "porTrCodes", deviceCodes(point)));
         return null;
     }
 
@@ -587,6 +649,22 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
             return Boolean.FALSE;
         }
         throw new IllegalArgumentException("剪切信号无法转换为 boolean: " + pointPath + "=" + value);
+    }
+
+    /** 配置设备解析后的物料端点及选择来源。 */
+    private static class AssociatedEndpoint {
+        /** 实际命中的 status 设备代码。 */
+        private final String deviceCode;
+        /** 后续颜色、物料、长度判定使用的设备快照。 */
+        private final Endpoint endpoint;
+        /** CURRENT 或 LAST_CONFIGURED_CANDIDATE。 */
+        private final String source;
+
+        private AssociatedEndpoint(String deviceCode, Endpoint endpoint, String source) {
+            this.deviceCode = deviceCode;
+            this.endpoint = endpoint;
+            this.source = source;
+        }
     }
 
     /** 从 status candidate/current 统一抽取的单侧设备物料快照。 */

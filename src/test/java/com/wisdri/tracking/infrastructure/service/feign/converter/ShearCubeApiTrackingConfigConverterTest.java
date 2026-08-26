@@ -49,6 +49,24 @@ class ShearCubeApiTrackingConfigConverterTest {
                 .isEqualTo(111);
         assertThat(converted.getTracking().getCoilerShearPoint().get(0).getTypeCodes().getTail())
                 .isEqualTo(909);
+        assertThat(converted.getTracking().getCoilerShearPoint().get(0)
+                .getShearSettings().getWelderPieces().getName())
+                .isEqualTo("exit_shear_weld_seam_scrap_pieces");
+    }
+
+    @Test
+    void acceptsOrderedPorTrCodesAndKeepsLegacySingleCode() throws Exception {
+        String plural = validConfig().replace(
+                "\"por_tr_code\":\"take-device-x\"",
+                "\"por_tr_codes\":[\"take-device-a\",\"take-device-x\"]");
+
+        ShearTrackingConfig pluralConfig = (ShearTrackingConfig) converter.convert("LINE-X", node(plural));
+        ShearTrackingConfig legacyConfig = (ShearTrackingConfig) converter.convert("LINE-X", node(validConfig()));
+
+        assertThat(pluralConfig.getTracking().getCoilerShearPoint().get(0).getPorTrCodes())
+                .containsExactly("take-device-a", "take-device-x");
+        assertThat(legacyConfig.getTracking().getCoilerShearPoint().get(0).getPorTrCode())
+                .isEqualTo("take-device-x");
     }
 
     @Test
@@ -65,6 +83,10 @@ class ShearCubeApiTrackingConfigConverterTest {
                     .getShearSettings().getFrontWelder().getSampleLength()).isNotNull();
             assertThat(converted.getTracking().getCoilerShearPoint().get(0)
                     .getShearSettings().getFrontWelder().getScrapLength()).isNotNull();
+            assertThat(converted.getTracking().getCoilerShearPoint().get(0).getPorTrCodes())
+                    .containsExactly("tr1", "tr2");
+            assertThat(converted.getTracking().getCoilerShearPoint().get(0)
+                    .getShearSettings().getWelderPieces()).isNotNull();
         }
     }
 

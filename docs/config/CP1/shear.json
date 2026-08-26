@@ -3,7 +3,7 @@
   "mqtt_topic": "cp1_shear_tracking",
   "tracking": {
     "point_prefix": "/aygg_tracking/cp1/shear/tracking/",
-    "mode": "continuous",
+    "mode": "CONTINUOUS",
     "tail_experience": "50",
     "shear_experience": "100",
     "uncoiler_shear_point": [
@@ -92,8 +92,14 @@
           "tail": 909
         },
         "normal_pos": true,
-        "por_tr_code": "tr1",
+        "por_tr_codes": [
+          "tr1"
+        ],
         "shear_settings": {
+          "welder_pieces": {
+            "name": "exit_shear_weld_seam_scrap_pieces",
+            "type": "int"
+          },
           "front_welder": {
             "sample_pieces": {
               "name": "exit_shear_front_sample_pieces",

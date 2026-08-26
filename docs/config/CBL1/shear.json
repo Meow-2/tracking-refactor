@@ -3,7 +3,7 @@
   "mqtt_topic": "cbl1_shear_tracking",
   "tracking": {
     "point_prefix": "/aygg_tracking/cbl1/shear/tracking/",
-    "mode": "discontinuous",
+    "mode": "DISCONTINUOUS",
     "tail_experience": "50",
     "shear_experience": "100",
     "uncoiler_shear_point": [

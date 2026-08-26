@@ -20,6 +20,8 @@ import com.wisdri.tracking.infrastructure.service.feign.converter.AbstractCubeAp
 import org.springframework.stereotype.Component;
 
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -73,8 +75,13 @@ public class ShearCubeApiTrackingConfigConverter extends AbstractCubeApiTracking
         }
         for (ShearPointConfig point : points) {
             if (point == null || blank(point.getName()) || point.getType() == null
-                    || point.getNormalPos() == null || blank(point.getPorTrCode())) {
+                    || point.getNormalPos() == null) {
                 throw new TrackingException("shear 剪刀基础配置无效");
+            }
+            List<String> deviceCodes = deviceCodes(point);
+            if (deviceCodes.isEmpty() || deviceCodes.stream().anyMatch(this::blank)
+                    || new HashSet<>(deviceCodes).size() != deviceCodes.size()) {
+                throw new TrackingException("shear por_tr_codes 不能为空或重复: " + point.getName());
             }
             if (point.getType() != PointDataType.BOOLEAN) {
                 throw new TrackingException("shear 剪切信号必须为 boolean: " + point.getName());
@@ -100,6 +107,9 @@ public class ShearCubeApiTrackingConfigConverter extends AbstractCubeApiTracking
                     validateCutSetting(settings.getTail(), point.getName(), "tail");
                 }
             } else {
+                if (settings.getWelderPieces() != null && invalidPoint(settings.getWelderPieces())) {
+                    throw new TrackingException("welder_pieces 点位无效: " + point.getName());
+                }
                 if (settings.getDefaultValue() == null
                         || settings.getDefaultValue() == ShearKind.TAIL) {
                     validateWelder(settings.getFrontWelder(), point.getName(), "front_welder");
@@ -150,5 +160,13 @@ public class ShearCubeApiTrackingConfigConverter extends AbstractCubeApiTracking
 
     private boolean blank(String value) {
         return value == null || value.trim().isEmpty();
+    }
+
+    private List<String> deviceCodes(ShearPointConfig point) {
+        if (point.getPorTrCodes() != null && !point.getPorTrCodes().isEmpty()) {
+            return new ArrayList<>(point.getPorTrCodes());
+        }
+        return blank(point.getPorTrCode())
+                ? Collections.emptyList() : Collections.singletonList(point.getPorTrCode());
     }
 }
