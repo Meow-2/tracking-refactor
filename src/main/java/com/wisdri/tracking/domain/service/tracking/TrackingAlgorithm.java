@@ -21,4 +21,11 @@ public interface TrackingAlgorithm<R extends TrackingResult> {
      * 执行跟踪计算。
      */
     List<R> calculate(TrackingInput input);
+
+    /**
+     * 结果持久化成功后的扩展动作，默认不处理。
+     */
+    default void afterPersist(TrackingInput input, List<R> results) {
+        // 默认算法在 calculate 内维护运行态。
+    }
 }

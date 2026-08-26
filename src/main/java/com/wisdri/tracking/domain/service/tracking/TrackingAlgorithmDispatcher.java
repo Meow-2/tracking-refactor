@@ -36,4 +36,21 @@ public class TrackingAlgorithmDispatcher {
         }
         return new ArrayList<>();
     }
+
+    /**
+     * 将结果持久化成功事件回调给对应算法。
+     */
+    @SuppressWarnings("unchecked")
+    public void afterPersist(TrackingInput input, List<? extends TrackingResult> results) {
+        if (input == null || algorithms == null || results == null || results.isEmpty()) {
+            return;
+        }
+        for (TrackingAlgorithm<? extends TrackingResult> algorithm : algorithms) {
+            if (algorithm.support(input.getTrackingType())) {
+                ((TrackingAlgorithm<TrackingResult>) algorithm).afterPersist(
+                        input, new ArrayList<>(results));
+                return;
+            }
+        }
+    }
 }

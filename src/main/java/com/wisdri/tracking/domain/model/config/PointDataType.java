@@ -15,6 +15,7 @@ import java.util.Locale;
 public enum PointDataType {
     BOOLEAN("boolean", "布尔型"),
     SHORT("short", "短整型"),
+    INT("int", "整型"),
     FLOAT("float", "单精度浮点型"),
     STRING("string", "字符串型");
 

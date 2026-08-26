@@ -50,6 +50,7 @@ public class TrackingTaskConsumerUseCase {
             return;
         }
         trackingResultRepositoryDispatcher.save(results);
+        trackingAlgorithmDispatcher.afterPersist(TrackingInput.of(task), results);
         log.info("跟踪任务处理完成，机组编码={}，跟踪类型={}，模板编码={}，结果数量={}",
                 task.getUnitCode(), task.getTrackingType(), task.getTemplateCode(), results.size());
     }

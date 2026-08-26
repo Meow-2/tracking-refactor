@@ -32,6 +32,11 @@ public class TrackingProperties {
          * 是否启用跟踪结果存储。
          */
         private StoreSwitch trackingResult = new StoreSwitch();
+
+        /**
+         * 是否启用剪切结果及运行态提交。
+         */
+        private StoreSwitch shear = new StoreSwitch();
     }
 
     @Data
@@ -52,5 +57,11 @@ public class TrackingProperties {
         return storage == null
                 || storage.getTrackingResult() == null
                 || !Boolean.FALSE.equals(storage.getTrackingResult().getEnabled());
+    }
+
+    public boolean shearStorageEnabled() {
+        return storage == null
+                || storage.getShear() == null
+                || !Boolean.FALSE.equals(storage.getShear().getEnabled());
     }
 }

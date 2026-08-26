@@ -1,0 +1,22 @@
+package com.wisdri.tracking.domain.model.config.shear;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * 一把剪刀各逻辑类型对应的数据库编码。
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class ShearTypeCodes {
+    /** 切头判型写入 qm_shear_log.shear_type 的整数编码。 */
+    private Integer head;
+    /** 分切判型写入 qm_shear_log.shear_type 的整数编码。 */
+    private Integer slice;
+    /** 切尾判型写入 qm_shear_log.shear_type 的整数编码。 */
+    private Integer tail;
+}

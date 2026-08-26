@@ -5,6 +5,8 @@ tracking:
       enabled: false
     tracking-result:
       enabled: false
+    shear:
+      enabled: true
 
 server:
   port: 9000

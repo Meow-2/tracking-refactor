@@ -25,7 +25,7 @@ class TimeSeriesDataTypeTest {
 
     @Test
     void mapsEveryPointTypeToItsIndependentTimeSeriesType() {
-        assertEquals(Arrays.asList("boolean", "short", "float", "string"),
+        assertEquals(Arrays.asList("boolean", "short", "int", "float", "string"),
                 Arrays.stream(PointDataType.values())
                         .map(PointDataType::getCode)
                         .collect(Collectors.toList()));
