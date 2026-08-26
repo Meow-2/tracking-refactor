@@ -1,5 +1,5 @@
 {
-  "enable": false,
+  "enable": true,
   "mqtt_topic": "fcl1_shear_tracking",
   "tracking": {
     "point_prefix": "/aygg_tracking/fcl1/shear/tracking/",

@@ -37,3 +37,4 @@ build/
 
 ### Runtime logs ###
 logs/
+**.log**
