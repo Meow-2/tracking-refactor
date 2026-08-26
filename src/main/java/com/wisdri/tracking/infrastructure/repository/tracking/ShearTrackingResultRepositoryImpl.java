@@ -64,6 +64,7 @@ public class ShearTrackingResultRepositoryImpl
         entity.setInMatNo(result.getInMatNo());
         entity.setInMatNoProdNo(result.getInMatNoProdNo());
         entity.setShearType(result.getShearType());
+        entity.setShearTypeName(result.getShearTypeName());
         entity.setShearLength(result.getShearLength());
         entity.setSetNumber(result.getSetNumber());
         entity.setShearTime(result.getShearTime());

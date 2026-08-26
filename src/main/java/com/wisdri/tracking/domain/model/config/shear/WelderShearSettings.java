@@ -14,9 +14,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class WelderShearSettings {
-    /** 该焊缝方向的取样片数点；与废料片数之和写入 set_number。 */
+    /** 该焊缝方向的取样片数点；与废料片数及 welder_pieces 分摊值之和写入 set_number。 */
     private PointConfig samplePieces;
-    /** 该焊缝方向的废料片数点；与取样片数之和写入 set_number。 */
+    /** 该焊缝方向的废料片数点；与取样片数及 welder_pieces 分摊值之和写入 set_number。 */
     private PointConfig scrapPieces;
     /**
      * 取样片与废料片共用的片长点；配置后优先于 sampleLength、scrapLength。

@@ -27,6 +27,10 @@ public class ShearResult extends TrackingResult {
     private String inMatNoProdNo;
     /** 当前剪刀 typeCodes 提供、最终写入 qm_shear_log.shear_type 的整数编码。 */
     private Integer shearType;
+    /**
+     * 实际关联的开卷机或卷取机代码与逻辑类型组合，例如 por1_head、tr2_tail。
+     */
+    private String shearTypeName;
     /** 本刀剪切长度；单位与配置长度点和 status 剩余长度保持一致。 */
     private BigDecimal shearLength;
     /**

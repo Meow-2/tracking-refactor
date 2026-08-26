@@ -78,6 +78,7 @@ class ShearTrackingAlgorithmImplTest {
         assertThat(first.getShearPointCode()).isEqualTo("entry-cut-x");
         assertThat(first.getShearKind()).isEqualTo(ShearKind.HEAD);
         assertThat(first.getShearType()).isEqualTo(711);
+        assertThat(first.getShearTypeName()).isEqualTo("feed-device-x_head");
         assertThat(first.getInMatNo()).isEqualTo("FEED-COIL");
         assertThat(first.getCutNo()).isEqualTo(1);
         assertThat(first.getShearLength()).isEqualByComparingTo("0");
@@ -227,13 +228,16 @@ class ShearTrackingAlgorithmImplTest {
         StatusTrackingContext currentMatched = context("10", "20", "500");
         currentMatched.getCurrent().get(DeviceSide.COILER).setDeviceCode("take-device-current");
         assertThat(calculate(exitValues(true, "30", "0", "0", "1.2", "1.8"),
-                exitValues(false, "30", "0", "0", "1.2", "1.8"), currentMatched)).hasSize(1);
+                exitValues(false, "30", "0", "0", "1.2", "1.8"), currentMatched))
+                .singleElement().extracting(ShearResult::getShearTypeName)
+                .isEqualTo("take-device-current_tail");
 
         StatusTrackingContext fallback = context("10", "20", "500");
         fallback.getCurrent().get(DeviceSide.COILER).setDeviceCode(null);
         ShearResult result = only(calculate(exitValues(true, "30", "0", "0", "1.2", "1.8"),
                 exitValues(false, "30", "0", "0", "1.2", "1.8"), fallback));
         assertThat(result.getTrCoilNo()).isEqualTo("TAKE-COIL");
+        assertThat(result.getShearTypeName()).isEqualTo("take-device-x_tail");
     }
 
     @Test

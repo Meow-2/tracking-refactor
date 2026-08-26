@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -245,6 +246,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 .inMatNo(material.coilNo)
                 .inMatNoProdNo(material.productNo)
                 .shearType(typeCode)
+                .shearTypeName(associated.deviceCode + "_" + kind.name().toLowerCase(Locale.ROOT))
                 .shearLength(lengthDecision.length)
                 .setNumber(lengthDecision.setNumber)
                 .shearTime(receivedAt)

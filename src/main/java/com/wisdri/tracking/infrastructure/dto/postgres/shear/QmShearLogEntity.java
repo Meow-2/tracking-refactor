@@ -24,6 +24,8 @@ public class QmShearLogEntity {
     private String inMatNoProdNo;
     /** 配置提供的剪切类型整数编码，不保存 HEAD、SLICE、TAIL 枚举名。 */
     private Integer shearType;
+    /** 实际关联设备代码与逻辑类型组合，例如 por1_head、tr2_tail。 */
+    private String shearTypeName;
     /** 本刀剪切长度。 */
     private BigDecimal shearLength;
     /** 长度对应的设定刀数或飞剪设定片数；非点位计算长度为空。 */
