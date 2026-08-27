@@ -15,11 +15,11 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class CutSetting {
     /**
-     * 设定刀数点；当剪切长度读取 {@link #length} 点位时，其值同步写入 set_number。
+     * 设定刀数点；切头或切尾的每一刀（含首刀）都与 {@link #length} 一起读取并写入 set_number。
      */
     private PointConfig number;
     /**
-     * 单刀剪切长度点；某类型首刀按算法固定为 0 时不读取该点。
+     * 单刀剪切长度点；切头或切尾的每一刀（含首刀）都读取该点。
      */
     private PointConfig length;
 }

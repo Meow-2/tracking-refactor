@@ -92,8 +92,8 @@ class ShearTrackingAlgorithmImplTest {
         assertThat(first.getShearTypeName()).isEqualTo("feed-device-x_head");
         assertThat(first.getInMatNo()).isEqualTo("FEED-COIL");
         assertThat(first.getCutNo()).isEqualTo(1);
-        assertThat(first.getShearLength()).isEqualByComparingTo("0");
-        assertThat(first.getSetNumber()).isNull();
+        assertThat(first.getShearLength()).isEqualByComparingTo("2.5");
+        assertThat(first.getSetNumber()).isEqualTo(2);
         assertThat(runtimes.get("feed-device-x").getUncoiler()
                 .getHead().getCutNo()).isEqualTo(1);
 
@@ -113,6 +113,8 @@ class ShearTrackingAlgorithmImplTest {
         assertThat(tail.getShearKind()).isEqualTo(ShearKind.TAIL);
         assertThat(tail.getShearType()).isEqualTo(719);
         assertThat(tail.getInMatNo()).isEqualTo("TAKE-COIL");
+        assertThat(tail.getShearLength()).isEqualByComparingTo("3.5");
+        assertThat(tail.getSetNumber()).isEqualTo(3);
         ShearResult secondTail = only(calculate(entryValues(true, "10", "2.5"),
                 entryValues(false, "10", "2.5"), context("10", "10", "40")));
         assertThat(secondTail.getShearLength()).isEqualByComparingTo("3.5");
@@ -123,6 +125,7 @@ class ShearTrackingAlgorithmImplTest {
         assertThat(slice.getShearKind()).isEqualTo(ShearKind.SLICE);
         assertThat(slice.getShearType()).isEqualTo(715);
         assertThat(slice.getInMatNo()).isEqualTo("FEED-COIL");
+        assertThat(slice.getSetNumber()).isNull();
     }
 
     @Test
@@ -132,7 +135,8 @@ class ShearTrackingAlgorithmImplTest {
         ShearResult tail = only(calculate(previous, latest, context("10", "20", "500")));
         assertThat(tail.getShearKind()).isEqualTo(ShearKind.TAIL);
         assertThat(tail.getShearType()).isEqualTo(939);
-        assertThat(tail.getSetNumber()).isNull();
+        assertThat(tail.getShearLength()).isEqualByComparingTo("1.2");
+        assertThat(tail.getSetNumber()).isZero();
         ShearResult head = only(calculate(previous, latest, context("10", "20", "450")));
         assertThat(head.getShearKind()).isEqualTo(ShearKind.HEAD);
         assertThat(head.getShearType()).isEqualTo(931);

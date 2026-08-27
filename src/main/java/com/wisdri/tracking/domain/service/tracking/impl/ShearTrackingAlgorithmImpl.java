@@ -45,7 +45,7 @@ import java.util.Optional;
  */
 @Component
 public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult> {
-    /** 非点位来源的首刀或首次分切长度。 */
+    /** 首次分切无法计算相邻剩余长度差时使用的长度。 */
     private static final BigDecimal ZERO = BigDecimal.ZERO;
 
     /** 读取 shear/status 配置与运行态，并在结果入库前保存算法算出的 shear runtime。 */
@@ -343,16 +343,10 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
         }
         ShearSettings settings = point.getShearSettings();
         if (uncoilerSide) {
-            if (decision.counter.getCutNo() == 1) {
-                return new LengthDecision(ZERO, null);
-            }
             CutSetting cutSetting = kind == ShearKind.HEAD ? settings.getHead() : settings.getTail();
             return new LengthDecision(
                     requiredDecimal(snapshot, tracking, cutSetting.getLength()),
                     integerValue(snapshot, tracking, cutSetting.getNumber()));
-        }
-        if (kind == ShearKind.TAIL && decision.counter.getCutNo() == 1) {
-            return new LengthDecision(ZERO, null);
         }
         WelderShearSettings welder = kind == ShearKind.TAIL
                 ? settings.getFrontWelder() : settings.getBehindWelder();
@@ -888,7 +882,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
     private static class LengthDecision {
         /** 本刀剪切长度。 */
         private final BigDecimal length;
-        /** 长度对应的设定数量；非点位计算长度为 null。 */
+        /** 长度对应的设定数量；切头切尾取配置数量，分切没有对应设定数量。 */
         private final Integer setNumber;
 
         private LengthDecision(BigDecimal length, Integer setNumber) {

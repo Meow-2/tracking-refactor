@@ -37,7 +37,7 @@ public class ShearResult extends TrackingResult {
     private BigDecimal shearLength;
     /**
      * 长度对应的设定数量：入口取 number 点，飞剪取 samplePieces + scrapPieces + 本侧焊缝片数；
-     * 固定 0 或剩余长度差等非点位长度为 null。
+     * 分切没有对应的设定数量，值为 null。
      */
     private Integer setNumber;
     /** 剪切触发帧的接收时间。 */
