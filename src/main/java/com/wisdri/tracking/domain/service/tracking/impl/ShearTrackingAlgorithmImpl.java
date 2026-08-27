@@ -2,6 +2,8 @@ package com.wisdri.tracking.domain.service.tracking.impl;
 
 import com.wisdri.tracking.domain.model.config.PointConfig;
 import com.wisdri.tracking.domain.model.config.shear.CutSetting;
+import com.wisdri.tracking.domain.model.config.shear.GratingPointConfig;
+import com.wisdri.tracking.domain.model.config.shear.ShearMode;
 import com.wisdri.tracking.domain.model.config.shear.ShearPointConfig;
 import com.wisdri.tracking.domain.model.config.shear.ShearSettings;
 import com.wisdri.tracking.domain.model.config.shear.ShearTrackingConfig;
@@ -41,7 +43,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * 基于颜色号和钢卷状态的通用连续生产线剪切算法。
+ * 基于颜色号或光栅占位和钢卷状态的通用剪切算法。
  */
 @Component
 public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult> {
@@ -174,7 +176,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
     }
 
     /**
-     * 对一个有效触发沿完成设备解析、连续线判型、物料归属、刀次和长度计算。
+     * 对一个有效触发沿完成设备解析、模式判型、物料归属、刀次和长度计算。
      * 返回值携带待持久化结果；runtime 先写入计算态，由 calculate 在返回结果前统一保存。
      */
     private ShearResult calculatePoint(TrackingInput input,
@@ -200,7 +202,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
             return skip(input, point, "卷号、生产次数或剩余长度不完整");
         }
         String shearColor = null;
-        if (kind == null) {
+        if (kind == null && tracking.getMode() == ShearMode.CONTINUOUS) {
             if (por.colorNo == null || tr.colorNo == null) {
                 return skip(input, point, "设备颜色号不完整");
             }
@@ -211,9 +213,22 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
             }
         }
         if (kind == null) {
-            kind = uncoilerSide
-                    ? classifyUncoiler(por, tr, shearColor, tracking.getTailExperience())
-                    : classifyCoiler(input, tracking, runtime, point, por, tr, shearColor);
+            if (tracking.getMode() == ShearMode.CONTINUOUS) {
+                kind = uncoilerSide
+                        ? classifyContinuousUncoiler(
+                                por, tr, shearColor, tracking.getTailExperience())
+                        : classifyContinuousCoiler(
+                                input, tracking, runtime, point, por, tr, shearColor);
+            } else if (tracking.getMode() == ShearMode.DISCONTINUOUS) {
+                boolean occupied = allGratingsOccupied(
+                        input.getLatestSnapshot(), tracking, point);
+                kind = uncoilerSide
+                        ? classifyDiscontinuousUncoiler(
+                                por, tr, occupied, tracking.getTailExperience())
+                        : classifyDiscontinuousCoiler(por, tr, occupied);
+            } else {
+                throw new IllegalArgumentException("不支持的剪切模式: " + tracking.getMode());
+            }
         }
         Endpoint material = material(kind, uncoilerSide, por, tr);
         CounterDecision decision = counter(runtime, kind, uncoilerSide,
@@ -221,8 +236,9 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
         LengthDecision lengthDecision = shearLength(
                 input.getLatestSnapshot(), tracking, point, kind, uncoilerSide, decision);
         Integer typeCode = typeCode(point, kind);
-        trackingStepLogger.log(input, "连续线剪切类型判定", point.getName(),
+        trackingStepLogger.log(input, "剪切类型判定", point.getName(),
                 TrackingStepLogger.details(
+                        "mode", tracking.getMode(),
                         "porTrCodes", deviceCodes(point),
                         "selectedDeviceCode", associated.deviceCode,
                         "deviceSource", associated.source,
@@ -277,10 +293,10 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
     /**
      * 开卷机侧判型：两端和剪刀处颜色决定切头/切尾，颜色相同时再用剩余长度区分切尾和分切。
      */
-    private ShearKind classifyUncoiler(Endpoint por,
-                                       Endpoint tr,
-                                       String shearColor,
-                                       BigDecimal tailExperience) {
+    private ShearKind classifyContinuousUncoiler(Endpoint por,
+                                                 Endpoint tr,
+                                                 String shearColor,
+                                                 BigDecimal tailExperience) {
         boolean sameEnds = colorsEqual(por.colorNo, tr.colorNo);
         if (!sameEnds && colorsEqual(shearColor, por.colorNo)) {
             return ShearKind.HEAD;
@@ -295,13 +311,13 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
     /**
      * 卷取机侧判型：剪刀处与卷取机颜色相同为分切；否则按焊缝前设定片数划分切尾和切头。
      */
-    private ShearKind classifyCoiler(TrackingInput input,
-                                     ShearTrackingSection tracking,
-                                     ShearTrackingRuntime runtime,
-                                     ShearPointConfig point,
-                                     Endpoint por,
-                                     Endpoint tr,
-                                     String shearColor) {
+    private ShearKind classifyContinuousCoiler(TrackingInput input,
+                                               ShearTrackingSection tracking,
+                                               ShearTrackingRuntime runtime,
+                                               ShearPointConfig point,
+                                               Endpoint por,
+                                               Endpoint tr,
+                                               String shearColor) {
         if (colorsEqual(tr.colorNo, shearColor)) {
             return ShearKind.SLICE;
         }
@@ -316,6 +332,54 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
         return nextTail.counter.getCutNo() <= tailLimit ? ShearKind.TAIL : ShearKind.HEAD;
     }
 
+    /**
+     * 非连续线开卷机侧判型：同卷按剩余长度区分切尾和分切，不同卷按光栅是否全部占位区分切头和切尾。
+     */
+    private ShearKind classifyDiscontinuousUncoiler(Endpoint por,
+                                                    Endpoint tr,
+                                                    boolean allGratingsOccupied,
+                                                    BigDecimal tailExperience) {
+        if (Objects.equals(por.coilNo, tr.coilNo)) {
+            return por.remainingLength.compareTo(tailExperience) < 0
+                    ? ShearKind.TAIL : ShearKind.SLICE;
+        }
+        return allGratingsOccupied ? ShearKind.HEAD : ShearKind.TAIL;
+    }
+
+    /** 非连续线卷取机侧判型：同卷为分切，不同卷按光栅是否全部占位区分切尾和切头。 */
+    private ShearKind classifyDiscontinuousCoiler(Endpoint por,
+                                                  Endpoint tr,
+                                                  boolean allGratingsOccupied) {
+        if (Objects.equals(por.coilNo, tr.coilNo)) {
+            return ShearKind.SLICE;
+        }
+        return allGratingsOccupied ? ShearKind.TAIL : ShearKind.HEAD;
+    }
+
+    /** 所有配置光栅的当前值均等于各自 hasCoil 时，认为剪刀到设备之间连续占位。 */
+    private boolean allGratingsOccupied(PointSnapshot snapshot,
+                                        ShearTrackingSection tracking,
+                                        ShearPointConfig point) {
+        List<GratingPointConfig> gratings = point.getGratingPoints();
+        if (gratings == null || gratings.isEmpty()) {
+            throw new IllegalArgumentException("grating_points 不能为空: " + point.getName());
+        }
+        for (GratingPointConfig grating : gratings) {
+            if (grating == null || grating.getHasCoil() == null) {
+                throw new IllegalArgumentException("光栅配置无效: " + point.getName());
+            }
+            String pointPath = path(tracking, grating.getName());
+            Boolean value = booleanValue(snapshot, pointPath);
+            if (value == null) {
+                throw new IllegalArgumentException("光栅点位值不存在: " + pointPath);
+            }
+            if (!grating.getHasCoil().equals(value)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /** 根据剪刀所在设备侧和逻辑判型，选择本条记录归属的投入物料。 */
     private Endpoint material(ShearKind kind,
                               boolean uncoilerSide,
@@ -328,7 +392,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
     }
 
     /**
-     * 计算本刀长度及 setNumber；分切长度来自相邻剩余长度差，其他类型按入口或飞剪配置读取。
+     * 计算本刀长度及 setNumber；分切长度来自相邻剩余长度差，其他类型按生产线模式读取配置。
      */
     private LengthDecision shearLength(PointSnapshot snapshot,
                                        ShearTrackingSection tracking,
@@ -342,7 +406,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
             return new LengthDecision(length, null);
         }
         ShearSettings settings = point.getShearSettings();
-        if (uncoilerSide) {
+        if (uncoilerSide || tracking.getMode() == ShearMode.DISCONTINUOUS) {
             CutSetting cutSetting = kind == ShearKind.HEAD ? settings.getHead() : settings.getTail();
             return new LengthDecision(
                     requiredDecimal(snapshot, tracking, cutSetting.getLength()),

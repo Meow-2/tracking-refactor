@@ -21,9 +21,9 @@ public class ShearSettings {
      */
     @JsonProperty("default")
     private ShearKind defaultValue;
-    /** 开卷机侧切头的设定刀数点和单刀长度点。 */
+    /** 开卷机侧或非连续线卷取机侧切头的设定刀数点和单刀长度点。 */
     private CutSetting head;
-    /** 开卷机侧切尾的设定刀数点和单刀长度点。 */
+    /** 开卷机侧或非连续线卷取机侧切尾的设定刀数点和单刀长度点。 */
     private CutSetting tail;
     /**
      * 飞剪切焊缝产生的总废料片数点；前侧取整数除以 2，余数归后侧。

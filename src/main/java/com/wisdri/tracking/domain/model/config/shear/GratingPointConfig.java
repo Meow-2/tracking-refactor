@@ -7,7 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * 非连续线光栅点位配置，当前连续线版本仅保留配置结构。
+ * 非连续线光栅点位配置。
  */
 @Data
 @Builder

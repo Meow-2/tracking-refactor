@@ -3,6 +3,7 @@ package com.wisdri.tracking.domain.service.tracking.impl;
 import com.wisdri.tracking.domain.model.config.PointConfig;
 import com.wisdri.tracking.domain.model.config.PointDataType;
 import com.wisdri.tracking.domain.model.config.shear.CutSetting;
+import com.wisdri.tracking.domain.model.config.shear.GratingPointConfig;
 import com.wisdri.tracking.domain.model.config.shear.ShearMode;
 import com.wisdri.tracking.domain.model.config.shear.ShearPointConfig;
 import com.wisdri.tracking.domain.model.config.shear.ShearSettings;
@@ -195,6 +196,81 @@ class ShearTrackingAlgorithmImplTest {
         ShearResult scrap = only(calculate(previous, latest, context("10", "20", "400")));
         assertThat(scrap.getShearLength()).isEqualByComparingTo("0.8");
         assertThat(scrap.getSetNumber()).isEqualTo(2);
+    }
+
+    @Test
+    void classifiesDiscontinuousUncoilerByAllGratingsAndReadsFirstCutSettings() {
+        configureDiscontinuous();
+
+        ShearResult head = only(calculate(discontinuousEntryValues(true, true),
+                discontinuousEntryValues(false, true), context("10", "20", "500")));
+        ShearResult tail = only(calculate(discontinuousEntryValues(true, false),
+                discontinuousEntryValues(false, false), context("10", "20", "450")));
+
+        assertThat(head.getShearKind()).isEqualTo(ShearKind.HEAD);
+        assertThat(head.getShearLength()).isEqualByComparingTo("2.5");
+        assertThat(head.getSetNumber()).isEqualTo(2);
+        assertThat(tail.getShearKind()).isEqualTo(ShearKind.TAIL);
+        assertThat(tail.getShearLength()).isEqualByComparingTo("3.5");
+        assertThat(tail.getSetNumber()).isEqualTo(3);
+    }
+
+    @Test
+    void usesStrictTailBoundaryForDiscontinuousUncoilerAndKeepsSliceNumberNull() {
+        configureDiscontinuous();
+        StatusTrackingContext atBoundary = sameMaterialContext("50");
+
+        ShearResult slice = only(calculate(discontinuousEntryValues(true, true),
+                discontinuousEntryValues(false, true), atBoundary));
+
+        assertThat(slice.getShearKind()).isEqualTo(ShearKind.SLICE);
+        assertThat(slice.getShearLength()).isEqualByComparingTo("0");
+        assertThat(slice.getSetNumber()).isNull();
+
+        ShearResult tail = only(calculate(discontinuousEntryValues(true, true),
+                discontinuousEntryValues(false, true), sameMaterialContext("49")));
+        assertThat(tail.getShearKind()).isEqualTo(ShearKind.TAIL);
+        assertThat(tail.getSetNumber()).isEqualTo(3);
+    }
+
+    @Test
+    void classifiesDiscontinuousCoilerAndUsesCutSettingsInsteadOfWelderSettings() {
+        configureDiscontinuous();
+
+        ShearResult tail = only(calculate(discontinuousExitValues(true, true),
+                discontinuousExitValues(false, true), context("10", "20", "500")));
+        ShearResult head = only(calculate(discontinuousExitValues(true, false),
+                discontinuousExitValues(false, false), context("10", "20", "450")));
+        ShearResult slice = only(calculate(discontinuousExitValues(true, true),
+                discontinuousExitValues(false, true), sameMaterialContext("400")));
+
+        assertThat(tail.getShearKind()).isEqualTo(ShearKind.TAIL);
+        assertThat(tail.getShearLength()).isEqualByComparingTo("6.5");
+        assertThat(tail.getSetNumber()).isEqualTo(6);
+        assertThat(head.getShearKind()).isEqualTo(ShearKind.HEAD);
+        assertThat(head.getShearLength()).isEqualByComparingTo("4.5");
+        assertThat(head.getSetNumber()).isEqualTo(4);
+        assertThat(slice.getShearKind()).isEqualTo(ShearKind.SLICE);
+        assertThat(slice.getSetNumber()).isNull();
+    }
+
+    @Test
+    void supportsDefaultSliceAndSkipsMissingGratingValueInDiscontinuousMode() {
+        configureDiscontinuous();
+        ShearPointConfig exit = config.getTracking().getCoilerShearPoint().get(0);
+        exit.setShearSettings(ShearSettings.builder().defaultValue(ShearKind.SLICE).build());
+        Map<String, Object> withoutGratings = exitValues(false, "30", "0", "0", "1.2", "1.8");
+
+        ShearResult slice = only(calculate(exitValues(true, "30", "0", "0", "1.2", "1.8"),
+                withoutGratings, context("10", "20", "500")));
+        assertThat(slice.getShearKind()).isEqualTo(ShearKind.SLICE);
+        assertThat(slice.getSetNumber()).isNull();
+
+        config.getTracking().getUncoilerShearPoint().get(0).getShearSettings().setDefaultValue(null);
+        Map<String, Object> missing = discontinuousEntryValues(false, true);
+        missing.remove("/line-x/shear/entry-grating-b");
+        assertThat(calculate(discontinuousEntryValues(true, true), missing,
+                context("10", "20", "500"))).isEmpty();
     }
 
     @Test
@@ -403,6 +479,54 @@ class ShearTrackingAlgorithmImplTest {
         values.put("/line-x/shear/rear-length", new BigDecimal(rearLength));
         values.put("/line-x/shear/welder-pieces", 0);
         return values;
+    }
+
+    private void configureDiscontinuous() {
+        config.getTracking().setMode(ShearMode.DISCONTINUOUS);
+        ShearPointConfig entry = config.getTracking().getUncoilerShearPoint().get(0);
+        entry.setColorPoint(null);
+        entry.setGratingPoints(Arrays.asList(
+                grating("entry-grating-a", true), grating("entry-grating-b", false)));
+
+        ShearPointConfig exit = config.getTracking().getCoilerShearPoint().get(0);
+        exit.setColorPoint(null);
+        exit.setGratingPoints(Arrays.asList(
+                grating("exit-grating-a", true), grating("exit-grating-b", false)));
+        exit.setShearSettings(ShearSettings.builder()
+                .head(CutSetting.builder().number(point("exit-head-number"))
+                        .length(point("exit-head-length")).build())
+                .tail(CutSetting.builder().number(point("exit-tail-number"))
+                        .length(point("exit-tail-length")).build())
+                .build());
+    }
+
+    private Map<String, Object> discontinuousEntryValues(boolean signal, boolean occupied) {
+        Map<String, Object> values = entryValues(signal, "ignored", "2.5");
+        values.put("/line-x/shear/entry-grating-a", true);
+        values.put("/line-x/shear/entry-grating-b", occupied ? false : true);
+        return values;
+    }
+
+    private Map<String, Object> discontinuousExitValues(boolean signal, boolean occupied) {
+        Map<String, Object> values = exitValues(signal, "ignored", "0", "0", "1.2", "1.8");
+        values.put("/line-x/shear/exit-grating-a", true);
+        values.put("/line-x/shear/exit-grating-b", occupied ? false : true);
+        values.put("/line-x/shear/exit-head-length", new BigDecimal("4.5"));
+        values.put("/line-x/shear/exit-head-number", 4);
+        values.put("/line-x/shear/exit-tail-length", new BigDecimal("6.5"));
+        values.put("/line-x/shear/exit-tail-number", 6);
+        return values;
+    }
+
+    private StatusTrackingContext sameMaterialContext(String feedLength) {
+        StatusTrackingContext context = context("10", "20", feedLength);
+        context.getCurrent().get(DeviceSide.COILER).setCoilNo("FEED-COIL");
+        return context;
+    }
+
+    private GratingPointConfig grating(String name, boolean hasCoil) {
+        return GratingPointConfig.builder().name(name).type(PointDataType.BOOLEAN)
+                .hasCoil(hasCoil).build();
     }
 
     private ShearResult only(List<ShearResult> results) {

@@ -22,7 +22,7 @@ public class ShearPointConfig {
      */
     private String name;
     /**
-     * 剪切触发信号的数据类型；连续线当前要求为 {@link PointDataType#BOOLEAN}。
+     * 剪切触发信号的数据类型；当前要求为 {@link PointDataType#BOOLEAN}。
      */
     private PointDataType type;
     /**
@@ -52,7 +52,7 @@ public class ShearPointConfig {
      */
     private PointConfig colorPoint;
     /**
-     * 非连续线剪刀附近的光栅占位点；当前保留配置结构，连续线算法不读取。
+     * 非连续线剪刀附近的光栅占位点；全部光栅占位时认为剪刀到设备之间连续占位。
      */
     private List<GratingPointConfig> gratingPoints;
 }

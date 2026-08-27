@@ -21,7 +21,7 @@ public class ShearTrackingSection {
      */
     private String pointPrefix;
     /**
-     * 生产线判型模式；当前算法仅执行 {@link ShearMode#CONTINUOUS}。
+     * 生产线判型模式；连续线读取颜色点，非连续线读取光栅占位点。
      */
     private ShearMode mode;
     /**

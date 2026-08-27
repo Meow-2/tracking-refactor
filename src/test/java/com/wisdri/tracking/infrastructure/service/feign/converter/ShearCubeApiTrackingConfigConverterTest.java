@@ -91,7 +91,24 @@ class ShearCubeApiTrackingConfigConverterTest {
     }
 
     @Test
-    void rejectsUnsupportedModeDuplicateNamesAndInvalidCodes() throws Exception {
+    void convertsDiscontinuousLineExamplesWithGratingAndCutSettings() throws Exception {
+        for (String unit : new String[]{"CBL1", "CSL1"}) {
+            String json = new String(Files.readAllBytes(
+                    Paths.get("docs/config/" + unit + "/shear.json")), StandardCharsets.UTF_8);
+
+            ShearTrackingConfig converted = (ShearTrackingConfig) converter.convert(unit, node(json));
+
+            assertThat(converted.getTracking().getMode().name()).isEqualTo("DISCONTINUOUS");
+            assertThat(converted.getTracking().getUncoilerShearPoint()).isNotEmpty();
+            assertThat(converted.getTracking().getUncoilerShearPoint().get(0).getGratingPoints())
+                    .isNotEmpty();
+            assertThat(converted.getTracking().getUncoilerShearPoint().get(0)
+                    .getShearSettings().getHead().getNumber()).isNotNull();
+        }
+    }
+
+    @Test
+    void rejectsIncompleteModeConfigDuplicateNamesAndInvalidCodes() throws Exception {
         assertInvalid(validConfig().replace("\"continuous\"", "\"discontinuous\""));
         assertInvalid(validConfig().replace("\"exit-cut-x\"", "\"entry-cut-x\""));
         assertInvalid(validConfig().replace("\"slice\":715", "\"slice\":711"));

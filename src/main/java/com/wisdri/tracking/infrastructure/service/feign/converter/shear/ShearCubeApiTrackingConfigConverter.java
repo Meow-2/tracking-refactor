@@ -6,6 +6,7 @@ import com.wisdri.tracking.domain.model.config.PointConfig;
 import com.wisdri.tracking.domain.model.config.PointDataType;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.shear.CutSetting;
+import com.wisdri.tracking.domain.model.config.shear.GratingPointConfig;
 import com.wisdri.tracking.domain.model.config.shear.ShearMode;
 import com.wisdri.tracking.domain.model.config.shear.ShearPointConfig;
 import com.wisdri.tracking.domain.model.config.shear.ShearSettings;
@@ -52,16 +53,16 @@ public class ShearCubeApiTrackingConfigConverter extends AbstractCubeApiTracking
         if (tracking == null) {
             throw new TrackingException("shear.tracking 不能为空");
         }
-        if (tracking.getMode() != ShearMode.CONTINUOUS) {
-            throw new TrackingException("当前仅支持 continuous 剪切模式");
+        if (tracking.getMode() == null) {
+            throw new TrackingException("shear.mode 不能为空");
         }
         if (tracking.getTailExperience() == null || tracking.getTailExperience().signum() < 0
                 || tracking.getShearExperience() == null || tracking.getShearExperience().signum() < 0) {
             throw new TrackingException("shear 经验阈值不能为空或小于 0");
         }
         Set<String> names = new HashSet<>();
-        validatePoints(tracking.getUncoilerShearPoint(), true, names);
-        validatePoints(tracking.getCoilerShearPoint(), false, names);
+        validatePoints(tracking.getUncoilerShearPoint(), true, tracking.getMode(), names);
+        validatePoints(tracking.getCoilerShearPoint(), false, tracking.getMode(), names);
         if (names.isEmpty()) {
             throw new TrackingException("shear 剪刀配置不能为空");
         }
@@ -69,6 +70,7 @@ public class ShearCubeApiTrackingConfigConverter extends AbstractCubeApiTracking
 
     private void validatePoints(List<ShearPointConfig> points,
                                 boolean uncoilerSide,
+                                ShearMode mode,
                                 Set<String> names) {
         if (points == null) {
             return;
@@ -94,10 +96,15 @@ public class ShearCubeApiTrackingConfigConverter extends AbstractCubeApiTracking
             if (settings == null) {
                 throw new TrackingException("shear_settings 不能为空: " + point.getName());
             }
-            if (settings.getDefaultValue() == null && invalidPoint(point.getColorPoint())) {
-                throw new TrackingException("continuous 剪刀颜色点无效: " + point.getName());
+            if (settings.getDefaultValue() == null) {
+                if (mode == ShearMode.CONTINUOUS && invalidPoint(point.getColorPoint())) {
+                    throw new TrackingException("continuous 剪刀颜色点无效: " + point.getName());
+                }
+                if (mode == ShearMode.DISCONTINUOUS) {
+                    validateGratings(point);
+                }
             }
-            if (uncoilerSide) {
+            if (uncoilerSide || mode == ShearMode.DISCONTINUOUS) {
                 if (settings.getDefaultValue() == null
                         || settings.getDefaultValue() == ShearKind.HEAD) {
                     validateCutSetting(settings.getHead(), point.getName(), "head");
@@ -118,6 +125,22 @@ public class ShearCubeApiTrackingConfigConverter extends AbstractCubeApiTracking
                         || settings.getDefaultValue() == ShearKind.HEAD) {
                     validateWelder(settings.getBehindWelder(), point.getName(), "behind_welder");
                 }
+            }
+        }
+    }
+
+    private void validateGratings(ShearPointConfig point) {
+        List<GratingPointConfig> gratings = point.getGratingPoints();
+        if (gratings == null || gratings.isEmpty()) {
+            throw new TrackingException("discontinuous 光栅配置不能为空: " + point.getName());
+        }
+        Set<String> names = new HashSet<>();
+        for (GratingPointConfig grating : gratings) {
+            if (grating == null || blank(grating.getName())
+                    || grating.getType() != PointDataType.BOOLEAN
+                    || grating.getHasCoil() == null
+                    || !names.add(grating.getName())) {
+                throw new TrackingException("discontinuous 光栅配置无效或重复: " + point.getName());
             }
         }
     }
