@@ -28,12 +28,12 @@ class ShearCubeApiTrackingConfigConverterTest {
         assertThat(config.getUnitCode()).isEqualTo("LINE-X");
         assertThat(config.getTrackingType()).isEqualTo(TrackingType.SHEAR);
         assertThat(config.getTracking().getUncoilerShearPoint()).hasSize(1);
-        assertThat(config.getTracking().getUncoilerShearPoint().get(0).getPorTrCode())
+        assertThat(config.getTracking().getUncoilerShearPoint().get(0).getDeviceCode())
                 .isEqualTo("feed-device-x");
         assertThat(config.getTracking().getUncoilerShearPoint().get(0).getTypeCodes().getHead())
-                .isEqualTo(711);
+                .isEqualTo("711");
         assertThat(config.getTracking().getCoilerShearPoint().get(0).getTypeCodes().getTail())
-                .isEqualTo(939);
+                .isEqualTo("939");
     }
 
     @Test
@@ -46,26 +46,26 @@ class ShearCubeApiTrackingConfigConverterTest {
         assertThat(converted.getTracking().getUncoilerShearPoint()).hasSize(2);
         assertThat(converted.getTracking().getCoilerShearPoint()).hasSize(1);
         assertThat(converted.getTracking().getUncoilerShearPoint().get(0).getTypeCodes().getHead())
-                .isEqualTo(111);
+                    .isEqualTo("111");
         assertThat(converted.getTracking().getCoilerShearPoint().get(0).getTypeCodes().getTail())
-                .isEqualTo(909);
+                    .isEqualTo("909");
         assertThat(converted.getTracking().getCoilerShearPoint().get(0)
                 .getShearSettings().getWelderPieces().getName())
                 .isEqualTo("exit_shear_weld_seam_scrap_pieces");
     }
 
     @Test
-    void acceptsOrderedPorTrCodesAndKeepsLegacySingleCode() throws Exception {
+    void acceptsOrderedDeviceCodesAndKeepsLegacySingleCode() throws Exception {
         String plural = validConfig().replace(
-                "\"por_tr_code\":\"take-device-x\"",
-                "\"por_tr_codes\":[\"take-device-a\",\"take-device-x\"]");
+                "\"device_code\":\"take-device-x\"",
+                "\"device_codes\":[\"take-device-a\",\"take-device-x\"]");
 
         ShearTrackingConfig pluralConfig = (ShearTrackingConfig) converter.convert("LINE-X", node(plural));
         ShearTrackingConfig legacyConfig = (ShearTrackingConfig) converter.convert("LINE-X", node(validConfig()));
 
-        assertThat(pluralConfig.getTracking().getCoilerShearPoint().get(0).getPorTrCodes())
+        assertThat(pluralConfig.getTracking().getCoilerShearPoint().get(0).getDeviceCodes())
                 .containsExactly("take-device-a", "take-device-x");
-        assertThat(legacyConfig.getTracking().getCoilerShearPoint().get(0).getPorTrCode())
+        assertThat(legacyConfig.getTracking().getCoilerShearPoint().get(0).getDeviceCode())
                 .isEqualTo("take-device-x");
     }
 
@@ -83,7 +83,7 @@ class ShearCubeApiTrackingConfigConverterTest {
                     .getShearSettings().getFrontWelder().getSampleLength()).isNotNull();
             assertThat(converted.getTracking().getCoilerShearPoint().get(0)
                     .getShearSettings().getFrontWelder().getScrapLength()).isNotNull();
-            assertThat(converted.getTracking().getCoilerShearPoint().get(0).getPorTrCodes())
+            assertThat(converted.getTracking().getCoilerShearPoint().get(0).getDeviceCodes())
                     .containsExactly("tr1", "tr2");
             assertThat(converted.getTracking().getCoilerShearPoint().get(0)
                     .getShearSettings().getWelderPieces()).isNotNull();
@@ -111,7 +111,7 @@ class ShearCubeApiTrackingConfigConverterTest {
     void rejectsIncompleteModeConfigDuplicateNamesAndInvalidCodes() throws Exception {
         assertInvalid(validConfig().replace("\"continuous\"", "\"discontinuous\""));
         assertInvalid(validConfig().replace("\"exit-cut-x\"", "\"entry-cut-x\""));
-        assertInvalid(validConfig().replace("\"slice\":715", "\"slice\":711"));
+        assertInvalid(validConfig().replace("\"slice\":\"715\"", "\"slice\":\"711\""));
         assertInvalid(validConfig().replace("\"tail_experience\":50", "\"tail_experience\":-1"));
         assertInvalid(validConfig().replace("\"number\":{\"name\":\"head-number\"},", ""));
     }
@@ -144,14 +144,14 @@ class ShearCubeApiTrackingConfigConverterTest {
                 + "\"point_prefix\":\"/line-x/shear/\",\"mode\":\"continuous\","
                 + "\"tail_experience\":50,\"shear_experience\":100,"
                 + "\"uncoiler_shear_point\":[{\"name\":\"entry-cut-x\",\"type\":\"boolean\","
-                + "\"type_codes\":{\"head\":711,\"slice\":715,\"tail\":719},"
-                + "\"normal_pos\":true,\"por_tr_code\":\"feed-device-x\","
+                + "\"type_codes\":{\"head\":\"711\",\"slice\":\"715\",\"tail\":\"719\"},"
+                + "\"normal_pos\":true,\"device_code\":\"feed-device-x\","
                 + "\"shear_settings\":{\"head\":{\"number\":{\"name\":\"head-number\"},\"length\":{\"name\":\"head-length\"}},"
                 + "\"tail\":{\"number\":{\"name\":\"tail-number\"},\"length\":{\"name\":\"tail-length\"}}},"
                 + "\"color_point\":{\"name\":\"entry-color\"}}],"
                 + "\"coiler_shear_point\":[{\"name\":\"exit-cut-x\",\"type\":\"boolean\","
-                + "\"type_codes\":{\"head\":931,\"slice\":935,\"tail\":939},"
-                + "\"normal_pos\":true,\"por_tr_code\":\"take-device-x\","
+                + "\"type_codes\":{\"head\":\"931\",\"slice\":\"935\",\"tail\":\"939\"},"
+                + "\"normal_pos\":true,\"device_code\":\"take-device-x\","
                 + "\"shear_settings\":{\"front_welder\":{"
                 + "\"sample_pieces\":{\"name\":\"front-sample\"},"
                 + "\"scrap_pieces\":{\"name\":\"front-scrap\"},"

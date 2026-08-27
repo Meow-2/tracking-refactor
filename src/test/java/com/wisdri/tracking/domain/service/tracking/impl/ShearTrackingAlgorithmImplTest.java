@@ -65,12 +65,12 @@ class ShearTrackingAlgorithmImplTest {
                 .thenReturn(Optional.of(statusConfig()));
         when(repository.findRuntimeAs(eq(UNIT), eq(TrackingType.SHEAR), anyString(),
                 eq(ShearTrackingRuntime.class))).thenAnswer(invocation -> {
-            String porTrCode = invocation.getArgument(2);
-            return Optional.ofNullable(runtimes.get(porTrCode));
+            String deviceCode = invocation.getArgument(2);
+            return Optional.ofNullable(runtimes.get(deviceCode));
         });
         doAnswer(invocation -> {
             ShearTrackingRuntime saved = invocation.getArgument(0);
-            runtimes.put(saved.getPorTrCode(), saved);
+            runtimes.put(saved.getDeviceCode(), saved);
             return null;
         }).when(repository).saveRuntime(any(TrackingRuntime.class));
 
@@ -87,9 +87,9 @@ class ShearTrackingAlgorithmImplTest {
                 entryValues(false, "10.0", "2.5"), context("10", "20", "500")));
 
         assertThat(first.getShearPointCode()).isEqualTo("entry-cut-x");
-        assertThat(first.getPorTrCode()).isEqualTo("feed-device-x");
+        assertThat(first.getDeviceCode()).isEqualTo("feed-device-x");
         assertThat(first.getShearKind()).isEqualTo(ShearKind.HEAD);
-        assertThat(first.getShearType()).isEqualTo(711);
+        assertThat(first.getShearType()).isEqualTo("711");
         assertThat(first.getShearTypeName()).isEqualTo("feed-device-x_head");
         assertThat(first.getInMatNo()).isEqualTo("FEED-COIL");
         assertThat(first.getCutNo()).isEqualTo(1);
@@ -112,7 +112,7 @@ class ShearTrackingAlgorithmImplTest {
         ShearResult tail = only(calculate(entryValues(true, "10", "2.5"),
                 entryValues(false, "10", "2.5"), context("10", "10", "50")));
         assertThat(tail.getShearKind()).isEqualTo(ShearKind.TAIL);
-        assertThat(tail.getShearType()).isEqualTo(719);
+        assertThat(tail.getShearType()).isEqualTo("719");
         assertThat(tail.getInMatNo()).isEqualTo("TAKE-COIL");
         assertThat(tail.getShearLength()).isEqualByComparingTo("3.5");
         assertThat(tail.getSetNumber()).isEqualTo(3);
@@ -124,7 +124,7 @@ class ShearTrackingAlgorithmImplTest {
         ShearResult slice = only(calculate(entryValues(true, "10", "2.5"),
                 entryValues(false, "10", "2.5"), context("10", "10", "51")));
         assertThat(slice.getShearKind()).isEqualTo(ShearKind.SLICE);
-        assertThat(slice.getShearType()).isEqualTo(715);
+        assertThat(slice.getShearType()).isEqualTo("715");
         assertThat(slice.getInMatNo()).isEqualTo("FEED-COIL");
         assertThat(slice.getSetNumber()).isNull();
     }
@@ -135,12 +135,12 @@ class ShearTrackingAlgorithmImplTest {
         Map<String, Object> latest = exitValues(false, "30", "0", "0", "1.2", "1.8");
         ShearResult tail = only(calculate(previous, latest, context("10", "20", "500")));
         assertThat(tail.getShearKind()).isEqualTo(ShearKind.TAIL);
-        assertThat(tail.getShearType()).isEqualTo(939);
+        assertThat(tail.getShearType()).isEqualTo("939");
         assertThat(tail.getShearLength()).isEqualByComparingTo("1.2");
         assertThat(tail.getSetNumber()).isZero();
         ShearResult head = only(calculate(previous, latest, context("10", "20", "450")));
         assertThat(head.getShearKind()).isEqualTo(ShearKind.HEAD);
-        assertThat(head.getShearType()).isEqualTo(931);
+        assertThat(head.getShearType()).isEqualTo("931");
         assertThat(head.getInMatNo()).isEqualTo("FEED-COIL");
         assertThat(head.getShearLength()).isEqualByComparingTo("1.8");
         assertThat(head.getSetNumber()).isEqualTo(5);
@@ -306,7 +306,7 @@ class ShearTrackingAlgorithmImplTest {
     @Test
     void matchesConfiguredCodesAgainstCurrentAndFallsBackToLastCode() {
         ShearPointConfig exit = config.getTracking().getCoilerShearPoint().get(0);
-        exit.setPorTrCodes(Arrays.asList("take-device-current", "take-device-x"));
+        exit.setDeviceCodes(Arrays.asList("take-device-current", "take-device-x"));
 
         StatusTrackingContext currentMatched = context("10", "20", "500");
         currentMatched.getCurrent().get(DeviceSide.COILER).setDeviceCode("take-device-current");
@@ -348,7 +348,7 @@ class ShearTrackingAlgorithmImplTest {
     }
 
     @Test
-    void keepsCountersIndependentForEachConfiguredPorTrCode() {
+    void keepsCountersIndependentForEachConfiguredDeviceCode() {
         Map<String, Object> previous = exitValues(true, "30", "0", "0", "1.2", "1.8");
         Map<String, Object> latest = exitValues(false, "30", "0", "0", "1.2", "1.8");
         StatusTrackingContext firstContext = context("10", "20", "500");
@@ -361,8 +361,8 @@ class ShearTrackingAlgorithmImplTest {
         secondContext.getCurrent().get(DeviceSide.COILER).setDeviceCode(null);
         ShearResult second = only(calculate(previous, latest, secondContext));
 
-        assertThat(first.getPorTrCode()).isEqualTo("take-device-y");
-        assertThat(second.getPorTrCode()).isEqualTo("take-device-x");
+        assertThat(first.getDeviceCode()).isEqualTo("take-device-y");
+        assertThat(second.getDeviceCode()).isEqualTo("take-device-x");
         assertThat(first.getCutNo()).isEqualTo(1);
         assertThat(second.getCutNo()).isEqualTo(1);
         assertThat(runtimes).containsKeys("feed-device-x", "take-device-y", "take-device-x");
@@ -392,7 +392,7 @@ class ShearTrackingAlgorithmImplTest {
         assertThat(results).extracting(ShearResult::getShearPointCode)
                 .containsExactly("entry-cut-x", "exit-cut-x");
         assertThat(results).extracting(ShearResult::getShearType)
-                .containsExactly(711, 935);
+                .containsExactly("711", "935");
     }
 
     @Test
@@ -537,8 +537,8 @@ class ShearTrackingAlgorithmImplTest {
     private ShearTrackingConfig config() {
         ShearPointConfig entry = ShearPointConfig.builder()
                 .name("entry-cut-x").type(PointDataType.BOOLEAN).normalPos(true)
-                .porTrCode("feed-device-x")
-                .typeCodes(ShearTypeCodes.builder().head(711).slice(715).tail(719).build())
+                .deviceCode("feed-device-x")
+                .typeCodes(ShearTypeCodes.builder().head("711").slice("715").tail("719").build())
                 .colorPoint(point("entry-color"))
                 .shearSettings(ShearSettings.builder()
                         .head(CutSetting.builder().number(point("head-number"))
@@ -549,8 +549,8 @@ class ShearTrackingAlgorithmImplTest {
                 .build();
         ShearPointConfig exit = ShearPointConfig.builder()
                 .name("exit-cut-x").type(PointDataType.BOOLEAN).normalPos(true)
-                .porTrCodes(Arrays.asList("take-device-y", "take-device-x"))
-                .typeCodes(ShearTypeCodes.builder().head(931).slice(935).tail(939).build())
+                .deviceCodes(Arrays.asList("take-device-y", "take-device-x"))
+                .typeCodes(ShearTypeCodes.builder().head("931").slice("935").tail("939").build())
                 .colorPoint(point("exit-color"))
                 .shearSettings(ShearSettings.builder()
                         .welderPieces(point("welder-pieces"))

@@ -1,5 +1,6 @@
 package com.wisdri.tracking.infrastructure.repository.runtime;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.batch.BatchTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
@@ -137,12 +138,12 @@ class TrackingRuntimeRepositoryImplTest {
     }
 
     @Test
-    void storesEachShearRuntimeBelowDirectoryByPorTrCode() {
+    void storesEachShearRuntimeBelowDirectoryByDeviceCode() throws Exception {
         TrackingRuntimeRepositoryImpl repository = repository();
         ShearTrackingRuntime runtime = ShearTrackingRuntime.builder()
                 .unitCode("CP1")
                 .trackingType(TrackingType.SHEAR)
-                .porTrCode("TR-A")
+                .deviceCode("TR-A")
                 .uncoiler(ShearDeviceRuntime.builder()
                         .side(DeviceSide.UNCOILER)
                         .running(true)
@@ -171,11 +172,11 @@ class TrackingRuntimeRepositoryImplTest {
         assertTrue(redis.get(key).contains("\"HEAD\""));
         assertTrue(redis.get(key).contains("\"SLICE\""));
         assertTrue(redis.get(key).contains("\"TAIL\""));
-        assertFalse(redis.get(key).contains("por_tr_code"));
+        assertFalse(new ObjectMapper().readTree(redis.get(key)).has("device_code"));
         ShearTrackingRuntime cached = repository.findRuntimeAs(
                 "CP1", TrackingType.SHEAR, "TR-A", ShearTrackingRuntime.class)
                 .orElseThrow(AssertionError::new);
-        assertEquals("TR-A", cached.getPorTrCode());
+        assertEquals("TR-A", cached.getDeviceCode());
         assertEquals("POR-1", cached.getUncoiler().getDeviceCode());
         assertEquals("TR-A", cached.getCoiler().getDeviceCode());
     }

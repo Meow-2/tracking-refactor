@@ -26,7 +26,7 @@ public class ShearPointConfig {
      */
     private PointDataType type;
     /**
-     * HEAD、SLICE、TAIL 三种逻辑判型对应的数据库整数编码。
+     * HEAD、SLICE、TAIL 三种逻辑判型对应的数据库字符串编码。
      */
     private ShearTypeCodes typeCodes;
     /**
@@ -35,14 +35,14 @@ public class ShearPointConfig {
     private Boolean normalPos;
     /**
      * 与 status runtime candidates 键完全一致的设备代码；所在配置集合决定其设备侧。
-     * 保留用于兼容旧配置，新配置优先使用 porTrCodes。
+     * 保留用于兼容旧配置，新配置优先使用 deviceCodes。
      */
-    private String porTrCode;
+    private String deviceCode;
     /**
      * 本剪刀允许关联的 status 设备代码范围，顺序同时决定 current 未匹配时的回退优先级；
      * 算法固定回退到最后一个元素。
      */
-    private List<String> porTrCodes;
+    private List<String> deviceCodes;
     /**
      * 该剪刀的默认判型、切头/切尾长度及飞剪取样废料参数。
      */

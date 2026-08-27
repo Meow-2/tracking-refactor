@@ -112,9 +112,9 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
         }
         Map<String, ShearTrackingRuntime> changed = new LinkedHashMap<>();
         for (ShearResult result : results) {
-            ShearTrackingRuntime runtime = workingRuntimes.get(result.getPorTrCode());
+            ShearTrackingRuntime runtime = workingRuntimes.get(result.getDeviceCode());
             if (runtime != null) {
-                changed.put(result.getPorTrCode(), runtime);
+                changed.put(result.getDeviceCode(), runtime);
             }
         }
         for (ShearTrackingRuntime runtime : changed.values()) {
@@ -153,7 +153,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 trackingStepLogger.log(input, "剪切触发沿检查", point.getName(),
                         TrackingStepLogger.details(
                                 "deviceSide", uncoilerSide ? "UNCOILER" : "COILER",
-                                "porTrCodes", deviceCodes(point),
+                                "deviceCodes", deviceCodes(point),
                                 "previous", previous,
                                 "latest", latest,
                                 "normalPos", point.getNormalPos(),
@@ -170,7 +170,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 trackingStepLogger.log(input, "剪切事件跳过", point == null ? null : point.getName(),
                         TrackingStepLogger.details(
                                 "reason", e.getMessage(),
-                                "porTrCodes", point == null ? null : deviceCodes(point)));
+                                "deviceCodes", point == null ? null : deviceCodes(point)));
             }
         }
     }
@@ -187,7 +187,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                                        boolean uncoilerSide) {
         DeviceSide associatedSide = uncoilerSide ? DeviceSide.UNCOILER : DeviceSide.COILER;
         AssociatedEndpoint associated = associatedEndpoint(context, point, associatedSide);
-        // 每个 por_tr_code 使用独立副本，完成本帧计算后再统一覆盖正式 runtime。
+        // 每个 device_code 使用独立副本，完成本帧计算后再统一覆盖正式 runtime。
         ShearTrackingRuntime runtime = workingRuntimes.computeIfAbsent(
                 associated.deviceCode, code -> runtime(input.getUnitCode(), code, uncoilerSide));
         StatusCurrentRuntime opposite = context.getCurrent() == null ? null
@@ -235,11 +235,11 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 por.remainingLength, tracking.getShearExperience(), true);
         LengthDecision lengthDecision = shearLength(
                 input.getLatestSnapshot(), tracking, point, kind, uncoilerSide, decision);
-        Integer typeCode = typeCode(point, kind);
+        String typeCode = typeCode(point, kind);
         trackingStepLogger.log(input, "剪切类型判定", point.getName(),
                 TrackingStepLogger.details(
                         "mode", tracking.getMode(),
-                        "porTrCodes", deviceCodes(point),
+                        "deviceCodes", deviceCodes(point),
                         "selectedDeviceCode", associated.deviceCode,
                         "deviceSource", associated.source,
                         "porCoilNo", por.coilNo,
@@ -268,7 +268,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 .generatedAt(Instant.now())
                 .receivedAt(receivedAt)
                 .shearPointCode(point.getName())
-                .porTrCode(associated.deviceCode)
+                .deviceCode(associated.deviceCode)
                 .shearKind(kind)
                 .inMatNo(material.coilNo)
                 .inMatNoProdNo(material.productNo)
@@ -528,22 +528,22 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
             return;
         }
         for (ShearPointConfig point : points) {
-            for (String porTrCode : deviceCodes(point)) {
+            for (String deviceCode : deviceCodes(point)) {
                 ShearTrackingRuntime runtime = runtime(
-                        input.getUnitCode(), porTrCode, uncoilerSide);
+                        input.getUnitCode(), deviceCode, uncoilerSide);
                 ShearDeviceRuntime previousUncoiler = runtime.getUncoiler();
                 ShearDeviceRuntime previousCoiler = runtime.getCoiler();
                 StatusCurrentRuntime opposite = context.getCurrent() == null ? null
                         : context.getCurrent().get(uncoilerSide
                                 ? DeviceSide.COILER : DeviceSide.UNCOILER);
                 ShearDeviceRuntime uncoiler = uncoilerSide
-                        ? configuredDevice(context, DeviceSide.UNCOILER, porTrCode,
-                                deviceNames.get(porTrCode), previousUncoiler, true)
+                        ? configuredDevice(context, DeviceSide.UNCOILER, deviceCode,
+                                deviceNames.get(deviceCode), previousUncoiler, true)
                         : currentDevice(DeviceSide.UNCOILER, opposite, previousUncoiler, false);
                 ShearDeviceRuntime coiler = uncoilerSide
                         ? currentDevice(DeviceSide.COILER, opposite, previousCoiler, false)
-                        : configuredDevice(context, DeviceSide.COILER, porTrCode,
-                                deviceNames.get(porTrCode), previousCoiler, true);
+                        : configuredDevice(context, DeviceSide.COILER, deviceCode,
+                                deviceNames.get(deviceCode), previousCoiler, true);
                 if (Objects.equals(previousUncoiler, uncoiler)
                         && Objects.equals(previousCoiler, coiler)) {
                     continue;
@@ -653,28 +653,28 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
         return names;
     }
 
-    /** 获取指定 por_tr_code runtime 的深拷贝；不存在时创建该剪刀的空计数态。 */
-    private ShearTrackingRuntime runtime(String unitCode, String porTrCode, boolean uncoilerSide) {
+    /** 获取指定 device_code runtime 的深拷贝；不存在时创建该剪刀的空计数态。 */
+    private ShearTrackingRuntime runtime(String unitCode, String deviceCode, boolean uncoilerSide) {
         return runtimeRepositoryDispatcher.findRuntimeAs(
-                unitCode, TrackingType.SHEAR, porTrCode, ShearTrackingRuntime.class)
+                unitCode, TrackingType.SHEAR, deviceCode, ShearTrackingRuntime.class)
                 .map(this::copyRuntime)
-                .orElseGet(() -> emptyRuntime(unitCode, porTrCode, null, uncoilerSide));
+                .orElseGet(() -> emptyRuntime(unitCode, deviceCode, null, uncoilerSide));
     }
 
     private ShearTrackingRuntime emptyRuntime(String unitCode,
-                                               String porTrCode,
+                                               String deviceCode,
                                                String deviceName,
                                                boolean uncoilerSide) {
         ShearDeviceRuntime uncoiler = device(DeviceSide.UNCOILER, false,
-                uncoilerSide ? porTrCode : null, uncoilerSide ? deviceName : null,
+                uncoilerSide ? deviceCode : null, uncoilerSide ? deviceName : null,
                 null, null, null, null, null, null, uncoilerSide);
         ShearDeviceRuntime coiler = device(DeviceSide.COILER, false,
-                uncoilerSide ? null : porTrCode, uncoilerSide ? null : deviceName,
+                uncoilerSide ? null : deviceCode, uncoilerSide ? null : deviceName,
                 null, null, null, null, null, null, !uncoilerSide);
         return ShearTrackingRuntime.builder()
                 .unitCode(unitCode)
                 .trackingType(TrackingType.SHEAR)
-                .porTrCode(porTrCode)
+                .deviceCode(deviceCode)
                 .uncoiler(uncoiler)
                 .coiler(coiler)
                 .build();
@@ -684,7 +684,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
         return ShearTrackingRuntime.builder()
                 .unitCode(source.getUnitCode())
                 .trackingType(TrackingType.SHEAR)
-                .porTrCode(source.getPorTrCode())
+                .deviceCode(source.getDeviceCode())
                 .updatedAt(source.getUpdatedAt())
                 .uncoiler(copyDevice(source.getUncoiler()))
                 .coiler(copyDevice(source.getCoiler()))
@@ -737,7 +737,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                                                   DeviceSide side) {
         List<String> codes = deviceCodes(point);
         if (codes.isEmpty()) {
-            throw new IllegalArgumentException("por_tr_codes 为空");
+            throw new IllegalArgumentException("device_codes 为空");
         }
         StatusCurrentRuntime current = context.getCurrent() == null
                 ? null : context.getCurrent().get(side);
@@ -762,11 +762,11 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
 
     /** 读取有序设备范围；复数配置优先，单数配置作为向后兼容。 */
     private List<String> deviceCodes(ShearPointConfig point) {
-        if (point != null && point.getPorTrCodes() != null && !point.getPorTrCodes().isEmpty()) {
-            return point.getPorTrCodes();
+        if (point != null && point.getDeviceCodes() != null && !point.getDeviceCodes().isEmpty()) {
+            return point.getDeviceCodes();
         }
-        return point == null || point.getPorTrCode() == null
-                ? Collections.emptyList() : Collections.singletonList(point.getPorTrCode());
+        return point == null || point.getDeviceCode() == null
+                ? Collections.emptyList() : Collections.singletonList(point.getDeviceCode());
     }
 
     private BigDecimal last(List<BigDecimal> values) {
@@ -777,7 +777,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
         return value == null ? null : String.valueOf(value);
     }
 
-    private Integer typeCode(ShearPointConfig point, ShearKind kind) {
+    private String typeCode(ShearPointConfig point, ShearKind kind) {
         switch (kind) {
             case HEAD:
                 return point.getTypeCodes().getHead();
@@ -813,7 +813,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
     private ShearResult skip(TrackingInput input, ShearPointConfig point, String reason) {
         trackingStepLogger.log(input, "剪切事件跳过", point.getName(), TrackingStepLogger.details(
                 "reason", reason,
-                "porTrCodes", deviceCodes(point)));
+                "deviceCodes", deviceCodes(point)));
         return null;
     }
 

@@ -11,12 +11,12 @@
         "name": "is_upper_cut",
         "type": "boolean",
         "type_codes": {
-          "head": 111,
-          "slice": 115,
-          "tail": 119
+          "head": "111",
+          "slice": "115",
+          "tail": "119"
         },
         "normal_pos": true,
-        "por_tr_code": "por1",
+        "device_code": "por1",
         "shear_settings": {
           "head": {
             "number": {
@@ -48,12 +48,12 @@
         "name": "is_lower_cut",
         "type": "boolean",
         "type_codes": {
-          "head": 191,
-          "slice": 195,
-          "tail": 199
+          "head": "191",
+          "slice": "195",
+          "tail": "199"
         },
         "normal_pos": true,
-        "por_tr_code": "por2",
+        "device_code": "por2",
         "shear_settings": {
           "head": {
             "number": {
@@ -87,12 +87,12 @@
         "name": "is_shear_cut",
         "type": "boolean",
         "type_codes": {
-          "head": 901,
-          "slice": 905,
-          "tail": 909
+          "head": "901",
+          "slice": "905",
+          "tail": "909"
         },
         "normal_pos": true,
-        "por_tr_codes": [
+        "device_codes": [
           "tr1",
           "tr2"
         ],

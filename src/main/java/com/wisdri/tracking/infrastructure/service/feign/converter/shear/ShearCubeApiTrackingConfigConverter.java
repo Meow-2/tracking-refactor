@@ -83,7 +83,7 @@ public class ShearCubeApiTrackingConfigConverter extends AbstractCubeApiTracking
             List<String> deviceCodes = deviceCodes(point);
             if (deviceCodes.isEmpty() || deviceCodes.stream().anyMatch(this::blank)
                     || new HashSet<>(deviceCodes).size() != deviceCodes.size()) {
-                throw new TrackingException("shear por_tr_codes 不能为空或重复: " + point.getName());
+                throw new TrackingException("shear device_codes 不能为空或重复: " + point.getName());
             }
             if (point.getType() != PointDataType.BOOLEAN) {
                 throw new TrackingException("shear 剪切信号必须为 boolean: " + point.getName());
@@ -147,10 +147,10 @@ public class ShearCubeApiTrackingConfigConverter extends AbstractCubeApiTracking
 
     private void validateTypeCodes(ShearPointConfig point) {
         ShearTypeCodes codes = point.getTypeCodes();
-        if (codes == null || codes.getHead() == null || codes.getSlice() == null || codes.getTail() == null) {
+        if (codes == null || blank(codes.getHead()) || blank(codes.getSlice()) || blank(codes.getTail())) {
             throw new TrackingException("type_codes 必须包含 head/slice/tail: " + point.getName());
         }
-        Set<Integer> values = new HashSet<>();
+        Set<String> values = new HashSet<>();
         values.add(codes.getHead());
         values.add(codes.getSlice());
         values.add(codes.getTail());
@@ -186,10 +186,10 @@ public class ShearCubeApiTrackingConfigConverter extends AbstractCubeApiTracking
     }
 
     private List<String> deviceCodes(ShearPointConfig point) {
-        if (point.getPorTrCodes() != null && !point.getPorTrCodes().isEmpty()) {
-            return new ArrayList<>(point.getPorTrCodes());
+        if (point.getDeviceCodes() != null && !point.getDeviceCodes().isEmpty()) {
+            return new ArrayList<>(point.getDeviceCodes());
         }
-        return blank(point.getPorTrCode())
-                ? Collections.emptyList() : Collections.singletonList(point.getPorTrCode());
+        return blank(point.getDeviceCode())
+                ? Collections.emptyList() : Collections.singletonList(point.getDeviceCode());
     }
 }

@@ -11,12 +11,12 @@
         "name": "entry_shear_cut",
         "type": "boolean",
         "type_codes": {
-          "head": 101,
-          "slice": 105,
-          "tail": 109
+          "head": "101",
+          "slice": "105",
+          "tail": "109"
         },
         "normal_pos": true,
-        "por_tr_code": "por1",
+        "device_code": "por1",
         "shear_settings": {
           "head": {
             "number": {
@@ -63,12 +63,12 @@
         "name": "exit_shear_cut",
         "type": "boolean",
         "type_codes": {
-          "head": 901,
-          "slice": 905,
-          "tail": 909
+          "head": "901",
+          "slice": "905",
+          "tail": "909"
         },
         "normal_pos": true,
-        "por_tr_code": "tr1",
+        "device_code": "tr1",
         "shear_settings": {
           "head": {
             "number": {
@@ -92,11 +92,6 @@
           }
         },
         "grating_points": [
-          {
-            "name": "tr_grating1_position_status",
-            "type": "boolean",
-            "has_coil": true
-          },
           {
             "name": "tr_grating2_position_status",
             "type": "boolean",

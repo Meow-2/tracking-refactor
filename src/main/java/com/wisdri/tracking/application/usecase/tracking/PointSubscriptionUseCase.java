@@ -67,7 +67,7 @@ public class PointSubscriptionUseCase {
     }
 
     /**
-     * shear 开始监控时为每个 por_tr_code 创建独立空运行态，不等待首次剪切信号。
+     * shear 开始监控时为每个 device_code 创建独立空运行态，不等待首次剪切信号。
      */
     private void initializeShearRuntimes(TrackingConfig config) {
         if (!(config instanceof ShearTrackingConfig)
@@ -86,9 +86,9 @@ public class PointSubscriptionUseCase {
         collectShearRuntimes(runtimes, shearConfig.getTracking().getCoilerShearPoint(),
                 false, config.getUnitCode(), deviceNames);
         for (Map.Entry<String, ShearTrackingRuntime> entry : runtimes.entrySet()) {
-            String porTrCode = entry.getKey();
+            String deviceCode = entry.getKey();
             if (trackingRuntimeRepositoryDispatcher.findRuntimeAs(
-                    config.getUnitCode(), TrackingType.SHEAR, porTrCode,
+                    config.getUnitCode(), TrackingType.SHEAR, deviceCode,
                     ShearTrackingRuntime.class).isPresent()) {
                 continue;
             }
@@ -108,8 +108,8 @@ public class PointSubscriptionUseCase {
             if (point == null) {
                 continue;
             }
-            List<String> codes = point.getPorTrCodes() == null || point.getPorTrCodes().isEmpty()
-                    ? Collections.singletonList(point.getPorTrCode()) : point.getPorTrCodes();
+            List<String> codes = point.getDeviceCodes() == null || point.getDeviceCodes().isEmpty()
+                    ? Collections.singletonList(point.getDeviceCode()) : point.getDeviceCodes();
             for (String code : codes) {
                 if (code != null && !code.trim().isEmpty()) {
                     runtimes.put(code, emptyShearRuntime(
@@ -120,13 +120,13 @@ public class PointSubscriptionUseCase {
     }
 
     private ShearTrackingRuntime emptyShearRuntime(String unitCode,
-                                                   String porTrCode,
+                                                   String deviceCode,
                                                    String deviceName,
                                                    boolean uncoilerSide) {
         ShearDeviceRuntime uncoiler = ShearDeviceRuntime.builder()
                 .side(DeviceSide.UNCOILER)
                 .running(false)
-                .deviceCode(uncoilerSide ? porTrCode : null)
+                .deviceCode(uncoilerSide ? deviceCode : null)
                 .deviceName(uncoilerSide ? deviceName : null)
                 .head(ShearCounterRuntime.builder().build())
                 .slice(uncoilerSide ? ShearCounterRuntime.builder().build() : null)
@@ -134,7 +134,7 @@ public class PointSubscriptionUseCase {
         ShearDeviceRuntime coiler = ShearDeviceRuntime.builder()
                 .side(DeviceSide.COILER)
                 .running(false)
-                .deviceCode(uncoilerSide ? null : porTrCode)
+                .deviceCode(uncoilerSide ? null : deviceCode)
                 .deviceName(uncoilerSide ? null : deviceName)
                 .slice(uncoilerSide ? null : ShearCounterRuntime.builder().build())
                 .tail(ShearCounterRuntime.builder().build())
@@ -142,7 +142,7 @@ public class PointSubscriptionUseCase {
         return ShearTrackingRuntime.builder()
                 .unitCode(unitCode)
                 .trackingType(TrackingType.SHEAR)
-                .porTrCode(porTrCode)
+                .deviceCode(deviceCode)
                 .uncoiler(uncoiler)
                 .coiler(coiler)
                 .build();

@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
 /**
- * 单个 por_tr_code 对应的一把剪刀运行态。
+ * 单个 device_code 对应的一把剪刀运行态。
  */
 @Data
 @SuperBuilder
@@ -19,7 +19,7 @@ public class ShearTrackingRuntime extends TrackingRuntime {
      * 当前运行态对应的开卷机或卷取机代码，同时作为 Redis 目录下的末级 key。
      */
     @JsonIgnore
-    private String porTrCode;
+    private String deviceCode;
 
     /** 算法推理出的当前开卷机状态。 */
     private ShearDeviceRuntime uncoiler;

@@ -214,14 +214,14 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
     }
 
     /**
-     * batch 以模板代码隔离，shear 以 por_tr_code 隔离，其他类型保持单实例。
+     * batch 以模板代码隔离，shear 以 device_code 隔离，其他类型保持单实例。
      */
     private String runtimeInstanceCode(TrackingRuntime runtime) {
         if (TrackingType.SHEAR == runtime.getTrackingType()) {
             if (!(runtime instanceof ShearTrackingRuntime)) {
                 throw new TrackingException("保存剪切运行态失败: runtime 类型不匹配");
             }
-            return ((ShearTrackingRuntime) runtime).getPorTrCode();
+            return ((ShearTrackingRuntime) runtime).getDeviceCode();
         }
         return runtime.getTemplateCode();
     }
@@ -230,7 +230,7 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
         validateTemplateCode(trackingType, instanceCode);
         if (TrackingType.SHEAR == trackingType
                 && (instanceCode == null || instanceCode.trim().isEmpty())) {
-            throw new TrackingException("读写剪切跟踪运行态失败: porTrCode 不能为空");
+            throw new TrackingException("读写剪切跟踪运行态失败: deviceCode 不能为空");
         }
     }
 

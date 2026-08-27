@@ -64,11 +64,11 @@ class PointSubscriptionUseCaseTest {
                 .tracking(ShearTrackingSection.builder()
                         .uncoilerShearPoint(Arrays.asList(ShearPointConfig.builder()
                                 .name("entry-cut")
-                                .porTrCode("por-a")
+                                .deviceCode("por-a")
                                 .build()))
                         .coilerShearPoint(Arrays.asList(ShearPointConfig.builder()
                                 .name("exit-cut")
-                                .porTrCodes(Arrays.asList("tr-a", "tr-b"))
+                                .deviceCodes(Arrays.asList("tr-a", "tr-b"))
                                 .build()))
                         .build())
                 .build();
@@ -103,11 +103,11 @@ class PointSubscriptionUseCaseTest {
 
         ArgumentCaptor<TrackingRuntime> runtimes = ArgumentCaptor.forClass(TrackingRuntime.class);
         verify(dispatcher, times(3)).saveRuntime(runtimes.capture());
-        Set<String> porTrCodes = new HashSet<>();
+        Set<String> deviceCodes = new HashSet<>();
         for (TrackingRuntime runtime : runtimes.getAllValues()) {
-            porTrCodes.add(((ShearTrackingRuntime) runtime).getPorTrCode());
+            deviceCodes.add(((ShearTrackingRuntime) runtime).getDeviceCode());
         }
-        assertEquals(new HashSet<>(Arrays.asList("por-a", "tr-a", "tr-b")), porTrCodes);
+        assertEquals(new HashSet<>(Arrays.asList("por-a", "tr-a", "tr-b")), deviceCodes);
     }
 
     private void assertBatchSubscription(MqttSubscriptionRegistry registry,

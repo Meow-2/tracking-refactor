@@ -20,15 +20,15 @@ public class ShearResult extends TrackingResult {
     /** 剪切信号点名，也是提交 runtime 时定位剪刀的键；不写入 qm_shear_log。 */
     private String shearPointCode;
     /** 实际关联的开卷机或卷取机代码，用于定位独立的 shear runtime。 */
-    private String porTrCode;
-    /** 算法判定的逻辑类型 HEAD、SLICE 或 TAIL，不等同于数据库整数编码。 */
+    private String deviceCode;
+    /** 算法判定的逻辑类型 HEAD、SLICE 或 TAIL，不等同于数据库字符串编码。 */
     private ShearKind shearKind;
     /** 本次剪切归属的投入物料钢卷号。 */
     private String inMatNo;
     /** 本次剪切归属物料的生产次数。 */
     private String inMatNoProdNo;
-    /** 当前剪刀 typeCodes 提供、最终写入 qm_shear_log.shear_type 的整数编码。 */
-    private Integer shearType;
+    /** 当前剪刀 typeCodes 提供、最终写入 qm_shear_log.shear_type 的字符串编码。 */
+    private String shearType;
     /**
      * 实际关联的开卷机或卷取机代码与逻辑类型组合，例如 por1_head、tr2_tail。
      */

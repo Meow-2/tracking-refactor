@@ -24,7 +24,7 @@ class ShearTrackingResultRepositoryImplTest {
         ShearResult result = ShearResult.builder()
                 .unitCode("LINE-X").trackingType(TrackingType.SHEAR)
                 .inMatNo("MAT-1").inMatNoProdNo("3")
-                .shearType(711).shearTypeName("feed-device-x_head")
+                .shearType("711").shearTypeName("feed-device-x_head")
                 .shearLength(new BigDecimal("2.5")).setNumber(4).shearTime(time)
                 .porCoilNo("POR-1").porColorCode("10")
                 .trCoilNo("TR-1").trColorCode("20")
@@ -37,7 +37,7 @@ class ShearTrackingResultRepositoryImplTest {
         assertThat(entity.getUnitCode()).isEqualTo("LINE-X");
         assertThat(entity.getInMatNo()).isEqualTo("MAT-1");
         assertThat(entity.getInMatNoProdNo()).isEqualTo("3");
-        assertThat(entity.getShearType()).isEqualTo(711);
+        assertThat(entity.getShearType()).isEqualTo("711");
         assertThat(entity.getShearTypeName()).isEqualTo("feed-device-x_head");
         assertThat(entity.getShearLength()).isEqualByComparingTo("2.5");
         assertThat(entity.getSetNumber()).isEqualTo(4);
