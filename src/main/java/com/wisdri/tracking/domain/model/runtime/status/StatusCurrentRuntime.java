@@ -20,6 +20,8 @@ public class StatusCurrentRuntime {
     private Boolean running;
     private String deviceCode;
     private String deviceName;
+    private String coilerMethod;
+    private String coilerMethodName;
     private String coilNo;
     private Integer productNo;
     private String colorNo;

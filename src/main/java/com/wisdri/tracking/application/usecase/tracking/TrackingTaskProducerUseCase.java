@@ -11,8 +11,10 @@ import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
+import com.wisdri.tracking.domain.model.tracking.TrackingResult;
 import com.wisdri.tracking.domain.model.tracking.TrackingTask;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
+import com.wisdri.tracking.domain.model.tracking.status.StatusResult;
 import com.wisdri.tracking.domain.model.tracking.status.StatusTrackingContext;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.repository.point.LastPointSnapshotRepository;
@@ -124,10 +126,36 @@ public class TrackingTaskProducerUseCase {
                 .build();
         lastPointSnapshotRepository.save(unitCode, trackingType, templateCode, latestSnapshot);
         if (TrackingType.STATUS == trackingType) {
-            trackingAlgorithmDispatcher.calculate(TrackingInput.of(task));
+            publishCoilerTask(unitCode,
+                    trackingAlgorithmDispatcher.calculate(TrackingInput.of(task)));
             return;
         }
         trackingTaskProducer.send(task);
+    }
+
+    /**
+     * 状态算法检测到钢卷号变化时，发布一条批量开卷卷取跟踪任务。
+     */
+    private void publishCoilerTask(String unitCode, List<TrackingResult> calculated) {
+        List<StatusResult> results = new ArrayList<>();
+        if (calculated != null) {
+            for (TrackingResult result : calculated) {
+                if (result instanceof StatusResult) {
+                    results.add(copyStatusResult((StatusResult) result));
+                }
+            }
+        }
+        if (results.isEmpty()) {
+            return;
+        }
+        trackingTaskProducer.send(TrackingTask.builder()
+                .unitCode(unitCode)
+                .trackingType(TrackingType.COILER)
+                .statusContext(StatusTrackingContext.builder()
+                        .results(results)
+                        .build())
+                .publishedAt(Instant.now())
+                .build());
     }
 
     /**
@@ -163,6 +191,8 @@ public class TrackingTaskProducerUseCase {
                         .coilNo(candidate.getCoilNo())
                         .productNo(candidate.getProductNo())
                         .colorNo(candidate.getColorNo())
+                        .coilerMethod(candidate.getCoilerMethod())
+                        .coilerMethodName(candidate.getCoilerMethodName())
                         .maxLength(candidate.getMaxLength())
                         .lengths(lengths)
                         .build());
@@ -184,6 +214,8 @@ public class TrackingTaskProducerUseCase {
                         .running(current.getRunning())
                         .deviceCode(current.getDeviceCode())
                         .deviceName(current.getDeviceName())
+                        .coilerMethod(current.getCoilerMethod())
+                        .coilerMethodName(current.getCoilerMethodName())
                         .coilNo(current.getCoilNo())
                         .productNo(current.getProductNo())
                         .colorNo(current.getColorNo())
@@ -193,6 +225,26 @@ public class TrackingTaskProducerUseCase {
             }
         });
         return copied;
+    }
+
+    private StatusResult copyStatusResult(StatusResult source) {
+        return StatusResult.builder()
+                .unitCode(source.getUnitCode())
+                .trackingType(source.getTrackingType())
+                .generatedAt(source.getGeneratedAt())
+                .receivedAt(source.getReceivedAt())
+                .side(source.getSide())
+                .running(source.getRunning())
+                .deviceCode(source.getDeviceCode())
+                .deviceName(source.getDeviceName())
+                .coilerMethod(source.getCoilerMethod())
+                .coilerMethodName(source.getCoilerMethodName())
+                .coilNo(source.getCoilNo())
+                .productNo(source.getProductNo())
+                .colorNo(source.getColorNo())
+                .remainingLength(source.getRemainingLength())
+                .maxLength(source.getMaxLength())
+                .build();
     }
 
     /**

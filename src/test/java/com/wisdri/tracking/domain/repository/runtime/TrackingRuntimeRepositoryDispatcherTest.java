@@ -90,10 +90,10 @@ class TrackingRuntimeRepositoryDispatcherTest {
         verify(processRepository).refreshConfig();
         verify(shearRepository).refreshConfig();
 
-        assertTrue(!dispatcher.findConfig("CP1", TrackingType.WELDING).isPresent());
+        assertTrue(!dispatcher.findConfig("CP1", TrackingType.TRIMMING).isPresent());
         ProcessTrackingRuntime unsupported = ProcessTrackingRuntime.builder()
                 .unitCode("CP1")
-                .trackingType(TrackingType.WELDING)
+                .trackingType(TrackingType.TRIMMING)
                 .build();
         assertThrows(TrackingException.class, () -> dispatcher.saveRuntime(unsupported));
     }

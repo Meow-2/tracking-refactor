@@ -10,11 +10,13 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- * 生产跟踪任务时固化的状态运行态上下文。
+ * 生产跟踪任务时固化的状态上下文。
  */
 @Data
 @Builder
@@ -42,5 +44,11 @@ public class StatusTrackingContext {
      */
     @Builder.Default
     private Map<DeviceSide, StatusCurrentRuntime> current = new LinkedHashMap<>();
+
+    /**
+     * 当前状态帧检测到的钢卷号变化结果。
+     */
+    @Builder.Default
+    private List<StatusResult> results = new ArrayList<>();
 
 }

@@ -3,6 +3,8 @@ package com.wisdri.tracking.domain.service.tracking.impl;
 import com.wisdri.tracking.domain.model.config.PointConfig;
 import com.wisdri.tracking.domain.model.config.StartCondition;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
+import com.wisdri.tracking.domain.model.config.status.CoilerMethodConfig;
+import com.wisdri.tracking.domain.model.config.status.CoilerMethodDefinition;
 import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingSection;
@@ -77,16 +79,15 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 "threshold", tracking.getStartCondition().getThreshold(),
                 "passed", started));
 
+        Instant generatedAt = Instant.now();
+        List<StatusResult> results = new ArrayList<>();
         Map<String, StatusCandidateRuntime> candidates = started
-                ? updateCandidates(input, tracking)
+                ? updateCandidates(input, tracking, generatedAt, results)
                 : new LinkedHashMap<>();
         Map<DeviceSide, SelectedCandidate> selected = started
                 ? selectCandidates(input, tracking, candidates)
                 : new LinkedHashMap<>();
         Map<DeviceSide, StatusCurrentRuntime> current = current(input, selected);
-        Instant generatedAt = Instant.now();
-        List<StatusResult> results = results(config, input, current, generatedAt);
-
         runtimeRepositoryDispatcher.saveRuntime(StatusTrackingRuntime.builder()
                 .unitCode(input.getUnitCode())
                 .trackingType(TrackingType.STATUS)
@@ -105,8 +106,11 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         return results;
     }
 
-    private Map<String, StatusCandidateRuntime> updateCandidates(TrackingInput input,
-                                                                  StatusTrackingSection tracking) {
+    private Map<String, StatusCandidateRuntime> updateCandidates(
+            TrackingInput input,
+            StatusTrackingSection tracking,
+            Instant generatedAt,
+            List<StatusResult> results) {
         Map<String, StatusCandidateRuntime> previous = runtimeRepositoryDispatcher.findRuntimeAs(
                 input.getUnitCode(), TrackingType.STATUS, StatusTrackingRuntime.class)
                 .map(StatusTrackingRuntime::getCandidates)
@@ -126,6 +130,9 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             Integer productNo = !coilNoValid
                     ? null
                     : sameCoil ? old.getProductNo() : queryProductNo(input, group, coilNo);
+            CoilerMethodValue coilerMethod = sameCoil && coilerMethodPresent(old)
+                    ? coilerMethod(old)
+                    : resolveCoilerMethod(input.getLatestSnapshot(), tracking, group);
             List<BigDecimal> lengths = new ArrayList<>();
             BigDecimal maxLength = null;
             if (sameCoil) {
@@ -146,21 +153,95 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     .coilNo(coilNo)
                     .productNo(productNo)
                     .colorNo(colorNo)
+                    .coilerMethod(coilerMethod == null ? null : coilerMethod.getCode())
+                    .coilerMethodName(coilerMethod == null ? null : coilerMethod.getName())
                     .maxLength(maxLength)
                     .lengths(lengths)
                     .build();
+            if (coilNoValid && !sameCoil) {
+                StatusResult result = StatusResult.from(candidate, group, input.getUnitCode(),
+                        generatedAt, receivedAt(input));
+                if (result != null && !blank(result.getCoilerMethod())
+                        && !blank(result.getCoilerMethodName())) {
+                    results.add(result);
+                }
+            }
             updated.put(group.getCode(), candidate);
             trackingStepLogger.log(input, "设备窗口更新", group.getCode(), TrackingStepLogger.details(
                     "side", group.getSide(),
                     "coilNo", coilNo,
                     "productNo", productNo,
                     "colorNo", colorNo,
+                    "coilerMethod", candidate.getCoilerMethod(),
+                    "coilerMethodName", candidate.getCoilerMethodName(),
                     "maxLength", maxLength,
                     "lengths", lengths,
                     "dataComplete", dataComplete,
                     "reason", dataComplete ? null : "当前帧卷号或剩余长度无效"));
         }
         return updated;
+    }
+
+    private CoilerMethodValue resolveCoilerMethod(PointSnapshot snapshot,
+                                                  StatusTrackingSection tracking,
+                                                  StatusPointGroup group) {
+        if (tracking.getCoilerMethodDef() == null || group.getCoilerMethod() == null) {
+            return null;
+        }
+        CoilerMethodDefinition definition = tracking.getCoilerMethodDef().definition(group.getSide());
+        if (definition == null || definition.getName() == null || definition.getCode() == null
+                || definition.getName().size() < 2 || definition.getCode().size() < 2) {
+            throw new IllegalArgumentException("开卷卷取方式定义无效: " + group.getCode());
+        }
+        Boolean selector = selectorValue(snapshot, tracking, group.getCoilerMethod());
+        int index = coilerMethodIndex(selector, group.getCoilerMethod());
+        return new CoilerMethodValue(
+                definition.getCode().get(index), definition.getName().get(index));
+    }
+
+    private CoilerMethodValue coilerMethod(StatusCandidateRuntime candidate) {
+        if (candidate == null) {
+            return null;
+        }
+        return new CoilerMethodValue(candidate.getCoilerMethod(), candidate.getCoilerMethodName());
+    }
+
+    private boolean coilerMethodPresent(StatusCandidateRuntime candidate) {
+        return candidate != null && !blank(candidate.getCoilerMethod())
+                && !blank(candidate.getCoilerMethodName());
+    }
+
+    private Boolean selectorValue(PointSnapshot snapshot,
+                                  StatusTrackingSection tracking,
+                                  CoilerMethodConfig config) {
+        Boolean pointValue = null;
+        if (config.getName() != null && !config.getName().trim().isEmpty()
+                && config.getType() != null) {
+            Object raw = PointReader.rawValue(snapshot,
+                    PointReader.pathResolve(tracking.getPointPrefix(), config.getName()));
+            pointValue = strictBoolean(raw);
+        }
+        return pointValue == null ? config.getDefaultValue() : pointValue;
+    }
+
+    private Boolean strictBoolean(Object value) {
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).intValue() == 0 ? Boolean.FALSE : Boolean.TRUE;
+        }
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value).trim();
+        if ("1".equals(text) || "true".equalsIgnoreCase(text)) {
+            return Boolean.TRUE;
+        }
+        if ("0".equals(text) || "false".equalsIgnoreCase(text)) {
+            return Boolean.FALSE;
+        }
+        return null;
     }
 
     private Integer queryProductNo(TrackingInput input, StatusPointGroup group, String coilNo) {
@@ -232,7 +313,8 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             SelectedCandidate existing = selected.get(group.getSide());
             if (existing == null || absoluteChange.compareTo(existing.getAbsoluteChange()) > 0) {
                 selected.put(group.getSide(), new SelectedCandidate(
-                        group, runtime.getCoilNo(), runtime.getProductNo(), runtime.getColorNo(), latest,
+                        group, runtime.getCoilNo(), runtime.getProductNo(), runtime.getColorNo(),
+                        runtime.getCoilerMethod(), runtime.getCoilerMethodName(), latest,
                         runtime.getMaxLength(), absoluteChange));
             }
         }
@@ -250,6 +332,8 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     .running(candidate != null)
                     .deviceCode(candidate == null ? null : candidate.getGroup().getCode())
                     .deviceName(candidate == null ? null : candidate.getGroup().getName())
+                    .coilerMethod(candidate == null ? null : candidate.getCoilerMethod())
+                    .coilerMethodName(candidate == null ? null : candidate.getCoilerMethodName())
                     .coilNo(candidate == null ? null : candidate.getCoilNo())
                     .productNo(candidate == null ? null : candidate.getProductNo())
                     .colorNo(candidate == null ? null : candidate.getColorNo())
@@ -260,6 +344,8 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             trackingStepLogger.log(input, "设备端状态生成", side.getCode(), TrackingStepLogger.details(
                     "running", runtime.getRunning(),
                     "deviceCode", runtime.getDeviceCode(),
+                    "coilerMethod", runtime.getCoilerMethod(),
+                    "coilerMethodName", runtime.getCoilerMethodName(),
                     "coilNo", runtime.getCoilNo(),
                     "productNo", runtime.getProductNo(),
                     "colorNo", runtime.getColorNo(),
@@ -269,21 +355,9 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         return current;
     }
 
-    private List<StatusResult> results(StatusTrackingConfig config,
-                                       TrackingInput input,
-                                       Map<DeviceSide, StatusCurrentRuntime> current,
-                                       Instant generatedAt) {
-        List<StatusResult> results = new ArrayList<>();
-        Instant receivedAt = input.getLatestSnapshot() == null
-                ? null : input.getLatestSnapshot().getReceivedAt();
-        for (DeviceSide side : RESULT_ORDER) {
-            StatusResult result = StatusResult.from(
-                    current.get(side), config.getUnitCode(), generatedAt, receivedAt);
-            if (result != null) {
-                results.add(result);
-            }
-        }
-        return results;
+    private int coilerMethodIndex(Boolean selector, CoilerMethodConfig config) {
+        int falseIndex = config.getFalseIndex() == null ? 0 : config.getFalseIndex();
+        return Boolean.FALSE.equals(selector) ? falseIndex : 1 - falseIndex;
     }
 
     private BigDecimal startConditionValue(PointSnapshot snapshot, StatusTrackingSection tracking) {
@@ -334,6 +408,16 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 || Character.getType(value) == Character.FORMAT;
     }
 
+    private Instant receivedAt(TrackingInput input) {
+        return input.getLatestSnapshot() == null
+                || input.getLatestSnapshot().getReceivedAt() == null
+                ? Instant.now() : input.getLatestSnapshot().getReceivedAt();
+    }
+
+    private boolean blank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
     private void validateInput(TrackingInput input) {
         if (input == null || input.getTrackingType() != TrackingType.STATUS) {
             throw new IllegalArgumentException("状态跟踪输入和跟踪类型不能为空");
@@ -358,8 +442,17 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         private final String coilNo;
         private final Integer productNo;
         private final String colorNo;
+        private final String coilerMethod;
+        private final String coilerMethodName;
         private final BigDecimal remainingLength;
         private final BigDecimal maxLength;
         private final BigDecimal absoluteChange;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    private static class CoilerMethodValue {
+        private final String code;
+        private final String name;
     }
 }

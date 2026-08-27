@@ -3,20 +3,74 @@
   "mqtt_topic": "csl1_status_tracking",
   "tracking": {
     "point_prefix": "/aygg_tracking/csl1/status/tracking/",
-    "start_condition": { "point": { "name": "line_speed_pv", "type": "short" }, "threshold": 0 },
+    "start_condition": {
+      "point": {
+        "name": "line_speed_pv",
+        "type": "short"
+      },
+      "threshold": 0
+    },
     "sample_count": 4,
     "min_length_change": 0.01,
     "monotonicity_check_enabled": false,
+    "coiler_method_def": {
+      "uncoiler": {
+        "name": [
+          "上开卷",
+          "下开卷"
+        ],
+        "code": [
+          "11",
+          "91"
+        ]
+      },
+      "coiler": {
+        "name": [
+          "上卷取",
+          "下卷取"
+        ],
+        "code": [
+          "19",
+          "99"
+        ]
+      }
+    },
     "points": [
       {
-        "code": "por1", "name": "1#开卷机", "side": "uncoiler",
-        "coil_no": { "name": "coil_info1_entry_coil_no", "type": "string" },
-        "remaining_length": { "name": "por_length", "type": "float" }
+        "code": "por1",
+        "name": "1#开卷机",
+        "side": "uncoiler",
+        "coil_no": {
+          "name": "coil_info1_entry_coil_no",
+          "type": "string"
+        },
+        "remaining_length": {
+          "name": "por_length",
+          "type": "float"
+        },
+        "coiler_method": {
+          "default": false,
+          "false_index": 0,
+          "name": "por_uncoiler_mode_pv",
+          "type": "boolean"
+        }
       },
       {
-        "code": "tr1", "name": "1#卷取机", "side": "coiler",
-        "coil_no": { "name": "coil_info1_exit_coil_no", "type": "string" },
-        "remaining_length": { "name": "tr_length", "type": "float" }
+        "code": "tr1",
+        "name": "1#卷取机",
+        "side": "coiler",
+        "coil_no": {
+          "name": "coil_info1_exit_coil_no",
+          "type": "string"
+        },
+        "remaining_length": {
+          "name": "tr_length",
+          "type": "float"
+        },
+        "coiler_method": {
+          "default": false,
+          "false_index": 0
+        }
       }
     ]
   }

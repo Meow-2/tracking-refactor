@@ -1,0 +1,26 @@
+package com.wisdri.tracking.infrastructure.dto.postgres.coiler;
+
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+import java.time.Instant;
+
+/**
+ * PostgreSQL 钢卷开卷卷取方式记录。
+ */
+@Data
+@TableName("qm_coiler_log")
+public class QmCoilerLogEntity {
+    @TableId
+    private Long id;
+    private String unitCode;
+    private String inMatNo;
+    private String inMatNoProdNo;
+    private String coilerMethod;
+    private String coilerMethodName;
+    private String deviceCode;
+    private String deviceName;
+    private String maxLength;
+    private Instant createTime;
+}

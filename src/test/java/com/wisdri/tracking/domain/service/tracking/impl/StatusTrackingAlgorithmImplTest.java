@@ -1,7 +1,11 @@
 package com.wisdri.tracking.domain.service.tracking.impl;
 
 import com.wisdri.tracking.domain.model.config.PointConfig;
+import com.wisdri.tracking.domain.model.config.PointDataType;
 import com.wisdri.tracking.domain.model.config.StartCondition;
+import com.wisdri.tracking.domain.model.config.status.CoilerMethodConfig;
+import com.wisdri.tracking.domain.model.config.status.CoilerMethodDefinition;
+import com.wisdri.tracking.domain.model.config.status.CoilerMethodDefinitions;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
@@ -68,6 +72,7 @@ class StatusTrackingAlgorithmImplTest {
 
     @Test
     void selectsLargestNetChangeForEachSideAfterWindowIsFull() {
+        enableCoilerMethods();
         assertEmptySides(calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200",
                 "C1", "COIL-C1", "10"));
         assertEmptySides(calculate(true, "U1", "COIL-U1", "102", "U2", "COIL-U2", "194",
@@ -82,9 +87,13 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(current.get(DeviceSide.UNCOILER).getCoilNo()).isEqualTo("COIL-U2");
         assertThat(current.get(DeviceSide.UNCOILER).getProductNo()).isEqualTo(1);
         assertThat(current.get(DeviceSide.UNCOILER).getColorNo()).isEqualTo("U2-COLOR");
+        assertThat(current.get(DeviceSide.UNCOILER).getCoilerMethod()).isEqualTo("11");
+        assertThat(current.get(DeviceSide.UNCOILER).getCoilerMethodName()).isEqualTo("上开卷");
         assertThat(current.get(DeviceSide.UNCOILER).getRemainingLength()).isEqualByComparingTo("188");
         assertThat(current.get(DeviceSide.COILER).getRunning()).isTrue();
         assertThat(current.get(DeviceSide.COILER).getDeviceCode()).isEqualTo("C1");
+        assertThat(current.get(DeviceSide.COILER).getCoilerMethod()).isEqualTo("19");
+        assertThat(current.get(DeviceSide.COILER).getCoilerMethodName()).isEqualTo("上卷取");
         assertThat(current.get(DeviceSide.COILER).getRemainingLength()).isEqualByComparingTo("17");
         assertThat(runtime.get().getCandidates().get("U2").getLengths())
                 .containsExactly(new BigDecimal("200"), new BigDecimal("194"), new BigDecimal("188"));
@@ -101,24 +110,30 @@ class StatusTrackingAlgorithmImplTest {
     }
 
     @Test
-    void returnsStatusResultsConvertedFromCurrentRuntime() {
-        calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
-        calculate(true, "U1", "COIL-U1", "95", "U2", "COIL-U2", "195", "C1", "COIL-C1", "15");
+    void returnsResultsOnlyForChangedCoilsInConfigurationOrder() {
+        enableCoilerMethods();
 
-        List<StatusResult> results = algorithm.calculate(input(values(
-                true, "U1", "COIL-U1", "90", "U2", "COIL-U2", "190", "C1", "COIL-C1", "20")));
+        List<StatusResult> first = algorithm.calculate(input(values(
+                true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10")));
 
-        assertThat(results).hasSize(2);
-        assertThat(results).extracting(StatusResult::getSide)
-                .containsExactly(DeviceSide.UNCOILER, DeviceSide.COILER);
-        StatusCurrentRuntime uncoiler = runtime.get().getCurrent().get(DeviceSide.UNCOILER);
-        assertThat(results.get(0).getDeviceCode()).isEqualTo(uncoiler.getDeviceCode());
-        assertThat(results.get(0).getCoilNo()).isEqualTo(uncoiler.getCoilNo());
-        assertThat(results.get(0).getProductNo()).isEqualTo(uncoiler.getProductNo());
-        assertThat(results.get(0).getColorNo()).isEqualTo(uncoiler.getColorNo());
-        assertThat(results.get(0).getRemainingLength()).isEqualByComparingTo(uncoiler.getRemainingLength());
-        assertThat(results.get(0).getMaxLength()).isEqualByComparingTo(uncoiler.getMaxLength());
-        assertThat(results.get(0).getTrackingType()).isEqualTo(TrackingType.STATUS);
+        assertThat(first).extracting(StatusResult::getDeviceCode)
+                .containsExactly("U1", "U2", "C1");
+        assertThat(first.get(0).getRunning()).isNull();
+        assertThat(first.get(0).getTrackingType()).isEqualTo(TrackingType.STATUS);
+        assertThat(first.get(0).getCoilNo()).isEqualTo("COIL-U1");
+        assertThat(first.get(0).getRemainingLength()).isEqualByComparingTo("100");
+        assertThat(first.get(0).getMaxLength()).isEqualByComparingTo("100");
+
+        List<StatusResult> unchanged = algorithm.calculate(input(values(
+                true, "U1", "COIL-U1", "95", "U2", "COIL-U2", "195", "C1", "COIL-C1", "15")));
+        assertThat(unchanged).isEmpty();
+
+        List<StatusResult> changed = algorithm.calculate(input(values(
+                true, "U1", "COIL-U1-NEW", "90", "U2", "COIL-U2", "190", "C1", "COIL-C1", "20")));
+        assertThat(changed).singleElement().satisfies(result -> {
+            assertThat(result.getDeviceCode()).isEqualTo("U1");
+            assertThat(result.getCoilNo()).isEqualTo("COIL-U1-NEW");
+        });
     }
 
     @Test
@@ -295,6 +310,69 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(current.get(DeviceSide.UNCOILER).getRunning()).isTrue();
         assertThat(current.get(DeviceSide.UNCOILER).getProductNo()).isNull();
         verify(qualityRepository, times(1)).queryProductNo("COIL-U1");
+    }
+
+    @Test
+    void freezesCoilerMethodForNewCoilAndUsesPointValueBeforeDefault() {
+        enableCoilerMethods();
+        statusConfig.getTracking().getPoints().get(0).setCoilerMethod(CoilerMethodConfig.builder()
+                .name("u1_method").type(PointDataType.BOOLEAN)
+                .defaultValue(false).falseIndex(0).build());
+        Map<String, Object> first = values(true, "U1", "COIL-U1", "100",
+                "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
+        first.put("/status/u1_method", true);
+
+        List<StatusResult> results = algorithm.calculate(input(first));
+
+        StatusResult uncoiler = results.stream()
+                .filter(result -> "U1".equals(result.getDeviceCode())).findFirst().get();
+        assertThat(uncoiler.getCoilNo()).isEqualTo("COIL-U1");
+        assertThat(uncoiler.getProductNo()).isEqualTo(1);
+        assertThat(uncoiler.getCoilerMethod()).isEqualTo("91");
+        assertThat(uncoiler.getCoilerMethodName()).isEqualTo("下开卷");
+        assertThat(uncoiler.getMaxLength()).isEqualByComparingTo("100");
+        StatusResult coiler = results.stream()
+                .filter(result -> "C1".equals(result.getDeviceCode())).findFirst().get();
+        assertThat(coiler.getCoilerMethod()).isEqualTo("19");
+        assertThat(coiler.getCoilerMethodName()).isEqualTo("上卷取");
+
+        first.put("/status/u1_method", false);
+        assertThat(algorithm.calculate(input(first))).isEmpty();
+        assertThat(runtime.get().getCandidates().get("U1").getCoilerMethod()).isEqualTo("91");
+        assertThat(runtime.get().getCandidates().get("U1").getCoilerMethodName()).isEqualTo("下开卷");
+    }
+
+    @Test
+    void fallsBackToDefaultWhenConfiguredMethodPointValueIsInvalid() {
+        enableCoilerMethods();
+        statusConfig.getTracking().getPoints().get(0).setCoilerMethod(CoilerMethodConfig.builder()
+                .name("u1_method").type(PointDataType.BOOLEAN)
+                .defaultValue(false).falseIndex(0).build());
+        Map<String, Object> first = values(true, "U1", "COIL-U1", "100",
+                "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
+        first.put("/status/u1_method", "unknown");
+
+        List<StatusResult> results = algorithm.calculate(input(first));
+
+        StatusResult uncoiler = results.stream()
+                .filter(result -> "U1".equals(result.getDeviceCode())).findFirst().get();
+        assertThat(uncoiler.getCoilerMethod()).isEqualTo("11");
+        assertThat(uncoiler.getCoilerMethodName()).isEqualTo("上开卷");
+    }
+
+    private void enableCoilerMethods() {
+        statusConfig.getTracking().setCoilerMethodDef(CoilerMethodDefinitions.builder()
+                .uncoiler(CoilerMethodDefinition.builder()
+                        .name(Arrays.asList("上开卷", "下开卷"))
+                        .code(Arrays.asList("11", "91")).build())
+                .coiler(CoilerMethodDefinition.builder()
+                        .name(Arrays.asList("上卷取", "下卷取"))
+                        .code(Arrays.asList("19", "99")).build())
+                .build());
+        for (StatusPointGroup group : statusConfig.getTracking().getPoints()) {
+            group.setCoilerMethod(CoilerMethodConfig.builder()
+                    .defaultValue(false).falseIndex(0).build());
+        }
     }
 
     private Map<DeviceSide, StatusCurrentRuntime> calculate(boolean started, String... values) {

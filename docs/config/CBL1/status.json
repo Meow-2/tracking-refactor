@@ -13,6 +13,10 @@
     "sample_count": 4,
     "min_length_change": 0.01,
     "monotonicity_check_enabled": false,
+    "coiler_method_def": {
+      "uncoiler": { "name": ["上开卷", "下开卷"], "code": ["11", "91"] },
+      "coiler": { "name": ["上卷取", "下卷取"], "code": ["19", "99"] }
+    },
     "points": [
       {
         "code": "por1",
@@ -25,6 +29,10 @@
         "remaining_length": {
           "name": "thread_por_length",
           "type": "float"
+        },
+        "coiler_method": {
+          "default": false,
+          "false_index": 0
         }
       },
       {
@@ -38,6 +46,10 @@
         "remaining_length": {
           "name": "normal_por_length",
           "type": "float"
+        },
+        "coiler_method": {
+          "default": false,
+          "false_index": 0
         }
       },
       {
@@ -51,6 +63,10 @@
         "remaining_length": {
           "name": "exit_tr_length",
           "type": "float"
+        },
+        "coiler_method": {
+          "default": false,
+          "false_index": 0
         }
       }
     ]

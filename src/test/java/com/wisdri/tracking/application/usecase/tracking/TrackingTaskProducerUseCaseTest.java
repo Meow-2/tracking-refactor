@@ -10,6 +10,7 @@ import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingTask;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
+import com.wisdri.tracking.domain.model.tracking.status.StatusResult;
 import com.wisdri.tracking.domain.repository.point.LastPointSnapshotRepository;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.infrastructure.service.mqtt.MqttSubscriptionRegistry;
@@ -77,12 +78,15 @@ class TrackingTaskProducerUseCaseTest {
         assertThat(task.getStatusContext().getStartConditionPointValue()).isEqualByComparingTo("1");
         assertThat(task.getStatusContext().getCandidates().get("U1").getColorNo()).isEqualTo("12");
         assertThat(task.getStatusContext().getCandidates().get("U1").getProductNo()).isEqualTo(3);
+        assertThat(task.getStatusContext().getCandidates().get("U1").getCoilerMethod()).isEqualTo("11");
         assertThat(task.getStatusContext().getCandidates().get("U1").getMaxLength())
                 .isEqualByComparingTo("90");
         assertThat(task.getStatusContext().getCurrent().get(DeviceSide.UNCOILER))
                 .satisfies(current -> {
                     assertThat(current.getRunning()).isTrue();
                     assertThat(current.getDeviceCode()).isEqualTo("U1");
+                    assertThat(current.getCoilerMethod()).isEqualTo("11");
+                    assertThat(current.getCoilerMethodName()).isEqualTo("上开卷");
                     assertThat(current.getProductNo()).isEqualTo(3);
                     assertThat(current.getColorNo()).isEqualTo("12");
                     assertThat(current.getRemainingLength()).isEqualByComparingTo("88.5");
@@ -96,7 +100,7 @@ class TrackingTaskProducerUseCaseTest {
     }
 
     @Test
-    void calculatesStatusOnProducerWithoutSendingStatusTask() {
+    void doesNotSendCoilerTaskWhenStatusHasNoChangedCoil() {
         StatusTrackingConfig config = StatusTrackingConfig.builder()
                 .unitCode("CP1")
                 .trackingType(TrackingType.STATUS)
@@ -127,12 +131,69 @@ class TrackingTaskProducerUseCaseTest {
         verify(taskProducer, never()).send(org.mockito.ArgumentMatchers.any());
     }
 
+    @Test
+    void sendsOneCoilerTaskWithOnlyCopiedStatusResults() {
+        StatusTrackingConfig config = StatusTrackingConfig.builder()
+                .unitCode("CP1")
+                .trackingType(TrackingType.STATUS)
+                .enable(true)
+                .build();
+        MqttSubscriptionRegistry registry = mock(MqttSubscriptionRegistry.class);
+        TrackingRuntimeRepositoryDispatcher runtimeRepository = mock(TrackingRuntimeRepositoryDispatcher.class);
+        LastPointSnapshotRepository snapshotRepository = mock(LastPointSnapshotRepository.class);
+        TrackingTaskProducer taskProducer = mock(TrackingTaskProducer.class);
+        TrackingAlgorithmDispatcher algorithmDispatcher = mock(TrackingAlgorithmDispatcher.class);
+        StatusResult statusResult = StatusResult.builder()
+                .unitCode("CP1")
+                .trackingType(TrackingType.STATUS)
+                .receivedAt(Instant.parse("2026-08-27T01:00:00Z"))
+                .side(DeviceSide.UNCOILER)
+                .deviceCode("U1")
+                .deviceName("1#开卷机")
+                .coilerMethod("11")
+                .coilerMethodName("上开卷")
+                .coilNo("COIL-1")
+                .productNo(2)
+                .remainingLength(new BigDecimal("100"))
+                .maxLength(new BigDecimal("100"))
+                .build();
+        when(registry.find("cp1_status_tracking"))
+                .thenReturn(Optional.of(new TrackingSubscription(config, null)));
+        when(runtimeRepository.findConfig("CP1", TrackingType.STATUS)).thenReturn(Optional.of(config));
+        when(algorithmDispatcher.calculate(org.mockito.ArgumentMatchers.any(TrackingInput.class)))
+                .thenReturn(Collections.singletonList(statusResult));
+
+        TrackingTaskProducerUseCase useCase = new TrackingTaskProducerUseCase();
+        ReflectionTestUtils.setField(useCase, "mqttSubscriptionRegistry", registry);
+        ReflectionTestUtils.setField(useCase, "runtimeRepositoryDispatcher", runtimeRepository);
+        ReflectionTestUtils.setField(useCase, "lastPointSnapshotRepository", snapshotRepository);
+        ReflectionTestUtils.setField(useCase, "trackingTaskProducer", taskProducer);
+        ReflectionTestUtils.setField(useCase, "trackingAlgorithmDispatcher", algorithmDispatcher);
+
+        useCase.handle("cp1_status_tracking", "{\"run\":1}");
+
+        ArgumentCaptor<TrackingTask> taskCaptor = ArgumentCaptor.forClass(TrackingTask.class);
+        verify(taskProducer).send(taskCaptor.capture());
+        TrackingTask task = taskCaptor.getValue();
+        assertThat(task.getTrackingType()).isEqualTo(TrackingType.COILER);
+        assertThat(task.getStatusContext().getCandidates()).isEmpty();
+        assertThat(task.getStatusContext().getCurrent()).isEmpty();
+        assertThat(task.getStatusContext().getResults()).singleElement().satisfies(result -> {
+            assertThat(result).isNotSameAs(statusResult);
+            assertThat(result.getCoilNo()).isEqualTo("COIL-1");
+            assertThat(result.getCoilerMethod()).isEqualTo("11");
+            assertThat(result.getRemainingLength()).isEqualByComparingTo("100");
+        });
+    }
+
     private StatusTrackingRuntime statusRuntime() {
         Map<DeviceSide, StatusCurrentRuntime> current = new EnumMap<>(DeviceSide.class);
         current.put(DeviceSide.UNCOILER, StatusCurrentRuntime.builder()
                 .side(DeviceSide.UNCOILER)
                 .running(true)
                 .deviceCode("U1")
+                .coilerMethod("11")
+                .coilerMethodName("上开卷")
                 .coilNo("U001")
                 .productNo(3)
                 .colorNo("12")
@@ -154,6 +215,8 @@ class TrackingTaskProducerUseCaseTest {
                         .coilNo("U001")
                         .productNo(3)
                         .colorNo("12")
+                        .coilerMethod("11")
+                        .coilerMethodName("上开卷")
                         .maxLength(new BigDecimal("90"))
                         .lengths(Arrays.asList(new BigDecimal("90"), new BigDecimal("88.5")))
                         .build()))

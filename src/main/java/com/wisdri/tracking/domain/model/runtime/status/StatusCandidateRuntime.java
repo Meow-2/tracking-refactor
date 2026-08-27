@@ -31,6 +31,14 @@ public class StatusCandidateRuntime {
     private Integer productNo;
     private String colorNo;
     /**
+     * 当前钢卷固化的开卷卷取方式代码。
+     */
+    private String coilerMethod;
+    /**
+     * 当前钢卷固化的开卷卷取方式名称。
+     */
+    private String coilerMethodName;
+    /**
      * 当前钢卷在该设备上已采集到的最大长度。
      */
     private BigDecimal maxLength;

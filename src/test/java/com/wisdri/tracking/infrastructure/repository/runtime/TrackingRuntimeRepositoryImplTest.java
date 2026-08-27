@@ -187,6 +187,8 @@ class TrackingRuntimeRepositoryImplTest {
         StatusCandidateRuntime candidate = StatusCandidateRuntime.builder()
                 .coilNo("C001")
                 .productNo(2)
+                .coilerMethod("11")
+                .coilerMethodName("上开卷")
                 .maxLength(new BigDecimal("100"))
                 .lengths(Arrays.asList(new BigDecimal("100"), new BigDecimal("95")))
                 .build();
@@ -194,6 +196,8 @@ class TrackingRuntimeRepositoryImplTest {
                 .side(DeviceSide.UNCOILER)
                 .running(true)
                 .deviceCode("U1")
+                .coilerMethod("11")
+                .coilerMethodName("上开卷")
                 .coilNo("C001")
                 .productNo(2)
                 .remainingLength(new BigDecimal("95"))
@@ -219,11 +223,15 @@ class TrackingRuntimeRepositoryImplTest {
         ).orElseThrow(AssertionError::new);
         assertEquals("C001", cached.getCandidates().get("U1").getCoilNo());
         assertEquals(2, cached.getCandidates().get("U1").getProductNo());
+        assertEquals("11", cached.getCandidates().get("U1").getCoilerMethod());
+        assertEquals("上开卷", cached.getCandidates().get("U1").getCoilerMethodName());
         assertEquals(new BigDecimal("100"), cached.getCandidates().get("U1").getMaxLength());
         assertEquals(Arrays.asList(new BigDecimal("100"), new BigDecimal("95")),
                 cached.getCandidates().get("U1").getLengths());
         assertTrue(cached.getCurrent().get(DeviceSide.UNCOILER).getRunning());
         assertEquals(2, cached.getCurrent().get(DeviceSide.UNCOILER).getProductNo());
+        assertEquals("11", cached.getCurrent().get(DeviceSide.UNCOILER).getCoilerMethod());
+        assertEquals("上开卷", cached.getCurrent().get(DeviceSide.UNCOILER).getCoilerMethodName());
         assertEquals(new BigDecimal("95"),
                 cached.getCurrent().get(DeviceSide.UNCOILER).getRemainingLength());
         assertEquals(new BigDecimal("100"),

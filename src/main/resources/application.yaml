@@ -7,6 +7,8 @@ tracking:
       enabled: false
     shear:
       enabled: true
+    coiler:
+      enabled: true
 
 server:
   port: 9000

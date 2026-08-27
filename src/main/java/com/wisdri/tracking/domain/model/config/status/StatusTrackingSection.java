@@ -23,5 +23,6 @@ public class StatusTrackingSection {
     private BigDecimal minLengthChange;
     @Builder.Default
     private Boolean monotonicityCheckEnabled = false;
+    private CoilerMethodDefinitions coilerMethodDef;
     private List<StatusPointGroup> points;
 }

@@ -20,4 +20,5 @@ public class StatusPointGroup {
     private PointConfig coilNo;
     private PointConfig colorNo;
     private PointConfig remainingLength;
+    private CoilerMethodConfig coilerMethod;
 }

@@ -45,7 +45,7 @@ public class TrackingTask {
     private PointSnapshot previousSnapshot;
 
     /**
-     * 任务生产时固化的开卷机、卷取机钢卷状态。
+     * 普通任务携带状态运行态快照，coiler 任务携带钢卷号变化结果。
      */
     private StatusTrackingContext statusContext;
 

@@ -3,9 +3,13 @@ package com.wisdri.tracking.infrastructure.service.feign.converter.status;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.wisdri.tracking.common.exception.TrackingException;
 import com.wisdri.tracking.domain.model.config.PointConfig;
+import com.wisdri.tracking.domain.model.config.PointDataType;
 import com.wisdri.tracking.domain.model.config.StartCondition;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
+import com.wisdri.tracking.domain.model.config.status.CoilerMethodConfig;
+import com.wisdri.tracking.domain.model.config.status.CoilerMethodDefinition;
+import com.wisdri.tracking.domain.model.config.status.CoilerMethodDefinitions;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingSection;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
@@ -57,6 +61,7 @@ public class StatusCubeApiTrackingConfigConverter extends AbstractCubeApiTrackin
         if (tracking.getPoints() == null || tracking.getPoints().isEmpty()) {
             throw new TrackingException("status.points 不能为空");
         }
+        validateCoilerMethodDefinitions(tracking.getCoilerMethodDef());
         Set<String> codes = new HashSet<>();
         for (StatusPointGroup group : tracking.getPoints()) {
             if (group == null || blank(group.getCode()) || blank(group.getName()) || group.getSide() == null
@@ -66,9 +71,49 @@ public class StatusCubeApiTrackingConfigConverter extends AbstractCubeApiTrackin
             if (group.getColorNo() != null && invalidPoint(group.getColorNo())) {
                 throw new TrackingException("status.points 色号点位配置无效: " + group.getCode());
             }
+            validateCoilerMethod(group, tracking.getCoilerMethodDef() != null);
             if (!codes.add(group.getCode().toLowerCase(Locale.ROOT))) {
                 throw new TrackingException("status.points 设备编码重复: " + group.getCode());
             }
+        }
+    }
+
+    private void validateCoilerMethodDefinitions(CoilerMethodDefinitions definitions) {
+        if (definitions == null) {
+            return;
+        }
+        validateCoilerMethodDefinition("uncoiler", definitions.getUncoiler());
+        validateCoilerMethodDefinition("coiler", definitions.getCoiler());
+    }
+
+    private void validateCoilerMethodDefinition(String side, CoilerMethodDefinition definition) {
+        if (definition == null || definition.getName() == null || definition.getCode() == null
+                || definition.getName().size() != 2 || definition.getCode().size() != 2
+                || definition.getName().stream().anyMatch(this::blank)
+                || definition.getCode().stream().anyMatch(this::blank)) {
+            throw new TrackingException("status.coiler_method_def." + side
+                    + " 的 name/code 必须各配置 true、false 两个非空值");
+        }
+    }
+
+    private void validateCoilerMethod(StatusPointGroup group, boolean definitionsConfigured) {
+        CoilerMethodConfig method = group.getCoilerMethod();
+        if (!definitionsConfigured && method == null) {
+            return;
+        }
+        if (!definitionsConfigured || method == null || method.getDefaultValue() == null) {
+            throw new TrackingException("status.points.coiler_method 配置无效: " + group.getCode());
+        }
+        if (method.getFalseIndex() != null
+                && method.getFalseIndex() != 0 && method.getFalseIndex() != 1) {
+            throw new TrackingException("status.points.coiler_method.false_index 只能配置 0 或 1: "
+                    + group.getCode());
+        }
+        boolean hasName = !blank(method.getName());
+        boolean hasType = method.getType() != null;
+        if (hasName != hasType || (hasType && method.getType() != PointDataType.BOOLEAN)) {
+            throw new TrackingException("status.points.coiler_method 点位必须同时配置 name 和 boolean type: "
+                    + group.getCode());
         }
     }
 

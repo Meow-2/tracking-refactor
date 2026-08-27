@@ -28,6 +28,12 @@ class StatusCubeApiTrackingConfigConverterTest {
         assertThat(config.getTracking().getPoints().get(0).getSide()).isEqualTo(DeviceSide.UNCOILER);
         assertThat(config.getTracking().getPoints().get(0).getColorNo().getName())
                 .isEqualTo("u1_color");
+        assertThat(config.getTracking().getCoilerMethodDef().getUncoiler().getCode())
+                .containsExactly("11", "91");
+        assertThat(config.getTracking().getPoints().get(0).getCoilerMethod().getDefaultValue()).isTrue();
+        assertThat(config.getTracking().getPoints().get(0).getCoilerMethod().getFalseIndex()).isZero();
+        assertThat(config.getTracking().getPoints().get(0).getCoilerMethod().getType().getCode())
+                .isEqualTo("boolean");
     }
 
     @Test
@@ -47,6 +53,11 @@ class StatusCubeApiTrackingConfigConverterTest {
         assertInvalid(validConfig().replace("\"code\":\"C1\"", "\"code\":\"U1\""));
         assertInvalid(validConfig().replace("\"remaining_length\":{\"name\":\"c1_length\"}",
                 "\"missing_remaining_length\":{\"name\":\"c1_length\"}"));
+        assertInvalid(validConfig().replace("[\"11\",\"91\"]", "[\"11\"]"));
+        assertInvalid(validConfig().replace("\"type\":\"boolean\"", "\"type\":\"short\""));
+        assertInvalid(validConfig().replace("\"false_index\":0", "\"false_index\":2"));
+        assertInvalid(validConfig().replace("\"coiler_method\":{\"default\":false,\"false_index\":0}",
+                "\"missing_coiler_method\":{\"default\":false,\"false_index\":0}"));
     }
 
     private void assertInvalid(String config) throws Exception {
@@ -64,13 +75,19 @@ class StatusCubeApiTrackingConfigConverterTest {
                 + "\"tracking\":{\"point_prefix\":\"/status/\",\"sample_count\":3,"
                 + "\"min_length_change\":0.5,"
                 + "\"start_condition\":{\"point\":{\"name\":\"run\"},\"threshold\":1},"
+                + "\"coiler_method_def\":{"
+                + "\"uncoiler\":{\"name\":[\"上开卷\",\"下开卷\"],\"code\":[\"11\",\"91\"]},"
+                + "\"coiler\":{\"name\":[\"上卷取\",\"下卷取\"],\"code\":[\"19\",\"99\"]}},"
                 + "\"points\":["
                 + "{\"code\":\"U1\",\"name\":\"开卷机1\",\"side\":\"uncoiler\","
                 + "\"coil_no\":{\"name\":\"u1_coil\"},"
                 + "\"color_no\":{\"name\":\"u1_color\"},"
-                + "\"remaining_length\":{\"name\":\"u1_length\"}},"
+                + "\"remaining_length\":{\"name\":\"u1_length\"},"
+                + "\"coiler_method\":{\"name\":\"u1_method\",\"type\":\"boolean\","
+                + "\"default\":true,\"false_index\":0}},"
                 + "{\"code\":\"C1\",\"name\":\"卷取机1\",\"side\":\"coiler\","
                 + "\"coil_no\":{\"name\":\"c1_coil\"},"
-                + "\"remaining_length\":{\"name\":\"c1_length\"}}]}}";
+                + "\"remaining_length\":{\"name\":\"c1_length\"},"
+                + "\"coiler_method\":{\"default\":false,\"false_index\":0}}]}}";
     }
 }
