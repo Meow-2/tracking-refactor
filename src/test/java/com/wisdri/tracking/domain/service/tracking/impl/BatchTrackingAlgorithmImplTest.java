@@ -14,7 +14,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.batch.BatchResult;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
-import com.wisdri.tracking.domain.service.tracking.trace.TrackingStepLogger;
+import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;

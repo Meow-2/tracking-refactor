@@ -1,4 +1,4 @@
-package com.wisdri.tracking.domain.service.tracking.trace;
+package com.wisdri.tracking.domain.service.steplog;
 
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import lombok.Builder;

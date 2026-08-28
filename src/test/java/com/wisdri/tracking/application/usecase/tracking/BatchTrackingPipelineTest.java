@@ -17,7 +17,7 @@ import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepositoryDi
 import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithmDispatcher;
 import com.wisdri.tracking.domain.service.tracking.impl.BatchTrackingAlgorithmImpl;
-import com.wisdri.tracking.domain.service.tracking.trace.TrackingStepLogger;
+import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;

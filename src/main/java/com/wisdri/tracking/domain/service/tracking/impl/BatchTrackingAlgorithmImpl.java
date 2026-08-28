@@ -15,7 +15,7 @@ import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDi
 import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
-import com.wisdri.tracking.domain.service.tracking.trace.TrackingStepLogger;
+import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;

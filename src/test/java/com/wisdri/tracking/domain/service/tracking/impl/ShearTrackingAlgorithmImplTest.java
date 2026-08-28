@@ -26,7 +26,7 @@ import com.wisdri.tracking.domain.model.tracking.shear.ShearKind;
 import com.wisdri.tracking.domain.model.tracking.shear.ShearResult;
 import com.wisdri.tracking.domain.model.tracking.status.StatusTrackingContext;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
-import com.wisdri.tracking.domain.service.tracking.trace.TrackingStepLogger;
+import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

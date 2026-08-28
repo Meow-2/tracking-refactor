@@ -1,4 +1,4 @@
-package com.wisdri.tracking.domain.service.tracking.trace;
+package com.wisdri.tracking.domain.service.steplog;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
