@@ -11,6 +11,7 @@ import com.wisdri.tracking.domain.model.config.batch.BatchTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.config.shear.ShearTrackingConfig;
+import com.wisdri.tracking.domain.model.config.trimming.TrimmingTrackingConfig;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.shear.ShearTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
@@ -84,7 +85,8 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
         return TrackingType.PROCESS == trackingType
                 || TrackingType.BATCH == trackingType
                 || TrackingType.STATUS == trackingType
-                || TrackingType.SHEAR == trackingType;
+                || TrackingType.SHEAR == trackingType
+                || TrackingType.TRIMMING == trackingType;
     }
 
     /**
@@ -261,6 +263,7 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
         types.put(TrackingType.BATCH, BatchTrackingConfig.class);
         types.put(TrackingType.STATUS, StatusTrackingConfig.class);
         types.put(TrackingType.SHEAR, ShearTrackingConfig.class);
+        types.put(TrackingType.TRIMMING, TrimmingTrackingConfig.class);
         return types;
     }
 

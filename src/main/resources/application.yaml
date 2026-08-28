@@ -11,6 +11,8 @@ tracking:
       enabled: true
     coiler:
       enabled: true
+    trimming:
+      enabled: true
 
 server:
   port: 9000

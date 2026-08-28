@@ -1,0 +1,37 @@
+{
+  "enable": true,
+  "mqtt_topic": "cbl1_trimming_tracking",
+  "tracking": {
+    "point_prefix": "/aygg_tracking/cbl1/trimming/tracking/",
+    "speed_point": {
+      "name": "line_speed_pv",
+      "type": "float"
+    },
+    "start_condition": {
+      "point": {
+        "name": "line_speed_pv",
+        "type": "float"
+      },
+      "threshold": 0
+    },
+    "length_mode": "status"
+  },
+  "segments": [
+    {
+      "code": "disc",
+      "name": "圆盘剪",
+      "point_prefix": "/aygg_tracking/cbl1/trimming/tech/default/",
+      "length_correct": 0,
+      "points": [
+        {
+          "name": "disc_width_adjust_pv",
+          "type": "float"
+        },
+        {
+          "name": "disc_width_adjust_sv",
+          "type": "float"
+        }
+      ]
+    }
+  ]
+}

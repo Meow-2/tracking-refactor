@@ -47,6 +47,11 @@ public class TrackingProperties {
          * 是否启用开卷卷取结果存储。
          */
         private StoreSwitch coiler = new StoreSwitch();
+
+        /**
+         * 是否启用切边结果存储及运行态提交。
+         */
+        private StoreSwitch trimming = new StoreSwitch();
     }
 
     @Data
@@ -85,5 +90,11 @@ public class TrackingProperties {
         return storage == null
                 || storage.getCoiler() == null
                 || !Boolean.FALSE.equals(storage.getCoiler().getEnabled());
+    }
+
+    public boolean trimmingStorageEnabled() {
+        return storage == null
+                || storage.getTrimming() == null
+                || !Boolean.FALSE.equals(storage.getTrimming().getEnabled());
     }
 }
