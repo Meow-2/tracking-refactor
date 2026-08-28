@@ -69,8 +69,11 @@ class CoilerTrackingAlgorithmImplTest {
             assertThat(result.getUncoilerMethodName()).isEqualTo("上开卷");
             assertThat(result.getCoilerMethod()).isNull();
             assertThat(result.getCoilerMethodName()).isNull();
-            assertThat(result.getDeviceCode()).isEqualTo("por1");
-            assertThat(result.getMaxLength()).isEqualByComparingTo("1200.50");
+            assertThat(result.getUncoilerDeviceCode()).isEqualTo("por1");
+            assertThat(result.getUncoilerDeviceName()).isEqualTo("1#开卷机");
+            assertThat(result.getUncoilerMaxLength()).isEqualByComparingTo("1200.50");
+            assertThat(result.getCoilerDeviceCode()).isNull();
+            assertThat(result.getCoilerMaxLength()).isNull();
             assertThat(result.getReceivedAt()).isEqualTo(detectedAt);
         });
         assertThat(results.get(1).getInMatNo()).isEqualTo("COIL-2");
@@ -78,7 +81,11 @@ class CoilerTrackingAlgorithmImplTest {
         assertThat(results.get(1).getCoilerMethodName()).isEqualTo("上卷取");
         assertThat(results.get(1).getUncoilerMethod()).isNull();
         assertThat(results.get(1).getUncoilerMethodName()).isNull();
-        assertThat(results.get(1).getDeviceCode()).isEqualTo("tr1");
+        assertThat(results.get(1).getCoilerDeviceCode()).isEqualTo("tr1");
+        assertThat(results.get(1).getCoilerDeviceName()).isEqualTo("1#卷取机");
+        assertThat(results.get(1).getCoilerMaxLength()).isEqualByComparingTo("10");
+        assertThat(results.get(1).getUncoilerDeviceCode()).isNull();
+        assertThat(results.get(1).getUncoilerMaxLength()).isNull();
         verify(trackingStepLogger).log(any(TrackingInput.class), eq("计算开始"), anyMap());
         verify(trackingStepLogger).log(any(TrackingInput.class),
                 eq("开卷卷取结果生成"), eq("por1"), anyMap());

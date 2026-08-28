@@ -46,8 +46,8 @@ class CoilerTrackingResultRepositoryImplTest {
                 .unitCode("CP1").trackingType(TrackingType.COILER).receivedAt(time)
                 .inMatNo("COIL-1").inMatNoProdNo(3)
                 .coilerMethod("99").coilerMethodName("下卷取")
-                .deviceCode("tr1").deviceName("1#卷取机")
-                .maxLength(new BigDecimal("800.500")).build();
+                .coilerDeviceCode("tr1").coilerDeviceName("1#卷取机")
+                .coilerMaxLength(new BigDecimal("800.500")).build();
 
         QmCoilerLogEntity entity = ReflectionTestUtils.invokeMethod(repository, "toEntity", result);
 
@@ -59,9 +59,12 @@ class CoilerTrackingResultRepositoryImplTest {
         assertThat(entity.getCoilerMethodName()).isEqualTo("下卷取");
         assertThat(entity.getUncoilerMethod()).isNull();
         assertThat(entity.getUncoilerMethodName()).isNull();
-        assertThat(entity.getDeviceCode()).isEqualTo("tr1");
-        assertThat(entity.getDeviceName()).isEqualTo("1#卷取机");
-        assertThat(entity.getMaxLength()).isEqualTo("800.500");
+        assertThat(entity.getCoilerDeviceCode()).isEqualTo("tr1");
+        assertThat(entity.getCoilerDeviceName()).isEqualTo("1#卷取机");
+        assertThat(entity.getCoilerMaxLength()).isEqualTo("800.500");
+        assertThat(entity.getUncoilerDeviceCode()).isNull();
+        assertThat(entity.getUncoilerDeviceName()).isNull();
+        assertThat(entity.getUncoilerMaxLength()).isNull();
         assertThat(entity.getCreateTime()).isEqualTo(time);
     }
 
@@ -72,7 +75,8 @@ class CoilerTrackingResultRepositoryImplTest {
                 .unitCode("CP1").trackingType(TrackingType.COILER)
                 .inMatNo("COIL-1")
                 .uncoilerMethod("11").uncoilerMethodName("上开卷")
-                .deviceCode("por1").deviceName("1#开卷机")
+                .uncoilerDeviceCode("por1").uncoilerDeviceName("1#开卷机")
+                .uncoilerMaxLength(new BigDecimal("1200.50"))
                 .build();
 
         QmCoilerLogEntity entity = ReflectionTestUtils.invokeMethod(repository, "toEntity", result);
@@ -81,6 +85,9 @@ class CoilerTrackingResultRepositoryImplTest {
         assertThat(entity.getUncoilerMethodName()).isEqualTo("上开卷");
         assertThat(entity.getCoilerMethod()).isNull();
         assertThat(entity.getCoilerMethodName()).isNull();
+        assertThat(entity.getUncoilerDeviceCode()).isEqualTo("por1");
+        assertThat(entity.getUncoilerDeviceName()).isEqualTo("1#开卷机");
+        assertThat(entity.getUncoilerMaxLength()).isEqualTo("1200.50");
     }
 
     @Test
@@ -93,6 +100,9 @@ class CoilerTrackingResultRepositoryImplTest {
         existing.setPassNo(2);
         existing.setUncoilerMethod("11");
         existing.setUncoilerMethodName("上开卷");
+        existing.setUncoilerDeviceCode("por1");
+        existing.setUncoilerDeviceName("1#开卷机");
+        existing.setUncoilerMaxLength("1200.50");
         when(mapper.selectOne(any())).thenAnswer(invocation -> {
             LambdaQueryWrapper<QmCoilerLogEntity> query = invocation.getArgument(0);
             String sql = query.getSqlSegment().toLowerCase();
@@ -106,7 +116,8 @@ class CoilerTrackingResultRepositoryImplTest {
                 .unitCode("CP1").trackingType(TrackingType.COILER)
                 .inMatNo("COIL-1").inMatNoProdNo(3).passNo(2)
                 .coilerMethod("99").coilerMethodName("下卷取")
-                .deviceCode("tr1").deviceName("1#卷取机")
+                .coilerDeviceCode("tr1").coilerDeviceName("1#卷取机")
+                .coilerMaxLength(new BigDecimal("800.50"))
                 .build()));
 
         ArgumentCaptor<QmCoilerLogEntity> captor = ArgumentCaptor.forClass(QmCoilerLogEntity.class);
@@ -117,8 +128,14 @@ class CoilerTrackingResultRepositoryImplTest {
         assertThat(updated.getPassNo()).isEqualTo(2);
         assertThat(updated.getUncoilerMethod()).isEqualTo("11");
         assertThat(updated.getUncoilerMethodName()).isEqualTo("上开卷");
+        assertThat(updated.getUncoilerDeviceCode()).isEqualTo("por1");
+        assertThat(updated.getUncoilerDeviceName()).isEqualTo("1#开卷机");
+        assertThat(updated.getUncoilerMaxLength()).isEqualTo("1200.50");
         assertThat(updated.getCoilerMethod()).isEqualTo("99");
         assertThat(updated.getCoilerMethodName()).isEqualTo("下卷取");
+        assertThat(updated.getCoilerDeviceCode()).isEqualTo("tr1");
+        assertThat(updated.getCoilerDeviceName()).isEqualTo("1#卷取机");
+        assertThat(updated.getCoilerMaxLength()).isEqualTo("800.50");
     }
 
     @Test
@@ -137,7 +154,8 @@ class CoilerTrackingResultRepositoryImplTest {
                 .unitCode("CP1").trackingType(TrackingType.COILER)
                 .inMatNo("COIL-2")
                 .uncoilerMethod("91").uncoilerMethodName("下开卷")
-                .deviceCode("por2").deviceName("2#开卷机")
+                .uncoilerDeviceCode("por2").uncoilerDeviceName("2#开卷机")
+                .uncoilerMaxLength(new BigDecimal("900"))
                 .build()));
 
         ArgumentCaptor<QmCoilerLogEntity> captor = ArgumentCaptor.forClass(QmCoilerLogEntity.class);
@@ -147,7 +165,11 @@ class CoilerTrackingResultRepositoryImplTest {
         assertThat(captor.getValue().getInMatNoProdNo()).isNull();
         assertThat(captor.getValue().getPassNo()).isNull();
         assertThat(captor.getValue().getUncoilerMethod()).isEqualTo("91");
+        assertThat(captor.getValue().getUncoilerDeviceCode()).isEqualTo("por2");
+        assertThat(captor.getValue().getUncoilerDeviceName()).isEqualTo("2#开卷机");
+        assertThat(captor.getValue().getUncoilerMaxLength()).isEqualTo("900");
         assertThat(captor.getValue().getCoilerMethod()).isNull();
+        assertThat(captor.getValue().getCoilerDeviceCode()).isNull();
     }
 
     @Test

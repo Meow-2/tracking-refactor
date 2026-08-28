@@ -14,6 +14,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.annotation.Resource;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -54,7 +55,7 @@ public class CoilerTrackingResultRepositoryImpl
     }
 
     /**
-     * 同一物料号、重复生产号和道次号只保留一条记录，后续开卷或卷取事件更新对应侧的方式字段。
+     * 同一物料号、重复生产号和道次号只保留一条记录，后续事件更新对应侧的方式和设备字段。
      */
     private void upsert(CoilerResult result) {
         String productNo = result.getInMatNoProdNo() == null
@@ -100,18 +101,24 @@ public class CoilerTrackingResultRepositoryImpl
         if (result.getCoilerMethod() != null || result.getCoilerMethodName() != null) {
             entity.setCoilerMethod(result.getCoilerMethod());
             entity.setCoilerMethodName(result.getCoilerMethodName());
+            entity.setCoilerDeviceCode(result.getCoilerDeviceCode());
+            entity.setCoilerDeviceName(result.getCoilerDeviceName());
+            entity.setCoilerMaxLength(decimalText(result.getCoilerMaxLength()));
         }
         if (result.getUncoilerMethod() != null || result.getUncoilerMethodName() != null) {
             entity.setUncoilerMethod(result.getUncoilerMethod());
             entity.setUncoilerMethodName(result.getUncoilerMethodName());
+            entity.setUncoilerDeviceCode(result.getUncoilerDeviceCode());
+            entity.setUncoilerDeviceName(result.getUncoilerDeviceName());
+            entity.setUncoilerMaxLength(decimalText(result.getUncoilerMaxLength()));
         }
         if (result.getCoilerMethod() == null && result.getCoilerMethodName() == null
                 && result.getUncoilerMethod() == null && result.getUncoilerMethodName() == null) {
             throw new IllegalArgumentException("开卷或卷取方式不能为空");
         }
-        entity.setDeviceCode(result.getDeviceCode());
-        entity.setDeviceName(result.getDeviceName());
-        entity.setMaxLength(result.getMaxLength() == null
-                ? null : result.getMaxLength().toPlainString());
+    }
+
+    private String decimalText(BigDecimal value) {
+        return value == null ? null : value.toPlainString();
     }
 }

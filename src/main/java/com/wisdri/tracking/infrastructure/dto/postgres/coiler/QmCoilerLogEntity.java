@@ -20,10 +20,13 @@ public class QmCoilerLogEntity {
     private Integer passNo;
     private String coilerMethod;
     private String coilerMethodName;
+    private String coilerDeviceCode;
+    private String coilerDeviceName;
+    private String coilerMaxLength;
     private String uncoilerMethod;
     private String uncoilerMethodName;
-    private String deviceCode;
-    private String deviceName;
-    private String maxLength;
+    private String uncoilerDeviceCode;
+    private String uncoilerDeviceName;
+    private String uncoilerMaxLength;
     private Instant createTime;
 }
