@@ -50,7 +50,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
     /** 首次分切无法计算相邻剩余长度差时使用的长度。 */
     private static final BigDecimal ZERO = BigDecimal.ZERO;
 
-    /** 读取 shear/status 配置与运行态，并在结果入库前保存算法算出的 shear runtime。 */
+    /** 读取 shear/status 配置与运行态，并维护剪切计数及重复消息标记。 */
     @Resource
     private TrackingRuntimeRepositoryDispatcher runtimeRepositoryDispatcher;
 
@@ -190,6 +190,10 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
         // 每个 device_code 使用独立副本，完成本帧计算后再统一覆盖正式 runtime。
         ShearTrackingRuntime runtime = workingRuntimes.computeIfAbsent(
                 associated.deviceCode, code -> runtime(input.getUnitCode(), code, uncoilerSide));
+        Instant receivedAt = input.getLatestSnapshot().getReceivedAt();
+        if (alreadyPersisted(runtime, receivedAt)) {
+            return skip(input, point, "重复剪切消息，触发帧已成功入库");
+        }
         StatusCurrentRuntime opposite = context.getCurrent() == null ? null
                 : context.getCurrent().get(uncoilerSide ? DeviceSide.COILER : DeviceSide.UNCOILER);
         if (opposite == null) {
@@ -261,7 +265,6 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 TrackingStepLogger.details(
                         "shearLength", lengthDecision.length,
                         "setNumber", lengthDecision.setNumber));
-        Instant receivedAt = input.getLatestSnapshot().getReceivedAt();
         return ShearResult.builder()
                 .unitCode(input.getUnitCode())
                 .trackingType(TrackingType.SHEAR)
@@ -288,6 +291,48 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 .cutNo(decision.counter.getCutNo())
                 .shearNo(decision.counter.getShearNo())
                 .build();
+    }
+
+    /** 相同设备和触发帧时间只允许成功入库一次。 */
+    private boolean alreadyPersisted(ShearTrackingRuntime runtime,
+                                     Instant receivedAt) {
+        return runtime != null && receivedAt != null
+                && receivedAt.equals(runtime.getLastPersistedTriggerTime());
+    }
+
+    /** 数据库持久化成功后提交重复消息标记。 */
+    @Override
+    public void afterPersist(TrackingInput input, List<ShearResult> results) {
+        if (!trackingProperties.shearStorageEnabled() || input == null
+                || results == null || results.isEmpty()) {
+            return;
+        }
+        Map<String, ShearTrackingRuntime> changed = new LinkedHashMap<>();
+        for (ShearResult result : results) {
+            if (result == null || result.getDeviceCode() == null || result.getShearTime() == null) {
+                continue;
+            }
+            ShearTrackingRuntime runtime = changed.get(result.getDeviceCode());
+            if (runtime == null) {
+                runtime = runtimeRepositoryDispatcher.findRuntimeAs(
+                                input.getUnitCode(), TrackingType.SHEAR, result.getDeviceCode(),
+                                ShearTrackingRuntime.class)
+                        .map(this::copyRuntime)
+                        .orElse(null);
+                if (runtime == null) {
+                    continue;
+                }
+                changed.put(result.getDeviceCode(), runtime);
+            }
+            runtime.setLastPersistedTriggerTime(result.getShearTime());
+        }
+        for (ShearTrackingRuntime runtime : changed.values()) {
+            runtime.setUpdatedAt(Instant.now());
+            runtimeRepositoryDispatcher.saveRuntime(runtime);
+        }
+        trackingStepLogger.log(input, "剪切幂等标记提交", TrackingStepLogger.details(
+                "resultCount", results.size(),
+                "runtimeCount", changed.size()));
     }
 
     /**
@@ -686,6 +731,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 .updatedAt(source.getUpdatedAt())
                 .uncoiler(copyDevice(source.getUncoiler()))
                 .coiler(copyDevice(source.getCoiler()))
+                .lastPersistedTriggerTime(source.getLastPersistedTriggerTime())
                 .build();
     }
 

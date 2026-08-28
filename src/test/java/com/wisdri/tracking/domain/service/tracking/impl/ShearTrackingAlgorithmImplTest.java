@@ -112,6 +112,23 @@ class ShearTrackingAlgorithmImplTest {
     }
 
     @Test
+    void skipsRepeatedMessageAfterFirstResultIsPersisted() {
+        TrackingInput input = input(entryValues(true, "10", "2.5"),
+                entryValues(false, "10", "2.5"), context("10", "20", "500"));
+
+        List<ShearResult> first = algorithm.calculate(input);
+        algorithm.afterPersist(input, first);
+        List<ShearResult> repeated = algorithm.calculate(input);
+
+        assertThat(first).hasSize(1);
+        assertThat(repeated).isEmpty();
+        ShearTrackingRuntime runtime = runtimes.get("feed-device-x");
+        assertThat(runtime.getUncoiler().getHead().getCutNo()).isEqualTo(1);
+        assertThat(runtime.getLastPersistedTriggerTime())
+                .isEqualTo(Instant.parse("2026-01-01T00:00:00Z"));
+    }
+
+    @Test
     void classifiesUncoilerTailAndSliceAtConfiguredBoundary() {
         ShearResult tail = only(calculate(entryValues(true, "10", "2.5"),
                 entryValues(false, "10", "2.5"), context("10", "10", "50")));

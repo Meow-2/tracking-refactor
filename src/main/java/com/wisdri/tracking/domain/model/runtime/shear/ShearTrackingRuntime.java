@@ -7,6 +7,8 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
+import java.time.Instant;
+
 /**
  * 单个 device_code 对应的一把剪刀运行态。
  */
@@ -26,4 +28,7 @@ public class ShearTrackingRuntime extends TrackingRuntime {
 
     /** 算法推理出的当前卷取机状态。 */
     private ShearDeviceRuntime coiler;
+
+    /** 本设备最近一次已成功入库的触发帧时间。 */
+    private Instant lastPersistedTriggerTime;
 }
