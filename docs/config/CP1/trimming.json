@@ -70,7 +70,7 @@
     {
       "name": "圆盘剪",
       "code": "disc",
-      "point_prefix": "/aygg_tracking/cp1/trimming/tech/nof/",
+      "point_prefix": "/aygg_tracking/cp1/trimming/tech/disc/",
       "length_correct": -25.196,
       "length_array_index": 0,
       "points": [

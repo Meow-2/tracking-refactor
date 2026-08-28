@@ -20,7 +20,7 @@
     {
       "code": "disc",
       "name": "圆盘剪",
-      "point_prefix": "/aygg_tracking/csl1/trimming/tech/default/",
+      "point_prefix": "/aygg_tracking/csl1/trimming/tech/disc/",
       "length_correct": 0,
       "points": [
         {
