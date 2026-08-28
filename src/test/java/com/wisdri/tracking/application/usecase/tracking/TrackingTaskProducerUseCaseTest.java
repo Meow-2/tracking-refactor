@@ -8,7 +8,6 @@ import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
-import com.wisdri.tracking.domain.model.tracking.TrackingTask;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.status.StatusResult;
 import com.wisdri.tracking.domain.repository.point.LastPointSnapshotRepository;
@@ -37,7 +36,7 @@ import static org.mockito.Mockito.when;
 
 class TrackingTaskProducerUseCaseTest {
     @Test
-    void propagatesSubscriptionTemplateCodeIntoTrackingTask() {
+    void propagatesSubscriptionTemplateCodeIntoTrackingInput() {
         BatchTrackingConfig config = BatchTrackingConfig.builder()
                 .unitCode("BAF1")
                 .trackingType(TrackingType.BATCH)
@@ -67,21 +66,21 @@ class TrackingTaskProducerUseCaseTest {
 
         useCase.handle("baf1_batch_tracking_fb1", "{\"frame\":\"latest\"}");
 
-        ArgumentCaptor<TrackingTask> taskCaptor = ArgumentCaptor.forClass(TrackingTask.class);
-        verify(taskProducer).send(taskCaptor.capture());
-        TrackingTask task = taskCaptor.getValue();
-        assertThat(task.getTemplateCode()).isEqualTo("fb1");
-        assertThat(task.getPreviousSnapshot()).isSameAs(previous);
-        assertThat(task.getLatestSnapshot().getValues()).containsEntry("frame", "latest");
-        assertThat(task.getStatusContext().getReceivedAt())
+        ArgumentCaptor<TrackingInput> inputCaptor = ArgumentCaptor.forClass(TrackingInput.class);
+        verify(taskProducer).send(inputCaptor.capture());
+        TrackingInput input = inputCaptor.getValue();
+        assertThat(input.getTemplateCode()).isEqualTo("fb1");
+        assertThat(input.getPreviousSnapshot()).isSameAs(previous);
+        assertThat(input.getLatestSnapshot().getValues()).containsEntry("frame", "latest");
+        assertThat(input.getStatusContext().getReceivedAt())
                 .isEqualTo(Instant.parse("2026-07-17T08:00:01Z"));
-        assertThat(task.getStatusContext().getStartConditionPointValue()).isEqualByComparingTo("1");
-        assertThat(task.getStatusContext().getCandidates().get("U1").getColorNo()).isEqualTo("12");
-        assertThat(task.getStatusContext().getCandidates().get("U1").getProductNo()).isEqualTo(3);
-        assertThat(task.getStatusContext().getCandidates().get("U1").getCoilerMethod()).isEqualTo("11");
-        assertThat(task.getStatusContext().getCandidates().get("U1").getMaxLength())
+        assertThat(input.getStatusContext().getStartConditionPointValue()).isEqualByComparingTo("1");
+        assertThat(input.getStatusContext().getCandidates().get("U1").getColorNo()).isEqualTo("12");
+        assertThat(input.getStatusContext().getCandidates().get("U1").getProductNo()).isEqualTo(3);
+        assertThat(input.getStatusContext().getCandidates().get("U1").getCoilerMethod()).isEqualTo("11");
+        assertThat(input.getStatusContext().getCandidates().get("U1").getMaxLength())
                 .isEqualByComparingTo("90");
-        assertThat(task.getStatusContext().getCurrent().get(DeviceSide.UNCOILER))
+        assertThat(input.getStatusContext().getCurrent().get(DeviceSide.UNCOILER))
                 .satisfies(current -> {
                     assertThat(current.getRunning()).isTrue();
                     assertThat(current.getDeviceCode()).isEqualTo("U1");
@@ -92,11 +91,11 @@ class TrackingTaskProducerUseCaseTest {
                     assertThat(current.getRemainingLength()).isEqualByComparingTo("88.5");
                     assertThat(current.getMaxLength()).isEqualByComparingTo("90");
                 });
-        assertThat(task.getStatusContext().getCurrent().get(DeviceSide.COILER).getCoilNo())
+        assertThat(input.getStatusContext().getCurrent().get(DeviceSide.COILER).getCoilNo())
                 .isEqualTo("C001");
-        assertThat(task.getStatusContext().getCurrent().get(DeviceSide.COILER).getProductNo())
+        assertThat(input.getStatusContext().getCurrent().get(DeviceSide.COILER).getProductNo())
                 .isEqualTo(4);
-        verify(snapshotRepository).save("BAF1", TrackingType.BATCH, "fb1", task.getLatestSnapshot());
+        verify(snapshotRepository).save("BAF1", TrackingType.BATCH, "fb1", input.getLatestSnapshot());
     }
 
     @Test
@@ -172,13 +171,13 @@ class TrackingTaskProducerUseCaseTest {
 
         useCase.handle("cp1_status_tracking", "{\"run\":1}");
 
-        ArgumentCaptor<TrackingTask> taskCaptor = ArgumentCaptor.forClass(TrackingTask.class);
-        verify(taskProducer).send(taskCaptor.capture());
-        TrackingTask task = taskCaptor.getValue();
-        assertThat(task.getTrackingType()).isEqualTo(TrackingType.COILER);
-        assertThat(task.getStatusContext().getCandidates()).isEmpty();
-        assertThat(task.getStatusContext().getCurrent()).isEmpty();
-        assertThat(task.getStatusContext().getResults()).singleElement().satisfies(result -> {
+        ArgumentCaptor<TrackingInput> inputCaptor = ArgumentCaptor.forClass(TrackingInput.class);
+        verify(taskProducer).send(inputCaptor.capture());
+        TrackingInput input = inputCaptor.getValue();
+        assertThat(input.getTrackingType()).isEqualTo(TrackingType.COILER);
+        assertThat(input.getStatusContext().getCandidates()).isEmpty();
+        assertThat(input.getStatusContext().getCurrent()).isEmpty();
+        assertThat(input.getStatusContext().getResults()).singleElement().satisfies(result -> {
             assertThat(result).isNotSameAs(statusResult);
             assertThat(result.getCoilNo()).isEqualTo("COIL-1");
             assertThat(result.getCoilerMethod()).isEqualTo("11");

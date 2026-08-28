@@ -1,6 +1,6 @@
 package com.wisdri.tracking.infrastructure.service.rocketmq;
 
-import com.wisdri.tracking.domain.model.tracking.TrackingTask;
+import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.infrastructure.properties.RocketMqConfig;
 import org.apache.rocketmq.client.core.RocketMQClientTemplate;
 import org.springframework.stereotype.Component;
@@ -30,29 +30,29 @@ public class TrackingTaskProducer {
      * RocketMQ FIFO 消息按 orderKey 分组有序。模板化跟踪额外使用 templateCode，
      * 保证单模板实例有序，同时允许不同模板实例并行消费。
      */
-    public void send(TrackingTask task) {
+    public void send(TrackingInput input) {
         rocketMQClientTemplate.syncSendFifoMessage(
-                destination(task),
-                task,
-                orderKey(task)
+                destination(input),
+                input,
+                orderKey(input)
         );
     }
 
     /**
      * 使用机组代码作为 Tag，使各机组消费者只接收自己的任务。
      */
-    private String destination(TrackingTask task) {
-        return rocketMqConfig.getProducer().getTopic() + ":" + task.getUnitCode();
+    private String destination(TrackingInput input) {
+        return rocketMqConfig.getProducer().getTopic() + ":" + input.getUnitCode();
     }
 
     /**
      * 构造 RocketMQ FIFO 顺序键。
      */
-    private String orderKey(TrackingTask task) {
-        String orderKey = task.getUnitCode() + ":" + task.getTrackingType().getCode();
-        if (task.getTemplateCode() == null || task.getTemplateCode().trim().isEmpty()) {
+    private String orderKey(TrackingInput input) {
+        String orderKey = input.getUnitCode() + ":" + input.getTrackingType().getCode();
+        if (input.getTemplateCode() == null || input.getTemplateCode().trim().isEmpty()) {
             return orderKey;
         }
-        return orderKey + ":" + task.getTemplateCode();
+        return orderKey + ":" + input.getTemplateCode();
     }
 }

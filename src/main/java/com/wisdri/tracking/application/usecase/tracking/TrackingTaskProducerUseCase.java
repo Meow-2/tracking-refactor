@@ -12,7 +12,6 @@ import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingResult;
-import com.wisdri.tracking.domain.model.tracking.TrackingTask;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.status.StatusResult;
 import com.wisdri.tracking.domain.model.tracking.status.StatusTrackingContext;
@@ -115,22 +114,21 @@ public class TrackingTaskProducerUseCase {
         PointSnapshot previousSnapshot = lastPointSnapshotRepository
                 .find(unitCode, trackingType, templateCode)
                 .orElse(null);
-        TrackingTask task = TrackingTask.builder()
+        TrackingInput input = TrackingInput.builder()
                 .unitCode(unitCode)
                 .trackingType(trackingType)
                 .templateCode(templateCode)
                 .latestSnapshot(latestSnapshot)
                 .previousSnapshot(previousSnapshot)
                 .statusContext(TrackingType.STATUS == trackingType ? null : statusContext(unitCode))
-                .publishedAt(Instant.now())
                 .build();
         lastPointSnapshotRepository.save(unitCode, trackingType, templateCode, latestSnapshot);
         if (TrackingType.STATUS == trackingType) {
             publishCoilerTask(unitCode,
-                    trackingAlgorithmDispatcher.calculate(TrackingInput.of(task)));
+                    trackingAlgorithmDispatcher.calculate(input));
             return;
         }
-        trackingTaskProducer.send(task);
+        trackingTaskProducer.send(input);
     }
 
     /**
@@ -148,13 +146,12 @@ public class TrackingTaskProducerUseCase {
         if (results.isEmpty()) {
             return;
         }
-        trackingTaskProducer.send(TrackingTask.builder()
+        trackingTaskProducer.send(TrackingInput.builder()
                 .unitCode(unitCode)
                 .trackingType(TrackingType.COILER)
                 .statusContext(StatusTrackingContext.builder()
                         .results(results)
                         .build())
-                .publishedAt(Instant.now())
                 .build());
     }
 

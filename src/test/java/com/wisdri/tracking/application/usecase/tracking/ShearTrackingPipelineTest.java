@@ -1,7 +1,6 @@
 package com.wisdri.tracking.application.usecase.tracking;
 
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
-import com.wisdri.tracking.domain.model.tracking.TrackingTask;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.shear.ShearResult;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepositoryDispatcher;
@@ -31,7 +30,7 @@ class ShearTrackingPipelineTest {
         ReflectionTestUtils.setField(useCase, "trackingAlgorithmDispatcher", algorithmDispatcher);
         ReflectionTestUtils.setField(useCase, "trackingResultRepositoryDispatcher", resultRepositoryDispatcher);
 
-        useCase.consume(TrackingTask.builder()
+        useCase.consume(TrackingInput.builder()
                 .unitCode("LINE-X")
                 .trackingType(TrackingType.SHEAR)
                 .build());

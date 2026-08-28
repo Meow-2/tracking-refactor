@@ -47,17 +47,4 @@ public class TrackingInput {
      */
     private StatusTrackingContext statusContext;
 
-    /**
-     * 从跟踪任务转换为算法输入。
-     */
-    public static TrackingInput of(TrackingTask task) {
-        return TrackingInput.builder()
-                .unitCode(task.getUnitCode())
-                .trackingType(task.getTrackingType())
-                .templateCode(task.getTemplateCode())
-                .latestSnapshot(task.getLatestSnapshot())
-                .previousSnapshot(task.getPreviousSnapshot())
-                .statusContext(task.getStatusContext())
-                .build();
-    }
 }

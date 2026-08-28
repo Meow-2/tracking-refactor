@@ -8,7 +8,7 @@ import com.wisdri.tracking.domain.model.config.batch.TrackingPointGroup;
 import com.wisdri.tracking.domain.model.config.batch.TrackingSection;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.tracking.TrackingResult;
-import com.wisdri.tracking.domain.model.tracking.TrackingTask;
+import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.batch.BatchResult;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
@@ -103,11 +103,11 @@ class BatchTrackingPipelineTest {
                 .build();
     }
 
-    private TrackingTask task() {
+    private TrackingInput task() {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("tracking/fb1_prod_status", 1);
         values.put("tracking/fb1_north_coil_no", "N001");
-        return TrackingTask.builder()
+        return TrackingInput.builder()
                 .unitCode("BAF1")
                 .trackingType(TrackingType.BATCH)
                 .templateCode("fb1")

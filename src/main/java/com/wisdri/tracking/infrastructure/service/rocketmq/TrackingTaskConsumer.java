@@ -6,7 +6,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.wisdri.tracking.application.usecase.tracking.TrackingTaskConsumerUseCase;
 import com.wisdri.tracking.common.utils.JsonUtils;
-import com.wisdri.tracking.domain.model.tracking.TrackingTask;
+import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.client.apis.consumer.ConsumeResult;
 import org.apache.rocketmq.client.apis.message.MessageView;
@@ -21,7 +21,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * RocketMQ 跟踪任务消费者。
  * <p>
- * 该类只负责 RocketMQ 消费协议适配：读取消息体、反序列化 TrackingTask，
+ * 该类只负责 RocketMQ 消费协议适配：读取消息体、反序列化 TrackingInput，
  * 并把任务交给应用用例。
  */
 @Slf4j
@@ -45,8 +45,8 @@ public class TrackingTaskConsumer implements RocketMQListener {
     @Override
     public ConsumeResult consume(MessageView messageView) {
         try {
-            TrackingTask task = objectMapper.readValue(payload(messageView), TrackingTask.class);
-            trackingTaskConsumerUseCase.consume(task);
+            TrackingInput input = objectMapper.readValue(payload(messageView), TrackingInput.class);
+            trackingTaskConsumerUseCase.consume(input);
             return ConsumeResult.SUCCESS;
         } catch (RuntimeException | IOException e) {
             log.error("消费 RocketMQ 跟踪任务失败", e);
