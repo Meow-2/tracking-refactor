@@ -39,6 +39,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -249,7 +250,7 @@ class StatusTrackingAlgorithmImplTest {
         StatusCandidateRuntime candidate = runtime.get().getCandidates().get("U1");
         assertThat(runtime.get().getCandidates()).containsKeys("U1", "U2", "C1");
         assertThat(candidate.getDataComplete()).isFalse();
-        assertThat(candidate.getCoilNo()).isEmpty();
+        assertThat(candidate.getCoilNo()).isNull();
         assertThat(candidate.getProductNo()).isNull();
         assertThat(candidate.getLengths()).isEmpty();
         assertThat(candidate.getMaxLength()).isNull();
@@ -284,6 +285,26 @@ class StatusTrackingAlgorithmImplTest {
 
         verify(qualityRepository, times(1)).queryProductNo("COIL-U1-NEW");
         assertThat(runtime.get().getCandidates().get("U1").getProductNo()).isEqualTo(1);
+    }
+
+    @Test
+    void ignoresDotOnlyCoilNumber() {
+        enableCoilerMethods();
+
+        List<StatusResult> results = algorithm.calculate(input(values(true,
+                "U1", "..................", "100",
+                "U2", "COIL-U2", "200",
+                "C1", "COIL-C1", "10")));
+
+        StatusCandidateRuntime candidate = runtime.get().getCandidates().get("U1");
+        assertThat(candidate.getCoilNo()).isNull();
+        assertThat(candidate.getProductNo()).isNull();
+        assertThat(candidate.getDataComplete()).isFalse();
+        assertThat(candidate.getLengths()).isEmpty();
+        assertThat(candidate.getMaxLength()).isNull();
+        assertThat(results).extracting(StatusResult::getDeviceCode)
+                .containsExactly("U2", "C1");
+        verify(qualityRepository, never()).queryProductNo("..................");
     }
 
     @Test

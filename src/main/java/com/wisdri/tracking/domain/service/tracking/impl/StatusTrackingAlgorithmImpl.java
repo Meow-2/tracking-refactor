@@ -117,7 +117,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 .orElse(null);
         Map<String, StatusCandidateRuntime> updated = new LinkedHashMap<>();
         for (StatusPointGroup group : tracking.getPoints()) {
-            String coilNo = trimInvisible(PointReader.stringValue(input.getLatestSnapshot(),
+            String coilNo = normalizeCoilNo(PointReader.stringValue(input.getLatestSnapshot(),
                     pointPath(tracking, group.getCoilNo())));
             String colorNo = trimInvisible(PointReader.stringValue(input.getLatestSnapshot(),
                     pointPath(tracking, group.getColorNo())));
@@ -401,6 +401,22 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             end--;
         }
         return value.substring(start, end);
+    }
+
+    /**
+     * 空值和仅由英文句点组成的占位值均不是有效钢卷号。
+     */
+    private String normalizeCoilNo(String value) {
+        String trimmed = trimInvisible(value);
+        if (trimmed == null || trimmed.isEmpty()) {
+            return null;
+        }
+        for (int index = 0; index < trimmed.length(); index++) {
+            if (trimmed.charAt(index) != '.') {
+                return trimmed;
+            }
+        }
+        return null;
     }
 
     private boolean invisible(char value) {
