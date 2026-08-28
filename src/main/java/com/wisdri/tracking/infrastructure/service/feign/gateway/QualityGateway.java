@@ -1,18 +1,30 @@
 package com.wisdri.tracking.infrastructure.service.feign.gateway;
 
+import com.wisdri.tracking.common.exception.ExternalServiceException;
+import com.wisdri.tracking.common.response.R;
 import com.wisdri.tracking.domain.repository.quality.QualityRepository;
+import com.wisdri.tracking.infrastructure.service.feign.client.QualityFeignClient;
 import org.springframework.stereotype.Component;
+
+import javax.annotation.Resource;
 
 /**
  * 质量服务访问网关。
- *
- * <p>生产次数查询接口契约确定前固定返回 1，后续在此处调用 QualityFeignClient
- * 并从 {@code R<Integer>.data} 中提取结果。</p>
  */
 @Component
 public class QualityGateway implements QualityRepository {
+    @Resource
+    private QualityFeignClient qualityFeignClient;
+
     @Override
-    public Integer queryProductNo(String coilNo) {
-        return 1;
+    public Integer queryProductNo(String unitCode, String coilNo) {
+        R<Integer> response = qualityFeignClient.queryNextProductNo(unitCode, coilNo);
+        if (!R.isSuccess(response)) {
+            String message = response == null ? null : response.getMessage();
+            throw new ExternalServiceException(message == null || message.trim().isEmpty()
+                    ? "物料重复生产次数查询失败"
+                    : "物料重复生产次数查询失败: " + message);
+        }
+        return response.getData();
     }
 }

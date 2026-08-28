@@ -5,7 +5,7 @@ package com.wisdri.tracking.domain.repository.quality;
  */
 public interface QualityRepository {
     /**
-     * 根据钢卷号查询重复生产次数。
+     * 根据机组编码和钢卷号查询重复生产次数。
      */
-    Integer queryProductNo(String coilNo);
+    Integer queryProductNo(String unitCode, String coilNo);
 }

@@ -248,7 +248,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
 
     private Integer queryProductNo(TrackingInput input, StatusPointGroup group, String coilNo) {
         try {
-            Integer productNo = qualityRepository.queryProductNo(coilNo);
+            Integer productNo = qualityRepository.queryProductNo(input.getUnitCode(), coilNo);
             trackingStepLogger.log(input, "重复生产次数查询", group.getCode(), TrackingStepLogger.details(
                     "coilNo", coilNo,
                     "productNo", productNo));

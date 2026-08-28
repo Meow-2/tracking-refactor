@@ -65,7 +65,7 @@ class StatusTrackingAlgorithmImplTest {
 
         algorithm = new StatusTrackingAlgorithmImpl();
         qualityRepository = mock(QualityRepository.class);
-        when(qualityRepository.queryProductNo(anyString())).thenReturn(1);
+        when(qualityRepository.queryProductNo(anyString(), anyString())).thenReturn(1);
         ReflectionTestUtils.setField(algorithm, "runtimeRepositoryDispatcher", repository);
         ReflectionTestUtils.setField(algorithm, "trackingStepLogger", mock(TrackingStepLogger.class));
         ReflectionTestUtils.setField(algorithm, "qualityRepository", qualityRepository);
@@ -278,12 +278,12 @@ class StatusTrackingAlgorithmImplTest {
         calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
         calculate(true, "U1", "COIL-U1", "95", "U2", "COIL-U2", "195", "C1", "COIL-C1", "15");
 
-        verify(qualityRepository, times(1)).queryProductNo("COIL-U1");
+        verify(qualityRepository, times(1)).queryProductNo("CP1", "COIL-U1");
         assertThat(runtime.get().getCandidates().get("U1").getProductNo()).isEqualTo(1);
 
         calculate(true, "U1", "COIL-U1-NEW", "90", "U2", "COIL-U2", "190", "C1", "COIL-C1", "20");
 
-        verify(qualityRepository, times(1)).queryProductNo("COIL-U1-NEW");
+        verify(qualityRepository, times(1)).queryProductNo("CP1", "COIL-U1-NEW");
         assertThat(runtime.get().getCandidates().get("U1").getProductNo()).isEqualTo(1);
     }
 
@@ -304,12 +304,13 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(candidate.getMaxLength()).isNull();
         assertThat(results).extracting(StatusResult::getDeviceCode)
                 .containsExactly("U2", "C1");
-        verify(qualityRepository, never()).queryProductNo("..................");
+        verify(qualityRepository, never()).queryProductNo("CP1", "..................");
     }
 
     @Test
     void keepsCalculatingWhenProductNoQueryFails() {
-        when(qualityRepository.queryProductNo("COIL-U1")).thenThrow(new IllegalStateException("unavailable"));
+        when(qualityRepository.queryProductNo("CP1", "COIL-U1"))
+                .thenThrow(new IllegalStateException("unavailable"));
 
         calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
         calculate(true, "U1", "COIL-U1", "95", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
@@ -319,12 +320,12 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(runtime.get().getCandidates().get("U1").getProductNo()).isNull();
         assertThat(current.get(DeviceSide.UNCOILER).getRunning()).isTrue();
         assertThat(current.get(DeviceSide.UNCOILER).getProductNo()).isNull();
-        verify(qualityRepository, times(1)).queryProductNo("COIL-U1");
+        verify(qualityRepository, times(1)).queryProductNo("CP1", "COIL-U1");
     }
 
     @Test
     void keepsCalculatingWhenProductNoQueryReturnsNull() {
-        when(qualityRepository.queryProductNo("COIL-U1")).thenReturn(null);
+        when(qualityRepository.queryProductNo("CP1", "COIL-U1")).thenReturn(null);
 
         calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
         calculate(true, "U1", "COIL-U1", "95", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
@@ -334,7 +335,7 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(runtime.get().getCandidates().get("U1").getProductNo()).isNull();
         assertThat(current.get(DeviceSide.UNCOILER).getRunning()).isTrue();
         assertThat(current.get(DeviceSide.UNCOILER).getProductNo()).isNull();
-        verify(qualityRepository, times(1)).queryProductNo("COIL-U1");
+        verify(qualityRepository, times(1)).queryProductNo("CP1", "COIL-U1");
     }
 
     @Test
