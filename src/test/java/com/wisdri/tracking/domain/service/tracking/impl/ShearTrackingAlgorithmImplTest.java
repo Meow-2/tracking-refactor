@@ -44,20 +44,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class ShearTrackingAlgorithmImplTest {
     private static final String UNIT = "LINE-X";
     private final Map<String, ShearTrackingRuntime> runtimes = new LinkedHashMap<>();
+    private TrackingRuntimeRepositoryDispatcher repository;
     private ShearTrackingAlgorithmImpl algorithm;
     private ShearTrackingConfig config;
     private TrackingProperties properties;
 
     @BeforeEach
     void setUp() {
-        TrackingRuntimeRepositoryDispatcher repository = mock(TrackingRuntimeRepositoryDispatcher.class);
+        repository = mock(TrackingRuntimeRepositoryDispatcher.class);
         config = config();
         when(repository.findConfigAs(UNIT, TrackingType.SHEAR, ShearTrackingConfig.class))
                 .thenReturn(Optional.of(config));
@@ -345,6 +349,23 @@ class ShearTrackingAlgorithmImplTest {
         assertThat(runtime.getCoiler().getDeviceName()).isEqualTo("2#卷取机");
         assertThat(runtime.getCoiler().getTail()).isNotNull();
         assertThat(runtime.getCoiler().getHead()).isNull();
+    }
+
+    @Test
+    void refreshesAllRuntimeHeartbeatsWhenDeviceStateIsUnchanged() {
+        TrackingInput input = TrackingInput.builder()
+                .unitCode(UNIT)
+                .trackingType(TrackingType.SHEAR)
+                .latestSnapshot(snapshot(entryValues(false, "10", "2.5")))
+                .statusContext(context("10", "20", "500"))
+                .build();
+        algorithm.calculate(input);
+        clearInvocations(repository);
+
+        algorithm.calculate(input);
+
+        verify(repository, times(3)).saveRuntime(any(TrackingRuntime.class));
+        assertThat(runtimes.values()).allMatch(runtime -> runtime.getUpdatedAt() != null);
     }
 
     @Test

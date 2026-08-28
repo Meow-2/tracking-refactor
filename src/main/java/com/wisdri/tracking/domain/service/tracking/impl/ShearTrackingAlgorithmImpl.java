@@ -505,7 +505,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
         return material;
     }
 
-    /** 每帧刷新所有配置代码的两侧设备绑定，即使本帧没有剪切触发。 */
+    /** 每帧刷新并保存所有配置代码的两侧设备绑定，将 updatedAt 作为运行心跳。 */
     private void synchronizeRuntimes(TrackingInput input,
                                      ShearTrackingSection tracking,
                                      StatusTrackingContext context) {
@@ -544,10 +544,6 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                         ? currentDevice(DeviceSide.COILER, opposite, previousCoiler, false)
                         : configuredDevice(context, DeviceSide.COILER, deviceCode,
                                 deviceNames.get(deviceCode), previousCoiler, true);
-                if (Objects.equals(previousUncoiler, uncoiler)
-                        && Objects.equals(previousCoiler, coiler)) {
-                    continue;
-                }
                 runtime.setUncoiler(uncoiler);
                 runtime.setCoiler(coiler);
                 runtime.setUpdatedAt(Instant.now());
