@@ -19,7 +19,11 @@ Tracking 使用一个 Jar、一个镜像、七套机组资源。各实例通过 
 data:
   TRACKING_UNIT: "cp1"
   TRACKING_STORAGE_ABNORMAL_ENABLED: "true"
-  TRACKING_STORAGE_TRACKINGRESULT_ENABLED: "true"
+  TRACKING_STORAGE_PROCESS_ENABLED: "true"
+  TRACKING_STORAGE_BATCH_ENABLED: "true"
+  TRACKING_STORAGE_SHEAR_ENABLED: "true"
+  TRACKING_STORAGE_COILER_ENABLED: "true"
+  QUALITY_BASEURL: "http://quality-mat.ay:8080"
 ```
 
 Service 的 selector 必须匹配各自 Deployment Pod 的 label。
