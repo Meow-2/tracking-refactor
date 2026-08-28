@@ -18,6 +18,16 @@ import java.util.List;
 @AllArgsConstructor
 public class StatusCandidateRuntime {
     /**
+     * 候选设备代码，与 StatusTrackingRuntime.candidates 的键保持一致。
+     */
+    private String deviceCode;
+
+    /**
+     * 候选设备名称，随状态快照固化，避免消费侧重新读取配置。
+     */
+    private String deviceName;
+
+    /**
      * 当前帧的卷号和剩余长度是否都有效。
      * false 时设备仍保留在 candidates 中，但不得参与 current 选择或剪切计算。
      * 该字段允许为 null，以兼容变更前已写入 Redis 的 status runtime。

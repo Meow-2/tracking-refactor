@@ -576,7 +576,9 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
             return device(side, false, deviceCode, deviceName,
                     null, null, null, null, null, previous, sliceEnabled);
         }
-        return device(side, Boolean.TRUE.equals(candidate.getDataComplete()), deviceCode, deviceName,
+        String resolvedDeviceName = candidate.getDeviceName() == null
+                ? deviceName : candidate.getDeviceName();
+        return device(side, Boolean.TRUE.equals(candidate.getDataComplete()), deviceCode, resolvedDeviceName,
                 candidate.getCoilNo(), candidate.getProductNo(), candidate.getColorNo(),
                 last(candidate.getLengths()), candidate.getMaxLength(), previous, sliceEnabled);
     }

@@ -348,6 +348,24 @@ class ShearTrackingAlgorithmImplTest {
     }
 
     @Test
+    void prefersCandidateDeviceNameFromStatusSnapshot() {
+        StatusTrackingContext context = context("10", "20", "500");
+        context.getCurrent().get(DeviceSide.UNCOILER).setDeviceCode(null);
+        context.getCandidates().get("feed-device-x").setDeviceCode("feed-device-x");
+        context.getCandidates().get("feed-device-x").setDeviceName("快照开卷机");
+
+        algorithm.calculate(TrackingInput.builder()
+                .unitCode(UNIT)
+                .trackingType(TrackingType.SHEAR)
+                .latestSnapshot(snapshot(entryValues(false, "10", "2.5")))
+                .statusContext(context)
+                .build());
+
+        assertThat(runtimes.get("feed-device-x").getUncoiler().getDeviceName())
+                .isEqualTo("快照开卷机");
+    }
+
+    @Test
     void keepsCountersIndependentForEachConfiguredDeviceCode() {
         Map<String, Object> previous = exitValues(true, "30", "0", "0", "1.2", "1.8");
         Map<String, Object> latest = exitValues(false, "30", "0", "0", "1.2", "1.8");

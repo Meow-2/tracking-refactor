@@ -54,8 +54,10 @@ public class StatusResult extends TrackingResult {
                 .receivedAt(receivedAt)
                 .side(group.getSide())
                 .running(null)
-                .deviceCode(group.getCode())
-                .deviceName(group.getName())
+                .deviceCode(candidate.getDeviceCode() == null
+                        ? group.getCode() : candidate.getDeviceCode())
+                .deviceName(candidate.getDeviceName() == null
+                        ? group.getName() : candidate.getDeviceName())
                 .coilerMethod(candidate.getCoilerMethod())
                 .coilerMethodName(candidate.getCoilerMethodName())
                 .coilNo(candidate.getCoilNo())

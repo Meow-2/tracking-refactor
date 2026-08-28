@@ -149,6 +149,8 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 lengths.remove(0);
             }
             StatusCandidateRuntime candidate = StatusCandidateRuntime.builder()
+                    .deviceCode(group.getCode())
+                    .deviceName(group.getName())
                     .dataComplete(dataComplete)
                     .coilNo(coilNo)
                     .productNo(productNo)

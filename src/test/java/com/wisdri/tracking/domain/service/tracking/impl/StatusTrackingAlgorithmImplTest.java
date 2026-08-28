@@ -95,6 +95,8 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(current.get(DeviceSide.COILER).getCoilerMethod()).isEqualTo("19");
         assertThat(current.get(DeviceSide.COILER).getCoilerMethodName()).isEqualTo("上卷取");
         assertThat(current.get(DeviceSide.COILER).getRemainingLength()).isEqualByComparingTo("17");
+        assertThat(runtime.get().getCandidates().get("U2").getDeviceCode()).isEqualTo("U2");
+        assertThat(runtime.get().getCandidates().get("U2").getDeviceName()).isEqualTo("U2 device");
         assertThat(runtime.get().getCandidates().get("U2").getLengths())
                 .containsExactly(new BigDecimal("200"), new BigDecimal("194"), new BigDecimal("188"));
         assertThat(runtime.get().getCandidates().get("U2").getMaxLength())
@@ -118,6 +120,8 @@ class StatusTrackingAlgorithmImplTest {
 
         assertThat(first).extracting(StatusResult::getDeviceCode)
                 .containsExactly("U1", "U2", "C1");
+        assertThat(first).extracting(StatusResult::getDeviceName)
+                .containsExactly("U1 device", "U2 device", "C1 device");
         assertThat(first.get(0).getRunning()).isNull();
         assertThat(first.get(0).getTrackingType()).isEqualTo(TrackingType.STATUS);
         assertThat(first.get(0).getCoilNo()).isEqualTo("COIL-U1");

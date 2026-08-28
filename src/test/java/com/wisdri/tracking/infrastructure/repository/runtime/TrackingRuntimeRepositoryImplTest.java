@@ -185,6 +185,8 @@ class TrackingRuntimeRepositoryImplTest {
     void savesAndRestoresStatusCandidateWindowsAndCurrentState() {
         TrackingRuntimeRepositoryImpl repository = repository();
         StatusCandidateRuntime candidate = StatusCandidateRuntime.builder()
+                .deviceCode("U1")
+                .deviceName("1#开卷机")
                 .coilNo("C001")
                 .productNo(2)
                 .coilerMethod("11")
@@ -218,9 +220,13 @@ class TrackingRuntimeRepositoryImplTest {
         assertTrue(redis.get("tracking:cp1:status:runtime").contains(
                 "\"lengths\" : [ 100, 95 ]"));
         assertTrue(redis.get("tracking:cp1:status:runtime").contains("\"product_no\" : 2"));
+        assertTrue(redis.get("tracking:cp1:status:runtime").contains("\"device_code\" : \"U1\""));
+        assertTrue(redis.get("tracking:cp1:status:runtime").contains("\"device_name\" : \"1#开卷机\""));
         StatusTrackingRuntime cached = repository.findRuntimeAs(
                 "CP1", TrackingType.STATUS, StatusTrackingRuntime.class
         ).orElseThrow(AssertionError::new);
+        assertEquals("U1", cached.getCandidates().get("U1").getDeviceCode());
+        assertEquals("1#开卷机", cached.getCandidates().get("U1").getDeviceName());
         assertEquals("C001", cached.getCandidates().get("U1").getCoilNo());
         assertEquals(2, cached.getCandidates().get("U1").getProductNo());
         assertEquals("11", cached.getCandidates().get("U1").getCoilerMethod());
