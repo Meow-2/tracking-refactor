@@ -5,9 +5,11 @@ import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.coiler.CoilerResult;
 import com.wisdri.tracking.domain.model.tracking.status.StatusResult;
 import com.wisdri.tracking.domain.model.tracking.status.StatusTrackingContext;
+import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.Resource;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +19,9 @@ import java.util.List;
  */
 @Component
 public class CoilerTrackingAlgorithmImpl implements TrackingAlgorithm<CoilerResult> {
+    @Resource
+    private TrackingStepLogger trackingStepLogger;
+
     @Override
     public boolean support(TrackingType trackingType) {
         return TrackingType.COILER == trackingType;
@@ -24,6 +29,7 @@ public class CoilerTrackingAlgorithmImpl implements TrackingAlgorithm<CoilerResu
 
     @Override
     public List<CoilerResult> calculate(TrackingInput input) {
+        long startedAt = System.nanoTime();
         if (input == null || input.getTrackingType() != TrackingType.COILER) {
             throw new IllegalArgumentException("开卷卷取跟踪输入和跟踪类型不能为空");
         }
@@ -31,11 +37,14 @@ public class CoilerTrackingAlgorithmImpl implements TrackingAlgorithm<CoilerResu
         if (context == null || context.getResults() == null || context.getResults().isEmpty()) {
             throw new IllegalArgumentException("开卷卷取状态结果不能为空");
         }
+        trackingStepLogger.log(input, "计算开始", TrackingStepLogger.details(
+                "statusResultCount", context.getResults().size()
+        ));
         List<CoilerResult> results = new ArrayList<>(context.getResults().size());
         Instant generatedAt = Instant.now();
         for (StatusResult status : context.getResults()) {
             validate(status);
-            results.add(CoilerResult.builder()
+            CoilerResult result = CoilerResult.builder()
                     .unitCode(status.getUnitCode())
                     .trackingType(TrackingType.COILER)
                     .generatedAt(generatedAt)
@@ -47,8 +56,22 @@ public class CoilerTrackingAlgorithmImpl implements TrackingAlgorithm<CoilerResu
                     .deviceCode(status.getDeviceCode())
                     .deviceName(status.getDeviceName())
                     .maxLength(status.getMaxLength())
-                    .build());
+                    .build();
+            results.add(result);
+            trackingStepLogger.log(input, "开卷卷取结果生成", status.getDeviceCode(),
+                    TrackingStepLogger.details(
+                            "coilNo", status.getCoilNo(),
+                            "productNo", status.getProductNo(),
+                            "coilerMethod", status.getCoilerMethod(),
+                            "coilerMethodName", status.getCoilerMethodName(),
+                            "deviceName", status.getDeviceName(),
+                            "maxLength", status.getMaxLength()
+                    ));
         }
+        trackingStepLogger.log(input, "计算完成", TrackingStepLogger.details(
+                "resultCount", results.size(),
+                "elapsedMillis", (System.nanoTime() - startedAt) / 1_000_000L
+        ));
         return results;
     }
 

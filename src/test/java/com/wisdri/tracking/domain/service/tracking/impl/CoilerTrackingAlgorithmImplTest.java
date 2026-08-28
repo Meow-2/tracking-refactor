@@ -5,7 +5,10 @@ import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.coiler.CoilerResult;
 import com.wisdri.tracking.domain.model.tracking.status.StatusResult;
 import com.wisdri.tracking.domain.model.tracking.status.StatusTrackingContext;
+import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -15,9 +18,22 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 class CoilerTrackingAlgorithmImplTest {
-    private final CoilerTrackingAlgorithmImpl algorithm = new CoilerTrackingAlgorithmImpl();
+    private TrackingStepLogger trackingStepLogger;
+    private CoilerTrackingAlgorithmImpl algorithm;
+
+    @BeforeEach
+    void setUp() {
+        trackingStepLogger = mock(TrackingStepLogger.class);
+        algorithm = new CoilerTrackingAlgorithmImpl();
+        ReflectionTestUtils.setField(algorithm, "trackingStepLogger", trackingStepLogger);
+    }
 
     @Test
     void convertsStatusResultsToCoilerResults() {
@@ -53,6 +69,12 @@ class CoilerTrackingAlgorithmImplTest {
         });
         assertThat(results.get(1).getInMatNo()).isEqualTo("COIL-2");
         assertThat(results.get(1).getDeviceCode()).isEqualTo("tr1");
+        verify(trackingStepLogger).log(any(TrackingInput.class), eq("计算开始"), anyMap());
+        verify(trackingStepLogger).log(any(TrackingInput.class),
+                eq("开卷卷取结果生成"), eq("por1"), anyMap());
+        verify(trackingStepLogger).log(any(TrackingInput.class),
+                eq("开卷卷取结果生成"), eq("tr1"), anyMap());
+        verify(trackingStepLogger).log(any(TrackingInput.class), eq("计算完成"), anyMap());
     }
 
     @Test
