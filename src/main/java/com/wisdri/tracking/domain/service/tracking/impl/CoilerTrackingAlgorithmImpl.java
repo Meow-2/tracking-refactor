@@ -1,5 +1,6 @@
 package com.wisdri.tracking.domain.service.tracking.impl;
 
+import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.coiler.CoilerResult;
@@ -51,8 +52,14 @@ public class CoilerTrackingAlgorithmImpl implements TrackingAlgorithm<CoilerResu
                     .receivedAt(status.getReceivedAt())
                     .inMatNo(status.getCoilNo())
                     .inMatNoProdNo(status.getProductNo())
-                    .coilerMethod(status.getCoilerMethod())
-                    .coilerMethodName(status.getCoilerMethodName())
+                    .coilerMethod(DeviceSide.COILER == status.getSide()
+                            ? status.getCoilerMethod() : null)
+                    .coilerMethodName(DeviceSide.COILER == status.getSide()
+                            ? status.getCoilerMethodName() : null)
+                    .uncoilerMethod(DeviceSide.UNCOILER == status.getSide()
+                            ? status.getCoilerMethod() : null)
+                    .uncoilerMethodName(DeviceSide.UNCOILER == status.getSide()
+                            ? status.getCoilerMethodName() : null)
                     .deviceCode(status.getDeviceCode())
                     .deviceName(status.getDeviceName())
                     .maxLength(status.getMaxLength())
@@ -62,6 +69,7 @@ public class CoilerTrackingAlgorithmImpl implements TrackingAlgorithm<CoilerResu
                     TrackingStepLogger.details(
                             "coilNo", status.getCoilNo(),
                             "productNo", status.getProductNo(),
+                            "side", status.getSide(),
                             "coilerMethod", status.getCoilerMethod(),
                             "coilerMethodName", status.getCoilerMethodName(),
                             "deviceName", status.getDeviceName(),
@@ -77,6 +85,7 @@ public class CoilerTrackingAlgorithmImpl implements TrackingAlgorithm<CoilerResu
 
     private void validate(StatusResult status) {
         if (status == null || blank(status.getUnitCode()) || blank(status.getCoilNo())
+                || status.getSide() == null
                 || blank(status.getCoilerMethod()) || blank(status.getCoilerMethodName())
                 || blank(status.getDeviceCode()) || blank(status.getDeviceName())) {
             throw new IllegalArgumentException("开卷卷取状态结果业务字段不能为空");

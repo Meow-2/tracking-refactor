@@ -1,5 +1,7 @@
 package com.wisdri.tracking.infrastructure.repository.tracking;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
@@ -13,7 +15,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.annotation.Resource;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -44,31 +45,73 @@ public class CoilerTrackingResultRepositoryImpl
         if (!trackingProperties.coilerStorageEnabled() || results == null || results.isEmpty()) {
             return;
         }
-        List<QmCoilerLogEntity> entities = new ArrayList<>(results.size());
-        for (CoilerResult result : results) {
-            entities.add(toEntity(result));
-        }
         transactionTemplate.execute(status -> {
-            saveBatch(entities);
+            for (CoilerResult result : results) {
+                upsert(result);
+            }
             return null;
         });
     }
 
+    /**
+     * 同一物料号、重复生产号和道次号只保留一条记录，后续开卷或卷取事件更新对应侧的方式字段。
+     */
+    private void upsert(CoilerResult result) {
+        String productNo = result.getInMatNoProdNo() == null
+                ? null : String.valueOf(result.getInMatNoProdNo());
+        LambdaQueryWrapper<QmCoilerLogEntity> query = Wrappers.<QmCoilerLogEntity>lambdaQuery()
+                .eq(QmCoilerLogEntity::getInMatNo, result.getInMatNo());
+        if (productNo == null) {
+            query.isNull(QmCoilerLogEntity::getInMatNoProdNo);
+        } else {
+            query.eq(QmCoilerLogEntity::getInMatNoProdNo, productNo);
+        }
+        if (result.getPassNo() == null) {
+            query.isNull(QmCoilerLogEntity::getPassNo);
+        } else {
+            query.eq(QmCoilerLogEntity::getPassNo, result.getPassNo());
+        }
+        QmCoilerLogEntity entity = baseMapper.selectOne(query
+                .orderByAsc(QmCoilerLogEntity::getId)
+                .last("LIMIT 1"));
+        if (entity == null) {
+            baseMapper.insert(toEntity(result));
+            return;
+        }
+        merge(entity, result);
+        baseMapper.updateById(entity);
+    }
+
     private QmCoilerLogEntity toEntity(CoilerResult result) {
         QmCoilerLogEntity entity = new QmCoilerLogEntity();
-        entity.setUnitCode(result.getUnitCode());
-        entity.setInMatNo(result.getInMatNo());
-        entity.setInMatNoProdNo(result.getInMatNoProdNo() == null
-                ? null : String.valueOf(result.getInMatNoProdNo()));
-        entity.setCoilerMethod(result.getCoilerMethod());
-        entity.setCoilerMethodName(result.getCoilerMethodName());
-        entity.setDeviceCode(result.getDeviceCode());
-        entity.setDeviceName(result.getDeviceName());
-        entity.setMaxLength(result.getMaxLength() == null
-                ? null : result.getMaxLength().toPlainString());
+        merge(entity, result);
         Instant createTime = result.getReceivedAt() == null
                 ? result.getGeneratedAt() : result.getReceivedAt();
         entity.setCreateTime(createTime);
         return entity;
+    }
+
+    private void merge(QmCoilerLogEntity entity, CoilerResult result) {
+        entity.setUnitCode(result.getUnitCode());
+        entity.setInMatNo(result.getInMatNo());
+        entity.setInMatNoProdNo(result.getInMatNoProdNo() == null
+                ? null : String.valueOf(result.getInMatNoProdNo()));
+        entity.setPassNo(result.getPassNo());
+        if (result.getCoilerMethod() != null || result.getCoilerMethodName() != null) {
+            entity.setCoilerMethod(result.getCoilerMethod());
+            entity.setCoilerMethodName(result.getCoilerMethodName());
+        }
+        if (result.getUncoilerMethod() != null || result.getUncoilerMethodName() != null) {
+            entity.setUncoilerMethod(result.getUncoilerMethod());
+            entity.setUncoilerMethodName(result.getUncoilerMethodName());
+        }
+        if (result.getCoilerMethod() == null && result.getCoilerMethodName() == null
+                && result.getUncoilerMethod() == null && result.getUncoilerMethodName() == null) {
+            throw new IllegalArgumentException("开卷或卷取方式不能为空");
+        }
+        entity.setDeviceCode(result.getDeviceCode());
+        entity.setDeviceName(result.getDeviceName());
+        entity.setMaxLength(result.getMaxLength() == null
+                ? null : result.getMaxLength().toPlainString());
     }
 }

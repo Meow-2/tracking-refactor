@@ -17,8 +17,11 @@ public class QmCoilerLogEntity {
     private String unitCode;
     private String inMatNo;
     private String inMatNoProdNo;
+    private Integer passNo;
     private String coilerMethod;
     private String coilerMethodName;
+    private String uncoilerMethod;
+    private String uncoilerMethodName;
     private String deviceCode;
     private String deviceName;
     private String maxLength;

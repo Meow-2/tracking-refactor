@@ -18,8 +18,14 @@ import java.math.BigDecimal;
 public class CoilerResult extends TrackingResult {
     private String inMatNo;
     private Integer inMatNoProdNo;
+    /**
+     * 预留道次号，当前开卷卷取算法不赋值。
+     */
+    private Integer passNo;
     private String coilerMethod;
     private String coilerMethodName;
+    private String uncoilerMethod;
+    private String uncoilerMethodName;
     private String deviceCode;
     private String deviceName;
     private BigDecimal maxLength;

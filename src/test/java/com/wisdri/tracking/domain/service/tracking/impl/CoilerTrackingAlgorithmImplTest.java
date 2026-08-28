@@ -1,5 +1,6 @@
 package com.wisdri.tracking.domain.service.tracking.impl;
 
+import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.coiler.CoilerResult;
@@ -40,12 +41,14 @@ class CoilerTrackingAlgorithmImplTest {
         Instant detectedAt = Instant.parse("2026-08-27T01:00:00Z");
         StatusResult uncoiler = StatusResult.builder()
                 .unitCode("CP1").trackingType(TrackingType.STATUS)
+                .side(DeviceSide.UNCOILER)
                 .coilNo("COIL-1").productNo(2)
                 .coilerMethod("11").coilerMethodName("上开卷")
                 .deviceCode("por1").deviceName("1#开卷机")
                 .maxLength(new BigDecimal("1200.50")).receivedAt(detectedAt).build();
         StatusResult coiler = StatusResult.builder()
                 .unitCode("CP1").trackingType(TrackingType.STATUS)
+                .side(DeviceSide.COILER)
                 .coilNo("COIL-2").productNo(3)
                 .coilerMethod("19").coilerMethodName("上卷取")
                 .deviceCode("tr1").deviceName("1#卷取机")
@@ -62,12 +65,19 @@ class CoilerTrackingAlgorithmImplTest {
             assertThat(result.getTrackingType()).isEqualTo(TrackingType.COILER);
             assertThat(result.getInMatNo()).isEqualTo("COIL-1");
             assertThat(result.getInMatNoProdNo()).isEqualTo(2);
-            assertThat(result.getCoilerMethod()).isEqualTo("11");
+            assertThat(result.getUncoilerMethod()).isEqualTo("11");
+            assertThat(result.getUncoilerMethodName()).isEqualTo("上开卷");
+            assertThat(result.getCoilerMethod()).isNull();
+            assertThat(result.getCoilerMethodName()).isNull();
             assertThat(result.getDeviceCode()).isEqualTo("por1");
             assertThat(result.getMaxLength()).isEqualByComparingTo("1200.50");
             assertThat(result.getReceivedAt()).isEqualTo(detectedAt);
         });
         assertThat(results.get(1).getInMatNo()).isEqualTo("COIL-2");
+        assertThat(results.get(1).getCoilerMethod()).isEqualTo("19");
+        assertThat(results.get(1).getCoilerMethodName()).isEqualTo("上卷取");
+        assertThat(results.get(1).getUncoilerMethod()).isNull();
+        assertThat(results.get(1).getUncoilerMethodName()).isNull();
         assertThat(results.get(1).getDeviceCode()).isEqualTo("tr1");
         verify(trackingStepLogger).log(any(TrackingInput.class), eq("计算开始"), anyMap());
         verify(trackingStepLogger).log(any(TrackingInput.class),
