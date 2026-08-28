@@ -32,7 +32,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -112,6 +115,19 @@ class BatchTrackingResultRepositoryImplTest {
                 point("shared", PointDataType.SHORT)));
 
         assertThrows(TrackingException.class, () -> repository.createTable(config));
+    }
+
+    @Test
+    void skipsBatchResultCreateAndSaveWhenDisabled() {
+        TrackingProperties properties = new TrackingProperties();
+        properties.getStorage().getBatch().setEnabled(false);
+        ReflectionTestUtils.setField(repository, "trackingProperties", properties);
+
+        repository.createTable(config());
+        repository.save(Collections.singletonList(result("fb1", "north", "N001")));
+
+        verify(gateway, never()).createTable(any());
+        verify(gateway, never()).saveColumn(anyString(), any());
     }
 
     private BatchTrackingConfig config() {

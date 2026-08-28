@@ -64,7 +64,7 @@ class ProcessTrackingResultRepositoryImplTest {
         ProcessTrackingResultRepositoryImpl repository = new ProcessTrackingResultRepositoryImpl();
         TimeSeriesStorageGateway gateway = mock(TimeSeriesStorageGateway.class);
         ReflectionTestUtils.setField(repository, "timeSeriesStorageGateway", gateway);
-        ReflectionTestUtils.setField(repository, "trackingProperties", trackingResultDisabled());
+        ReflectionTestUtils.setField(repository, "trackingProperties", processStorageDisabled());
 
         ProcessTrackingConfig config = ProcessTrackingConfig.builder()
                 .unitCode("CP1")
@@ -84,11 +84,9 @@ class ProcessTrackingResultRepositoryImplTest {
         verify(gateway, never()).saveColumn(anyString(), any());
     }
 
-    private TrackingProperties trackingResultDisabled() {
+    private TrackingProperties processStorageDisabled() {
         TrackingProperties properties = new TrackingProperties();
-        TrackingProperties.StoreSwitch trackingResult = new TrackingProperties.StoreSwitch();
-        trackingResult.setEnabled(false);
-        properties.getStorage().setTrackingResult(trackingResult);
+        properties.getStorage().getProcess().setEnabled(false);
         return properties;
     }
 }

@@ -3,7 +3,9 @@ tracking:
   storage:
     abnormal:
       enabled: false
-    tracking-result:
+    process:
+      enabled: false
+    batch:
       enabled: false
     shear:
       enabled: true

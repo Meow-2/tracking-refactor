@@ -29,9 +29,14 @@ public class TrackingProperties {
         private StoreSwitch abnormal = new StoreSwitch();
 
         /**
-         * 是否启用跟踪结果存储。
+         * 是否启用过程跟踪结果存储。
          */
-        private StoreSwitch trackingResult = new StoreSwitch();
+        private StoreSwitch process = new StoreSwitch();
+
+        /**
+         * 是否启用批次跟踪结果存储。
+         */
+        private StoreSwitch batch = new StoreSwitch();
 
         /**
          * 是否启用剪切结果及运行态提交。
@@ -58,10 +63,16 @@ public class TrackingProperties {
                 || !Boolean.FALSE.equals(storage.getAbnormal().getEnabled());
     }
 
-    public boolean trackingResultStorageEnabled() {
+    public boolean processStorageEnabled() {
         return storage == null
-                || storage.getTrackingResult() == null
-                || !Boolean.FALSE.equals(storage.getTrackingResult().getEnabled());
+                || storage.getProcess() == null
+                || !Boolean.FALSE.equals(storage.getProcess().getEnabled());
+    }
+
+    public boolean batchStorageEnabled() {
+        return storage == null
+                || storage.getBatch() == null
+                || !Boolean.FALSE.equals(storage.getBatch().getEnabled());
     }
 
     public boolean shearStorageEnabled() {

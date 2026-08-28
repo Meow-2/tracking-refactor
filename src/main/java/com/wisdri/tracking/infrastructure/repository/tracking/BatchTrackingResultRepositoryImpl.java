@@ -76,7 +76,7 @@ public class BatchTrackingResultRepositoryImpl
      */
     @Override
     public void createTable(BatchTrackingConfig config) {
-        if (trackingProperties != null && !trackingProperties.trackingResultStorageEnabled()) {
+        if (trackingProperties != null && !trackingProperties.batchStorageEnabled()) {
             return;
         }
         if (config == null) {
@@ -97,7 +97,7 @@ public class BatchTrackingResultRepositoryImpl
      */
     @Override
     public void save(List<BatchResult> results) {
-        if (trackingProperties != null && !trackingProperties.trackingResultStorageEnabled()) {
+        if (trackingProperties != null && !trackingProperties.batchStorageEnabled()) {
             return;
         }
         if (results == null || results.isEmpty()) {

@@ -56,7 +56,7 @@ public class ProcessTrackingResultRepositoryImpl implements TrackingResultReposi
 
     @Override
     public void createTable(ProcessTrackingConfig config) {
-        if (trackingProperties != null && !trackingProperties.trackingResultStorageEnabled()) {
+        if (trackingProperties != null && !trackingProperties.processStorageEnabled()) {
             return;
         }
         if (config == null || config.getSegments() == null || config.getSegments().isEmpty()) {
@@ -82,7 +82,7 @@ public class ProcessTrackingResultRepositoryImpl implements TrackingResultReposi
 
     @Override
     public void save(List<ProcessResult> results) {
-        if (trackingProperties != null && !trackingProperties.trackingResultStorageEnabled()) {
+        if (trackingProperties != null && !trackingProperties.processStorageEnabled()) {
             return;
         }
         if (results == null || results.isEmpty()) {
