@@ -27,6 +27,10 @@ public class StatusTrackingRuntime extends TrackingRuntime {
     private Instant receivedAt;
 
     private BigDecimal startConditionPointValue;
+    /** 最近一次有效的原始轧制方向点值。 */
+    private Boolean rollingDirection;
+    /** 最近一次有效的轧制道次号。 */
+    private Integer passNo;
     private Map<String, StatusCandidateRuntime> candidates = new LinkedHashMap<>();
     private Map<DeviceSide, StatusCurrentRuntime> current = new LinkedHashMap<>();
 

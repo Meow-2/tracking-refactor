@@ -3,6 +3,7 @@ package com.wisdri.tracking.domain.service.tracking.impl;
 import com.wisdri.tracking.domain.model.config.PointConfig;
 import com.wisdri.tracking.domain.model.config.PointDataType;
 import com.wisdri.tracking.domain.model.config.StartCondition;
+import com.wisdri.tracking.domain.model.config.process.RollingConfig;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodConfig;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodDefinition;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodDefinitions;
@@ -110,6 +111,72 @@ class StatusTrackingAlgorithmImplTest {
                 .isEqualByComparingTo("200");
         assertThat(runtime.get().getCurrent().get(DeviceSide.COILER).getMaxLength())
                 .isEqualByComparingTo("17");
+    }
+
+    @Test
+    void swapsSidesAndCreatesNewResultsWhenRollingPassChanges() {
+        enableCoilerMethods();
+        enableRolling(false);
+
+        List<StatusResult> first = algorithm.calculate(rollingInput(false, 1,
+                "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10"));
+        assertThat(first).extracting(StatusResult::getSide)
+                .containsExactly(DeviceSide.UNCOILER, DeviceSide.UNCOILER, DeviceSide.COILER);
+        assertThat(first).extracting(StatusResult::getPassNo).containsOnly(1);
+
+        algorithm.calculate(rollingInput(false, 1,
+                "U1", "COIL-U1", "95", "U2", "COIL-U2", "195", "C1", "COIL-C1", "15"));
+        algorithm.calculate(rollingInput(false, 1,
+                "U1", "COIL-U1", "90", "U2", "COIL-U2", "190", "C1", "COIL-C1", "20"));
+
+        List<StatusResult> nextPass = algorithm.calculate(rollingInput(true, 2,
+                "U1", "COIL-U1", "90", "U2", "COIL-U2", "190", "C1", "COIL-C1", "20"));
+
+        assertThat(nextPass).extracting(StatusResult::getSide)
+                .containsExactly(DeviceSide.COILER, DeviceSide.COILER, DeviceSide.UNCOILER);
+        assertThat(nextPass).extracting(StatusResult::getPassNo).containsOnly(2);
+        assertThat(nextPass.get(0).getCoilerMethodName()).isEqualTo("上卷取");
+        assertThat(nextPass.get(2).getCoilerMethodName()).isEqualTo("上开卷");
+        assertThat(runtime.get().getRollingDirection()).isTrue();
+        assertThat(runtime.get().getPassNo()).isEqualTo(2);
+        assertThat(runtime.get().getCandidates().get("U1").getLengths())
+                .containsExactly(new BigDecimal("90"));
+        assertThat(runtime.get().getCandidates().get("U1").getMaxLength())
+                .isEqualByComparingTo("90");
+        assertEmptySides(runtime.get().getCurrent());
+
+        algorithm.calculate(rollingInput(true, 2,
+                "U1", "COIL-U1", "95", "U2", "COIL-U2", "192", "C1", "COIL-C1", "15"));
+        algorithm.calculate(rollingInput(true, 2,
+                "U1", "COIL-U1", "100", "U2", "COIL-U2", "194", "C1", "COIL-C1", "10"));
+
+        assertThat(runtime.get().getCurrent().get(DeviceSide.COILER).getDeviceCode()).isEqualTo("U1");
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("C1");
+    }
+
+    @Test
+    void fallsBackToConfiguredThenPreviousSideAndHonorsDirectReverse() {
+        enableCoilerMethods();
+        enableRolling(true);
+
+        Map<String, Object> firstValues = values(true,
+                "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
+        firstValues.put("/status/pass_no", 1);
+        List<StatusResult> first = algorithm.calculate(input(firstValues));
+        assertThat(first).extracting(StatusResult::getSide)
+                .containsExactly(DeviceSide.UNCOILER, DeviceSide.UNCOILER, DeviceSide.COILER);
+        assertThat(runtime.get().getRollingDirection()).isNull();
+
+        List<StatusResult> second = algorithm.calculate(rollingInput(false, 2,
+                "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10"));
+        assertThat(second).extracting(StatusResult::getSide)
+                .containsExactly(DeviceSide.COILER, DeviceSide.COILER, DeviceSide.UNCOILER);
+
+        Map<String, Object> missingDirection = values(true,
+                "U1", "COIL-U1", "105", "U2", "COIL-U2", "205", "C1", "COIL-C1", "5");
+        assertThat(algorithm.calculate(input(missingDirection))).isEmpty();
+        assertThat(runtime.get().getRollingDirection()).isFalse();
+        assertThat(runtime.get().getPassNo()).isEqualTo(2);
     }
 
     @Test
@@ -399,6 +466,21 @@ class StatusTrackingAlgorithmImplTest {
             group.setCoilerMethod(CoilerMethodConfig.builder()
                     .defaultValue(false).falseIndex(0).build());
         }
+    }
+
+    private void enableRolling(boolean directReverse) {
+        statusConfig.getTracking().setRolling(RollingConfig.builder()
+                .directPoint(point("rolling_direction"))
+                .passNoPoint(point("pass_no"))
+                .directReverse(directReverse)
+                .build());
+    }
+
+    private TrackingInput rollingInput(boolean direction, int passNo, String... groups) {
+        Map<String, Object> values = values(true, groups);
+        values.put("/status/rolling_direction", direction);
+        values.put("/status/pass_no", passNo);
+        return input(values);
     }
 
     private Map<DeviceSide, StatusCurrentRuntime> calculate(boolean started, String... values) {

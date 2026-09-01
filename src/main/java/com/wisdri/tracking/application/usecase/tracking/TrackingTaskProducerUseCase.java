@@ -234,6 +234,7 @@ public class TrackingTaskProducerUseCase {
                 .receivedAt(source.getReceivedAt())
                 .side(source.getSide())
                 .running(source.getRunning())
+                .passNo(source.getPassNo())
                 .deviceCode(source.getDeviceCode())
                 .deviceName(source.getDeviceName())
                 .coilerMethod(source.getCoilerMethod())

@@ -61,6 +61,11 @@ public class StatusCubeApiTrackingConfigConverter extends AbstractCubeApiTrackin
         if (tracking.getPoints() == null || tracking.getPoints().isEmpty()) {
             throw new TrackingException("status.points 不能为空");
         }
+        if (tracking.getRolling() != null
+                && (invalidPoint(tracking.getRolling().getDirectPoint())
+                || invalidPoint(tracking.getRolling().getPassNoPoint()))) {
+            throw new TrackingException("status.rolling 配置无效");
+        }
         validateCoilerMethodDefinitions(tracking.getCoilerMethodDef());
         Set<String> codes = new HashSet<>();
         for (StatusPointGroup group : tracking.getPoints()) {

@@ -19,7 +19,7 @@ public class CoilerResult extends TrackingResult {
     private String inMatNo;
     private Integer inMatNoProdNo;
     /**
-     * 预留道次号，当前开卷卷取算法不赋值。
+     * 轧机道次号；非轧机 status 结果为空。
      */
     private Integer passNo;
     private String coilerMethod;

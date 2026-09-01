@@ -47,6 +47,26 @@ class StatusCubeApiTrackingConfigConverterTest {
     }
 
     @Test
+    void convertsAndValidatesRollingStatusConfig() throws Exception {
+        String rolling = "\"rolling\":{"
+                + "\"direct_point\":{\"name\":\"rolling_direction\",\"type\":\"boolean\"},"
+                + "\"pass_no_point\":{\"name\":\"pass_no_pv\",\"type\":\"short\"},"
+                + "\"direct_reverse\":false},";
+        String json = validConfig().replace("\"coiler_method_def\":", rolling + "\"coiler_method_def\":");
+
+        StatusTrackingConfig config = (StatusTrackingConfig) converter.convert("ZRM1", node(json));
+
+        assertThat(config.getTracking().getRolling().getDirectPoint().getName())
+                .isEqualTo("rolling_direction");
+        assertThat(config.getTracking().getRolling().getPassNoPoint().getName())
+                .isEqualTo("pass_no_pv");
+        assertThat(config.getTracking().getRolling().getDirectReverse()).isFalse();
+
+        assertInvalid(json.replace("\"name\":\"rolling_direction\"", "\"name\":\"\""));
+        assertInvalid(json.replace("\"pass_no_point\"", "\"missing_pass_no_point\""));
+    }
+
+    @Test
     void rejectsMissingConditionInvalidWindowAndDuplicateDevices() throws Exception {
         assertInvalid(validConfig().replace("\"start_condition\"", "\"missing_condition\""));
         assertInvalid(validConfig().replace("\"sample_count\":3", "\"sample_count\":1"));

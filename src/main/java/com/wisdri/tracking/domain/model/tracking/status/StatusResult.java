@@ -23,6 +23,7 @@ import java.time.Instant;
 public class StatusResult extends TrackingResult {
     private DeviceSide side;
     private Boolean running;
+    private Integer passNo;
     private String deviceCode;
     private String deviceName;
     private String coilerMethod;
@@ -41,6 +42,20 @@ public class StatusResult extends TrackingResult {
                                     String unitCode,
                                     Instant generatedAt,
                                     Instant receivedAt) {
+        return from(candidate, group, group == null ? null : group.getSide(), null,
+                unitCode, generatedAt, receivedAt);
+    }
+
+    /**
+     * 使用当前实际侧别和道次号生成开卷卷取跟踪输入结果。
+     */
+    public static StatusResult from(StatusCandidateRuntime candidate,
+                                    StatusPointGroup group,
+                                    DeviceSide side,
+                                    Integer passNo,
+                                    String unitCode,
+                                    Instant generatedAt,
+                                    Instant receivedAt) {
         if (candidate == null || group == null) {
             return null;
         }
@@ -52,8 +67,9 @@ public class StatusResult extends TrackingResult {
                 .trackingType(TrackingType.STATUS)
                 .generatedAt(generatedAt)
                 .receivedAt(receivedAt)
-                .side(group.getSide())
+                .side(side)
                 .running(null)
+                .passNo(passNo)
                 .deviceCode(candidate.getDeviceCode() == null
                         ? group.getCode() : candidate.getDeviceCode())
                 .deviceName(candidate.getDeviceName() == null

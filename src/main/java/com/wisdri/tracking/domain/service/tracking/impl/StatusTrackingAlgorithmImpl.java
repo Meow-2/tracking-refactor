@@ -72,6 +72,10 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         StatusTrackingConfig config = configOptional.get();
         StatusTrackingSection tracking = config.getTracking();
         validateConfig(tracking);
+        StatusTrackingRuntime previousRuntime = runtimeRepositoryDispatcher.findRuntimeAs(
+                input.getUnitCode(), TrackingType.STATUS, StatusTrackingRuntime.class)
+                .orElse(null);
+        RollingState rollingState = rollingState(input, tracking, previousRuntime);
         BigDecimal startValue = startConditionValue(input.getLatestSnapshot(), tracking);
         boolean started = started(startValue, tracking.getStartCondition());
         trackingStepLogger.log(input, "启动条件检查", TrackingStepLogger.details(
@@ -82,10 +86,10 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         Instant generatedAt = Instant.now();
         List<StatusResult> results = new ArrayList<>();
         Map<String, StatusCandidateRuntime> candidates = started
-                ? updateCandidates(input, tracking, generatedAt, results)
+                ? updateCandidates(input, tracking, previousRuntime, rollingState, generatedAt, results)
                 : new LinkedHashMap<>();
         Map<DeviceSide, SelectedCandidate> selected = started
-                ? selectCandidates(input, tracking, candidates)
+                ? selectCandidates(input, tracking, candidates, rollingState)
                 : new LinkedHashMap<>();
         Map<DeviceSide, StatusCurrentRuntime> current = current(input, selected);
         runtimeRepositoryDispatcher.saveRuntime(StatusTrackingRuntime.builder()
@@ -94,11 +98,15 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 .receivedAt(input.getLatestSnapshot() == null
                         ? null : input.getLatestSnapshot().getReceivedAt())
                 .startConditionPointValue(startValue)
+                .rollingDirection(rollingState.getDirection())
+                .passNo(rollingState.getPassNo())
                 .candidates(candidates)
                 .current(current)
                 .build());
         trackingStepLogger.log(input, "计算完成", TrackingStepLogger.details(
                 "started", started,
+                "rollingDirection", rollingState.getDirection(),
+                "passNo", rollingState.getPassNo(),
                 "uncoiler", current.get(DeviceSide.UNCOILER),
                 "coiler", current.get(DeviceSide.COILER),
                 "currentCount", current.size(),
@@ -109,14 +117,15 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
     private Map<String, StatusCandidateRuntime> updateCandidates(
             TrackingInput input,
             StatusTrackingSection tracking,
+            StatusTrackingRuntime previousRuntime,
+            RollingState rollingState,
             Instant generatedAt,
             List<StatusResult> results) {
-        Map<String, StatusCandidateRuntime> previous = runtimeRepositoryDispatcher.findRuntimeAs(
-                input.getUnitCode(), TrackingType.STATUS, StatusTrackingRuntime.class)
-                .map(StatusTrackingRuntime::getCandidates)
-                .orElse(null);
+        Map<String, StatusCandidateRuntime> previous = previousRuntime == null
+                ? null : previousRuntime.getCandidates();
         Map<String, StatusCandidateRuntime> updated = new LinkedHashMap<>();
         for (StatusPointGroup group : tracking.getPoints()) {
+            DeviceSide side = actualSide(group.getSide(), rollingState);
             String coilNo = normalizeCoilNo(PointReader.stringValue(input.getLatestSnapshot(),
                     pointPath(tracking, group.getCoilNo())));
             String colorNo = trimInvisible(PointReader.stringValue(input.getLatestSnapshot(),
@@ -130,19 +139,21 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             Integer productNo = !coilNoValid
                     ? null
                     : sameCoil ? old.getProductNo() : queryProductNo(input, group, coilNo);
-            CoilerMethodValue coilerMethod = sameCoil && coilerMethodPresent(old)
+            CoilerMethodValue coilerMethod = sameCoil && !rollingState.isWindowReset()
+                    && coilerMethodPresent(old)
                     ? coilerMethod(old)
-                    : resolveCoilerMethod(input.getLatestSnapshot(), tracking, group);
+                    : resolveCoilerMethod(input.getLatestSnapshot(), tracking, group, side);
             List<BigDecimal> lengths = new ArrayList<>();
             BigDecimal maxLength = null;
-            if (sameCoil) {
+            if (sameCoil && !rollingState.isWindowReset()) {
                 if (old.getLengths() != null) {
                     lengths.addAll(old.getLengths());
                 }
                 maxLength = old.getMaxLength();
             }
             if (length != null && coilNoValid) {
-                maxLength = sameCoil ? maxLength(old, length) : length;
+                maxLength = sameCoil && !rollingState.isWindowReset()
+                        ? maxLength(old, length) : length;
                 lengths.add(length);
             }
             while (lengths.size() > tracking.getSampleCount()) {
@@ -160,9 +171,9 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     .maxLength(maxLength)
                     .lengths(lengths)
                     .build();
-            if (coilNoValid && !sameCoil) {
-                StatusResult result = StatusResult.from(candidate, group, input.getUnitCode(),
-                        generatedAt, receivedAt(input));
+            if (coilNoValid && (!sameCoil || rollingState.isPassChanged())) {
+                StatusResult result = StatusResult.from(candidate, group, side,
+                        rollingState.getPassNo(), input.getUnitCode(), generatedAt, receivedAt(input));
                 if (result != null && !blank(result.getCoilerMethod())
                         && !blank(result.getCoilerMethodName())) {
                     results.add(result);
@@ -170,7 +181,9 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             }
             updated.put(group.getCode(), candidate);
             trackingStepLogger.log(input, "设备窗口更新", group.getCode(), TrackingStepLogger.details(
-                    "side", group.getSide(),
+                    "configuredSide", group.getSide(),
+                    "actualSide", side,
+                    "passNo", rollingState.getPassNo(),
                     "coilNo", coilNo,
                     "productNo", productNo,
                     "colorNo", colorNo,
@@ -186,11 +199,12 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
 
     private CoilerMethodValue resolveCoilerMethod(PointSnapshot snapshot,
                                                   StatusTrackingSection tracking,
-                                                  StatusPointGroup group) {
+                                                  StatusPointGroup group,
+                                                  DeviceSide side) {
         if (tracking.getCoilerMethodDef() == null || group.getCoilerMethod() == null) {
             return null;
         }
-        CoilerMethodDefinition definition = tracking.getCoilerMethodDef().definition(group.getSide());
+        CoilerMethodDefinition definition = tracking.getCoilerMethodDef().definition(side);
         if (definition == null || definition.getName() == null || definition.getCode() == null
                 || definition.getName().size() < 2 || definition.getCode().size() < 2) {
             throw new IllegalArgumentException("开卷卷取方式定义无效: " + group.getCode());
@@ -277,9 +291,11 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
 
     private Map<DeviceSide, SelectedCandidate> selectCandidates(TrackingInput input,
                                                                  StatusTrackingSection tracking,
-                                                                 Map<String, StatusCandidateRuntime> candidates) {
+                                                                 Map<String, StatusCandidateRuntime> candidates,
+                                                                 RollingState rollingState) {
         Map<DeviceSide, SelectedCandidate> selected = new LinkedHashMap<>();
         for (StatusPointGroup group : tracking.getPoints()) {
+            DeviceSide side = actualSide(group.getSide(), rollingState);
             StatusCandidateRuntime runtime = candidates.get(group.getCode());
             if (runtime == null || Boolean.FALSE.equals(runtime.getDataComplete())
                     || runtime.getLengths() == null
@@ -294,12 +310,13 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             BigDecimal max = lengths.stream().max(BigDecimal::compareTo).orElse(first);
             BigDecimal absoluteChange = max.subtract(min);
             boolean monotonicityCheckEnabled = Boolean.TRUE.equals(tracking.getMonotonicityCheckEnabled());
-            boolean directionMatched = group.getSide() == DeviceSide.UNCOILER
+            boolean directionMatched = side == DeviceSide.UNCOILER
                     ? signedChange.signum() < 0
                     : signedChange.signum() > 0;
             boolean thresholdMatched = absoluteChange.compareTo(tracking.getMinLengthChange()) >= 0;
             trackingStepLogger.log(input, "设备趋势评估", group.getCode(), TrackingStepLogger.details(
-                    "side", group.getSide(),
+                    "configuredSide", group.getSide(),
+                    "actualSide", side,
                     "firstLength", first,
                     "latestLength", latest,
                     "change", signedChange,
@@ -312,15 +329,63 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             if ((monotonicityCheckEnabled && !directionMatched) || !thresholdMatched) {
                 continue;
             }
-            SelectedCandidate existing = selected.get(group.getSide());
+            SelectedCandidate existing = selected.get(side);
             if (existing == null || absoluteChange.compareTo(existing.getAbsoluteChange()) > 0) {
-                selected.put(group.getSide(), new SelectedCandidate(
+                selected.put(side, new SelectedCandidate(
                         group, runtime.getCoilNo(), runtime.getProductNo(), runtime.getColorNo(),
                         runtime.getCoilerMethod(), runtime.getCoilerMethodName(), latest,
                         runtime.getMaxLength(), absoluteChange));
             }
         }
         return selected;
+    }
+
+    private RollingState rollingState(TrackingInput input,
+                                      StatusTrackingSection tracking,
+                                      StatusTrackingRuntime previous) {
+        if (tracking.getRolling() == null) {
+            return new RollingState(null, null, false, false, false);
+        }
+        Object rawDirection = PointReader.rawValue(input.getLatestSnapshot(),
+                pointPath(tracking, tracking.getRolling().getDirectPoint()));
+        Boolean currentDirection = strictBoolean(rawDirection);
+        Boolean previousDirection = previous == null ? null : previous.getRollingDirection();
+        Boolean direction = currentDirection == null ? previousDirection : currentDirection;
+
+        Integer currentPassNo = integerValue(input.getLatestSnapshot(),
+                pointPath(tracking, tracking.getRolling().getPassNoPoint()));
+        Integer previousPassNo = previous == null ? null : previous.getPassNo();
+        Integer passNo = currentPassNo == null ? previousPassNo : currentPassNo;
+
+        boolean hasPreviousCandidates = previous != null && previous.getCandidates() != null
+                && !previous.getCandidates().isEmpty();
+        boolean reverse = Boolean.TRUE.equals(tracking.getRolling().getDirectReverse());
+        boolean currentSideReversed = direction != null && direction ^ reverse;
+        boolean previousSideReversed = previousDirection != null && previousDirection ^ reverse;
+        boolean directionChanged = hasPreviousCandidates && direction != null
+                && currentSideReversed != previousSideReversed;
+        boolean passChanged = hasPreviousCandidates && currentPassNo != null
+                && !currentPassNo.equals(previousPassNo);
+        boolean windowReset = directionChanged || passChanged;
+        trackingStepLogger.log(input, "轧制状态判断", TrackingStepLogger.details(
+                "direct", currentDirection,
+                "fallbackDirect", currentDirection == null ? previousDirection : null,
+                "directReverse", reverse,
+                "sideReversed", currentSideReversed,
+                "passNo", passNo,
+                "directionChanged", directionChanged,
+                "passChanged", passChanged,
+                "windowReset", windowReset));
+        return new RollingState(direction, passNo, reverse, passChanged, windowReset);
+    }
+
+    private DeviceSide actualSide(DeviceSide configuredSide, RollingState rollingState) {
+        if (configuredSide == null || rollingState.getDirection() == null
+                || !(rollingState.getDirection() ^ rollingState.isReverse())) {
+            return configuredSide;
+        }
+        return configuredSide == DeviceSide.UNCOILER
+                ? DeviceSide.COILER : DeviceSide.UNCOILER;
     }
 
     private Map<DeviceSide, StatusCurrentRuntime> current(
@@ -377,6 +442,11 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private Integer integerValue(PointSnapshot snapshot, String path) {
+        BigDecimal value = decimalValue(snapshot, path);
+        return value == null ? null : value.intValue();
     }
 
     private boolean started(BigDecimal actual, StartCondition condition) {
@@ -448,9 +518,24 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 || tracking.getStartCondition().getThreshold() == null
                 || tracking.getSampleCount() == null || tracking.getSampleCount() < 2
                 || tracking.getMinLengthChange() == null || tracking.getMinLengthChange().signum() < 0
-                || tracking.getPoints() == null) {
+                || tracking.getPoints() == null
+                || tracking.getRolling() != null
+                && (tracking.getRolling().getDirectPoint() == null
+                || blank(tracking.getRolling().getDirectPoint().getName())
+                || tracking.getRolling().getPassNoPoint() == null
+                || blank(tracking.getRolling().getPassNoPoint().getName()))) {
             throw new IllegalArgumentException("状态跟踪配置无效");
         }
+    }
+
+    @Getter
+    @AllArgsConstructor
+    private static class RollingState {
+        private final Boolean direction;
+        private final Integer passNo;
+        private final boolean reverse;
+        private final boolean passChanged;
+        private final boolean windowReset;
     }
 
     @Getter

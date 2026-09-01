@@ -7,6 +7,17 @@
     "sample_count": 4,
     "min_length_change": 0.5,
     "monotonicity_check_enabled": false,
+    "rolling": {
+      "direct_point": {
+        "name": "rolling_direction",
+        "type": "bool"
+      },
+      "pass_no_point": {
+        "name": "pass_no_pv",
+        "type": "short"
+      },
+      "direct_reverse": false
+    },
     "coiler_method_def": {
       "uncoiler": { "name": ["上开卷", "下开卷"], "code": ["11", "91"] },
       "coiler": { "name": ["上卷取", "下卷取"], "code": ["19", "99"] }
