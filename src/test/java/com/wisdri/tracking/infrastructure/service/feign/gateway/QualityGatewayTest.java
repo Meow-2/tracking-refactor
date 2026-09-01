@@ -5,6 +5,9 @@ import com.wisdri.tracking.common.response.R;
 import com.wisdri.tracking.infrastructure.service.feign.client.QualityFeignClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import java.lang.reflect.Method;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -13,6 +16,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class QualityGatewayTest {
+    @Test
+    void usesInMatNoAsMaterialRequestParameter() throws Exception {
+        Method method = QualityFeignClient.class.getMethod(
+                "queryNextProductNo", String.class, String.class);
+
+        RequestParam requestParam = method.getParameters()[1].getAnnotation(RequestParam.class);
+
+        assertThat(requestParam.value()).isEqualTo("inMatNo");
+    }
+
     @Test
     void returnsProductNoFromSuccessfulResponse() {
         QualityFeignClient client = mock(QualityFeignClient.class);

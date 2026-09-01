@@ -20,5 +20,5 @@ public interface QualityFeignClient {
      */
     @GetMapping("/mat/preprocess/nextProdCount")
     R<Integer> queryNextProductNo(@RequestParam("unitCode") String unitCode,
-                                  @RequestParam("matNo") String matNo);
+                                  @RequestParam("inMatNo") String inMatNo);
 }
