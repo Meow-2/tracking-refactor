@@ -83,7 +83,7 @@ remote_bash() {
     -o UserKnownHostsFile=/dev/null \
     -p "${port}" \
     "${user}@${host}" \
-    "bash -lc $(printf '%q' "${command}")"
+    "bash -s --" <<<"${command}"
 }
 
 copy_to_remote() {
