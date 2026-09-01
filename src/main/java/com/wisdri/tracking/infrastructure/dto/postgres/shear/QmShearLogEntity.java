@@ -1,5 +1,6 @@
 package com.wisdri.tracking.infrastructure.dto.postgres.shear;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -21,6 +22,7 @@ public class QmShearLogEntity {
     /** 剪切归属的投入物料钢卷号。 */
     private String inMatNo;
     /** 剪切归属物料的生产次数。 */
+    @TableField("in_mat_prod_no")
     private String inMatNoProdNo;
     /** 配置提供的剪切类型字符串编码，不保存 HEAD、SLICE、TAIL 枚举名。 */
     private String shearType;

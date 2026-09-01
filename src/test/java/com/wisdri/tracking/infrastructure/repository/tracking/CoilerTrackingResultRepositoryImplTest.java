@@ -106,7 +106,7 @@ class CoilerTrackingResultRepositoryImplTest {
         when(mapper.selectOne(any())).thenAnswer(invocation -> {
             LambdaQueryWrapper<QmCoilerLogEntity> query = invocation.getArgument(0);
             String sql = query.getSqlSegment().toLowerCase();
-            assertThat(sql).contains("in_mat_no =", "in_mat_no_prod_no =", "pass_no =");
+            assertThat(sql).contains("in_mat_no =", "in_mat_prod_no =", "pass_no =");
             assertThat(query.getParamNameValuePairs())
                     .containsValue("COIL-1").containsValue("3").containsValue(2);
             return existing;
@@ -145,7 +145,7 @@ class CoilerTrackingResultRepositoryImplTest {
         when(mapper.selectOne(any())).thenAnswer(invocation -> {
             LambdaQueryWrapper<QmCoilerLogEntity> query = invocation.getArgument(0);
             String sql = query.getSqlSegment().toLowerCase();
-            assertThat(sql).contains("in_mat_no =", "in_mat_no_prod_no is null", "pass_no is null");
+            assertThat(sql).contains("in_mat_no =", "in_mat_prod_no is null", "pass_no is null");
             assertThat(query.getParamNameValuePairs()).containsValue("COIL-2");
             return null;
         });

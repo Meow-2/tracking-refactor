@@ -71,7 +71,7 @@ class TrimmingTrackingResultRepositoryImplTest {
         verify(mapper).update(entity.capture(), wrapper.capture());
         verify(mapper, never()).insert(any());
         assertThat(wrapper.getValue().getSqlSegment().toLowerCase())
-                .contains("unit_code =", "in_mat_no =", "in_mat_no_prod_no =");
+                .contains("unit_code =", "in_mat_no =", "in_mat_prod_no =");
         assertThat(wrapper.getValue().getParamNameValuePairs().values())
                 .contains("CP1", "C001", "2");
         assertThat(entity.getValue().getCreateTime()).isNull();

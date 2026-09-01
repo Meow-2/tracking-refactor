@@ -1,5 +1,6 @@
 package com.wisdri.tracking.infrastructure.dto.postgres.coiler;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -16,6 +17,7 @@ public class QmCoilerLogEntity {
     private Long id;
     private String unitCode;
     private String inMatNo;
+    @TableField("in_mat_prod_no")
     private String inMatNoProdNo;
     private Integer passNo;
     private String coilerMethod;
