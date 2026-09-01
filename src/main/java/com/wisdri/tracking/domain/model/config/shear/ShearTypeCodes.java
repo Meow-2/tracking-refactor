@@ -13,10 +13,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ShearTypeCodes {
-    /** 切头判型写入 qm_shear_log.shear_type 的字符串编码。 */
+    /** 切头判型写入 qm_dc_shear_log.shear_type 的字符串编码。 */
     private String head;
-    /** 分切判型写入 qm_shear_log.shear_type 的字符串编码。 */
+    /** 分切判型写入 qm_dc_shear_log.shear_type 的字符串编码。 */
     private String slice;
-    /** 切尾判型写入 qm_shear_log.shear_type 的字符串编码。 */
+    /** 切尾判型写入 qm_dc_shear_log.shear_type 的字符串编码。 */
     private String tail;
 }

@@ -37,7 +37,7 @@ public class TrimmingTrackingResultRepositoryImpl
 
     @Override
     public void createTable(TrimmingTrackingConfig config) {
-        // qm_trimming_log 由数据库脚本预建。
+        // qm_dc_trimming_log 由数据库脚本预建。
     }
 
     @Override

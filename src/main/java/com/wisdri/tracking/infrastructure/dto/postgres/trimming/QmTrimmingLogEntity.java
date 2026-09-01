@@ -10,7 +10,7 @@ import java.time.Instant;
  * PostgreSQL 圆盘剪切边量记录。
  */
 @Data
-@TableName("qm_trimming_log")
+@TableName("qm_dc_trimming_log")
 public class QmTrimmingLogEntity {
     @TableId
     private Long id;

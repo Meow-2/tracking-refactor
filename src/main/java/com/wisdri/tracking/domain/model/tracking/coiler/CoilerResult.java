@@ -9,7 +9,7 @@ import lombok.experimental.SuperBuilder;
 import java.math.BigDecimal;
 
 /**
- * 待写入 qm_coiler_log 的开卷卷取结果。
+ * 待写入 qm_dc_coiler_log 的开卷卷取结果。
  */
 @Data
 @SuperBuilder

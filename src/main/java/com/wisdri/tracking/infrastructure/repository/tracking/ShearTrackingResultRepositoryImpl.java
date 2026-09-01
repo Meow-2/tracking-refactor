@@ -37,7 +37,7 @@ public class ShearTrackingResultRepositoryImpl
 
     @Override
     public void createTable(ShearTrackingConfig config) {
-        // qm_shear_log 由数据库脚本预建。
+        // qm_dc_shear_log 由数据库脚本预建。
     }
 
     @Override

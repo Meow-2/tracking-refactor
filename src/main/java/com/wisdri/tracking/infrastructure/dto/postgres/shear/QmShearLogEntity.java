@@ -11,9 +11,9 @@ import java.time.Instant;
  * PostgreSQL 剪切过程记录实体。
  */
 @Data
-@TableName("qm_shear_log")
+@TableName("qm_dc_shear_log")
 public class QmShearLogEntity {
-    /** qm_shear_log 主键，由 MyBatis-Plus 主键策略生成。 */
+    /** qm_dc_shear_log 主键，由 MyBatis-Plus 主键策略生成。 */
     @TableId
     private Long id;
     /** 产生剪切事件的机组代码。 */

@@ -38,7 +38,7 @@ public class CoilerTrackingResultRepositoryImpl
 
     @Override
     public void createTable(TrackingConfig config) {
-        // qm_coiler_log 由数据库脚本预建。
+        // qm_dc_coiler_log 由数据库脚本预建。
     }
 
     @Override

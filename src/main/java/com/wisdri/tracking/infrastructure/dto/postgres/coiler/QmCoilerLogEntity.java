@@ -10,7 +10,7 @@ import java.time.Instant;
  * PostgreSQL 钢卷开卷卷取方式记录。
  */
 @Data
-@TableName("qm_coiler_log")
+@TableName("qm_dc_coiler_log")
 public class QmCoilerLogEntity {
     @TableId
     private Long id;
