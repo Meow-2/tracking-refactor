@@ -14,8 +14,26 @@
     "min_length_change": 0.01,
     "monotonicity_check_enabled": false,
     "coiler_method_def": {
-      "uncoiler": { "name": ["上开卷", "下开卷"], "code": ["11", "91"] },
-      "coiler": { "name": ["上卷取", "下卷取"], "code": ["19", "99"] }
+      "uncoiler": {
+        "name": [
+          "上开卷",
+          "下开卷"
+        ],
+        "code": [
+          "11",
+          "91"
+        ]
+      },
+      "coiler": {
+        "name": [
+          "上卷取",
+          "下卷取"
+        ],
+        "code": [
+          "19",
+          "99"
+        ]
+      }
     },
     "points": [
       {
@@ -30,12 +48,13 @@
           "name": "por1_length",
           "type": "float"
         },
-        "color_no":{
+        "color_no": {
           "name": "color_code_por1",
           "type": "short"
         },
         "coiler_method": {
-          "default": false
+          "default": false,
+          "false_index": 0
         }
       },
       {
@@ -50,12 +69,13 @@
           "name": "por2_length",
           "type": "float"
         },
-        "color_no":{
+        "color_no": {
           "name": "color_code_por2",
           "type": "short"
         },
         "coiler_method": {
-          "default": false
+          "default": false,
+          "false_index": 0
         }
       },
       {
@@ -76,7 +96,7 @@
         },
         "coiler_method": {
           "default": false,
-          "true_index": 1,
+          "false_index": 0,
           "name": "tr1_wind_mode",
           "type": "boolean"
         }

@@ -1,119 +1,136 @@
 {
-  "default": {
-    "enable": true,
-    "mqtt_topic": "dcl1_process_tracking",
-    "tracking": {
-      "point_prefix": "/aygg_tracking/dcl1/process/tracking/",
-      "speed_point": {
+  "enable": true,
+  "mqtt_topic": "dcl1_process_tracking",
+  "tracking": {
+    "point_prefix": "/aygg_tracking/dcl1/process/tracking/",
+    "speed_point": {
+      "name": "center_speed_pv",
+      "type": "float"
+    },
+    "start_condition": {
+      "point": {
         "name": "center_speed_pv",
         "type": "float"
       },
-      "start_condition": {
-        "point": {
-          "name": "center_speed_pv",
-          "type": "float"
-        },
-        "threshold": 0
+      "threshold": 0
+    },
+    "length_mode": "welder",
+    "points": [
+      {
+        "length": [
+          {
+            "name": "group1_head_to_welder_length",
+            "type": "float"
+          },
+          {
+            "name": "group1_head_to_weld_seam_detector1_length",
+            "type": "float"
+          },
+          {
+            "name": "group1_head_to_weld_seam_detector2_length",
+            "type": "float"
+          },
+          {
+            "name": "group1_head_to_weld_seam_detector3_length",
+            "type": "float"
+          }
+        ],
+        "coil_no": {
+          "name": "group1_coil_no",
+          "type": "string"
+        }
       },
-      "length_mode": "welder",
+      {
+        "length": [
+          {
+            "name": "group2_head_to_welder_length",
+            "type": "float"
+          },
+          {
+            "name": "group2_head_to_weld_seam_detector1_length",
+            "type": "float"
+          },
+          {
+            "name": "group2_head_to_weld_seam_detector2_length",
+            "type": "float"
+          },
+          {
+            "name": "group2_head_to_weld_seam_detector3_length",
+            "type": "float"
+          }
+        ],
+        "coil_no": {
+          "name": "group2_coil_no",
+          "type": "string"
+        }
+      },
+      {
+        "length": [
+          {
+            "name": "group3_head_to_welder_length",
+            "type": "float"
+          },
+          {
+            "name": "group3_head_to_weld_seam_detector1_length",
+            "type": "float"
+          },
+          {
+            "name": "group3_head_to_weld_seam_detector2_length",
+            "type": "float"
+          },
+          {
+            "name": "group3_head_to_weld_seam_detector3_length",
+            "type": "float"
+          }
+        ],
+        "coil_no": {
+          "name": "group3_coil_no",
+          "type": "string"
+        }
+      },
+      {
+        "length": [
+          {
+            "name": "group4_head_to_welder_length",
+            "type": "float"
+          },
+          {
+            "name": "group4_head_to_weld_seam_detector1_length",
+            "type": "float"
+          },
+          {
+            "name": "group4_head_to_weld_seam_detector2_length",
+            "type": "float"
+          },
+          {
+            "name": "group4_head_to_weld_seam_detector3_length",
+            "type": "float"
+          }
+        ],
+        "coil_no": {
+          "name": "group4_coil_no",
+          "type": "string"
+        }
+      }
+    ]
+  },
+  "segments": [
+    {
+      "name": "3#SF段",
+      "code": "sf3",
+      "point_prefix": "/aygg_tracking/dcl1/process/tech/sf3/",
+      "length_correct": -243.507,
+      "length_array_index": 1,
       "points": [
         {
-          "length": [
-            {
-              "name": "group1_head_to_welder_length",
-              "type": "float"
-            },
-            {
-              "name": "group1_head_to_weld_seam_detector1_length",
-              "type": "float"
-            },
-            {
-              "name": "group1_head_to_weld_seam_detector2_length",
-              "type": "float"
-            },
-            {
-              "name": "group1_head_to_weld_seam_detector3_length",
-              "type": "float"
-            }
-          ],
-          "coil_no": {
-            "name": "group1_coil_no",
-            "type": "string"
-          }
+          "name": "sf3_section1_furnace_temp_pv",
+          "type": "float"
         },
         {
-          "length": [
-            {
-              "name": "group2_head_to_welder_length",
-              "type": "float"
-            },
-            {
-              "name": "group2_head_to_weld_seam_detector1_length",
-              "type": "float"
-            },
-            {
-              "name": "group2_head_to_weld_seam_detector2_length",
-              "type": "float"
-            },
-            {
-              "name": "group2_head_to_weld_seam_detector3_length",
-              "type": "float"
-            }
-          ],
-          "coil_no": {
-            "name": "group2_coil_no",
-            "type": "string"
-          }
-        },
-        {
-          "length": [
-            {
-              "name": "group3_head_to_welder_length",
-              "type": "float"
-            },
-            {
-              "name": "group3_head_to_weld_seam_detector1_length",
-              "type": "float"
-            },
-            {
-              "name": "group3_head_to_weld_seam_detector2_length",
-              "type": "float"
-            },
-            {
-              "name": "group3_head_to_weld_seam_detector3_length",
-              "type": "float"
-            }
-          ],
-          "coil_no": {
-            "name": "group3_coil_no",
-            "type": "string"
-          }
-        },
-        {
-          "length": [
-            {
-              "name": "group4_head_to_welder_length",
-              "type": "float"
-            },
-            {
-              "name": "group4_head_to_weld_seam_detector1_length",
-              "type": "float"
-            },
-            {
-              "name": "group4_head_to_weld_seam_detector2_length",
-              "type": "float"
-            },
-            {
-              "name": "group4_head_to_weld_seam_detector3_length",
-              "type": "float"
-            }
-          ],
-          "coil_no": {
-            "name": "group4_coil_no",
-            "type": "string"
-          }
+          "name": "sf3_section2_furnace_temp_pv",
+          "type": "float"
         }
       ]
     }
-  }
+  ]
 }

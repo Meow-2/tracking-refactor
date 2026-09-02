@@ -14,8 +14,26 @@
     "min_length_change": 0.01,
     "monotonicity_check_enabled": false,
     "coiler_method_def": {
-      "uncoiler": { "name": ["上开卷", "下开卷"], "code": ["11", "91"] },
-      "coiler": { "name": ["上卷取", "下卷取"], "code": ["19", "99"] }
+      "uncoiler": {
+        "name": [
+          "上开卷",
+          "下开卷"
+        ],
+        "code": [
+          "11",
+          "91"
+        ]
+      },
+      "coiler": {
+        "name": [
+          "上卷取",
+          "下卷取"
+        ],
+        "code": [
+          "19",
+          "99"
+        ]
+      }
     },
     "points": [
       {
@@ -30,7 +48,7 @@
           "name": "por1_length",
           "type": "float"
         },
-        "color_no":{
+        "color_no": {
           "name": "color_code_por1",
           "type": "short"
         },
@@ -51,7 +69,7 @@
           "name": "por2_length",
           "type": "float"
         },
-        "color_no":{
+        "color_no": {
           "name": "color_code_por2",
           "type": "short"
         },
@@ -72,7 +90,7 @@
           "name": "tr1_length",
           "type": "float"
         },
-        "color_no":{
+        "color_no": {
           "name": "color_code_tension_reel1",
           "type": "short"
         },
@@ -95,7 +113,7 @@
           "name": "tr2_length",
           "type": "float"
         },
-        "color_no":{
+        "color_no": {
           "name": "color_code_tension_reel2",
           "type": "short"
         },

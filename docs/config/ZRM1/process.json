@@ -12,7 +12,7 @@
         "name": "mill_speed_pv",
         "type": "float"
       },
-      "threshold": 0
+      "threshold": 10
     },
     "length_mode": "rolling",
     "rolling": {

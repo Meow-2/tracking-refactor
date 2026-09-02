@@ -13,7 +13,7 @@
         "name": "prod_status",
         "type": "short"
       },
-      "threshold": 0
+      "threshold": 1
     },
     "point": [
       {

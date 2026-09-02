@@ -3,7 +3,13 @@
   "mqtt_topic": "zrm1_status_tracking",
   "tracking": {
     "point_prefix": "/aygg_tracking/zrm1/status/tracking/",
-    "start_condition": { "point": { "name": "mill_speed_pv", "type": "short" }, "threshold": 0 },
+    "start_condition": {
+      "point": {
+        "name": "mill_speed_pv",
+        "type": "short"
+      },
+      "threshold": 0
+    },
     "sample_count": 4,
     "min_length_change": 0.5,
     "monotonicity_check_enabled": false,
@@ -19,21 +25,61 @@
       "direct_reverse": false
     },
     "coiler_method_def": {
-      "uncoiler": { "name": ["上开卷", "下开卷"], "code": ["11", "91"] },
-      "coiler": { "name": ["上卷取", "下卷取"], "code": ["19", "99"] }
+      "uncoiler": {
+        "name": [
+          "上开卷",
+          "下开卷"
+        ],
+        "code": [
+          "11",
+          "91"
+        ]
+      },
+      "coiler": {
+        "name": [
+          "上卷取",
+          "下卷取"
+        ],
+        "code": [
+          "19",
+          "99"
+        ]
+      }
     },
     "points": [
       {
-        "code": "por1", "name": "入口卷取机", "side": "uncoiler",
-        "coil_no": { "name": "entry_tr_coil_no", "type": "string" },
-        "remaining_length": { "name": "entry_right_tr_coil_length", "type": "float" },
-        "coiler_method": { "default": true, "false_index": 0 }
+        "code": "por1",
+        "name": "入口卷取机",
+        "side": "uncoiler",
+        "coil_no": {
+          "name": "entry_tr_coil_no",
+          "type": "string"
+        },
+        "remaining_length": {
+          "name": "entry_right_tr_coil_length",
+          "type": "float"
+        },
+        "coiler_method": {
+          "default": true,
+          "false_index": 0
+        }
       },
       {
-        "code": "tr1", "name": "出口卷取机", "side": "coiler",
-        "coil_no": { "name": "exit_tr_coil_no", "type": "string" },
-        "remaining_length": { "name": "exit_left_tr_coil_length", "type": "float" },
-        "coiler_method": { "default": true, "false_index": 0 }
+        "code": "tr1",
+        "name": "出口卷取机",
+        "side": "coiler",
+        "coil_no": {
+          "name": "exit_tr_coil_no",
+          "type": "string"
+        },
+        "remaining_length": {
+          "name": "exit_left_tr_coil_length",
+          "type": "float"
+        },
+        "coiler_method": {
+          "default": true,
+          "false_index": 0
+        }
       }
     ]
   }
