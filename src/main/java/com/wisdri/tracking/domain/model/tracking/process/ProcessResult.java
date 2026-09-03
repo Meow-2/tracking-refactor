@@ -35,6 +35,11 @@ public class ProcessResult extends TrackingResult {
     private String coilNo;
 
     /**
+     * 入口物料重复生产次数。
+     */
+    private Integer inMatNoProdNo;
+
+    /**
      * 带头长度值。
      */
     private BigDecimal headLength;

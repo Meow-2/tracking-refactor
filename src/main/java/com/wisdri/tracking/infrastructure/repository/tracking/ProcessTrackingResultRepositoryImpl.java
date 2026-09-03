@@ -26,6 +26,7 @@ import java.util.Map;
 public class ProcessTrackingResultRepositoryImpl implements TrackingResultRepository<ProcessTrackingConfig, ProcessResult> {
     private static final List<TimeSeriesTableRule> NON_TAG_COLUMN = Arrays.asList(
             tableRule("coil_no", TimeSeriesDataType.STRING.getCode(), false),
+            tableRule("in_mat_prod_no", TimeSeriesDataType.INT.getCode(), false),
             tableRule("head_length", TimeSeriesDataType.FLOAT.getCode(), false),
             tableRule("speed", TimeSeriesDataType.FLOAT.getCode(), false),
             tableRule("pass_no", TimeSeriesDataType.INT.getCode(), false)
@@ -112,6 +113,7 @@ public class ProcessTrackingResultRepositoryImpl implements TrackingResultReposi
     private List<TimeSeriesDataValue> processValues(ProcessResult result, Long timestamp) {
         List<TimeSeriesDataValue> values = new ArrayList<>();
         add(values, "coil_no", result.getCoilNo(), false, timestamp);
+        add(values, "in_mat_prod_no", result.getInMatNoProdNo(), false, timestamp);
         add(values, "head_length", result.getHeadLength(), false, timestamp);
         add(values, "speed", result.getSpeed(), false, timestamp);
         add(values, "pass_no", result.getPassNo(), false, timestamp);

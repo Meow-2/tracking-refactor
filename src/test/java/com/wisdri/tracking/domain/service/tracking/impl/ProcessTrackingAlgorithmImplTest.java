@@ -4,15 +4,20 @@ import com.wisdri.tracking.domain.model.config.process.LengthMode;
 import com.wisdri.tracking.domain.model.config.PointConfig;
 import com.wisdri.tracking.domain.model.config.StartCondition;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
+import com.wisdri.tracking.domain.model.config.process.RollingConfig;
 import com.wisdri.tracking.domain.model.config.process.SegmentConfig;
 import com.wisdri.tracking.domain.model.config.process.TrackingPointGroup;
 import com.wisdri.tracking.domain.model.config.process.TrackingSection;
+import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
+import com.wisdri.tracking.domain.model.tracking.status.StatusTrackingContext;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.abnormal.AbnormalDataHandlerDispatcher;
 import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
@@ -26,6 +31,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -67,6 +73,9 @@ class ProcessTrackingAlgorithmImplTest {
     void replacesSegmentRuntimeWithCurrentCalculationIncludingEmptyState() {
         List<ProcessResult> results = algorithm.calculate(input(values("C001", new BigDecimal("15.5"))));
         assertEquals(1, results.size());
+        assertEquals("C001", results.get(0).getCoilNo());
+        assertEquals(Integer.valueOf(2), results.get(0).getInMatNoProdNo());
+        assertEquals(new BigDecimal("15.5"), results.get(0).getHeadLength());
 
         List<ProcessResult> emptyResults = algorithm.calculate(input(Collections.emptyMap()));
         assertTrue(emptyResults.isEmpty());
@@ -79,7 +88,7 @@ class ProcessTrackingAlgorithmImplTest {
         assertEquals(new BigDecimal("2.5"), populated.getSpeedPointValue());
         assertEquals(BigDecimal.ONE, populated.getStartConditionPointValue());
         verify(trackingStepLogger).log(any(TrackingInput.class),
-                eq("区段候选钢卷评估"), eq("S1"), anyMap());
+                eq("状态物料检查"), eq("S1"), anyMap());
         verify(trackingStepLogger).log(any(TrackingInput.class),
                 eq("区段结果生成"), eq("S1"), anyMap());
 
@@ -117,6 +126,94 @@ class ProcessTrackingAlgorithmImplTest {
         assertTrue(saved.getSegments().isEmpty());
     }
 
+    @Test
+    void rollingUsesStatusMaterialAndKeepsPassNumber() {
+        ProcessTrackingConfig config = config();
+        config.getTracking().setLengthMode(LengthMode.ROLLING);
+        config.getTracking().setRolling(RollingConfig.builder()
+                .directPoint(PointConfig.builder().name("direction").build())
+                .passNoPoint(PointConfig.builder().name("pass").build())
+                .directReverse(false)
+                .build());
+        when(runtimeRepositoryDispatcher.findConfigAs(
+                "CP1", TrackingType.PROCESS, ProcessTrackingConfig.class
+        )).thenReturn(Optional.of(config));
+        Map<String, Object> values = values("POINT-COIL", new BigDecimal("999"));
+        values.put("direction", true);
+        values.put("pass", 3);
+
+        List<ProcessResult> results = algorithm.calculate(input(values,
+                status("STATUS-COIL", 7, "120", "20", "5")));
+
+        assertEquals(1, results.size());
+        assertEquals("STATUS-COIL", results.get(0).getCoilNo());
+        assertEquals(Integer.valueOf(7), results.get(0).getInMatNoProdNo());
+        assertEquals(new BigDecimal("100"), results.get(0).getHeadLength());
+        assertEquals(Integer.valueOf(3), results.get(0).getPassNo());
+    }
+
+    @Test
+    void appliesEachSegmentCorrectionToStatusMaterial() {
+        ProcessTrackingConfig config = config();
+        config.setSegments(java.util.Arrays.asList(
+                SegmentConfig.builder().code("S1").lengthCorrect(new BigDecimal("1.5")).build(),
+                SegmentConfig.builder().code("S2").lengthCorrect(new BigDecimal("-2")).build()));
+        when(runtimeRepositoryDispatcher.findConfigAs(
+                "CP1", TrackingType.PROCESS, ProcessTrackingConfig.class
+        )).thenReturn(Optional.of(config));
+
+        List<ProcessResult> results = algorithm.calculate(input(values("POINT-COIL", new BigDecimal("999")),
+                status("STATUS-COIL", null, "100", "75", "2")));
+
+        assertEquals(2, results.size());
+        assertEquals(new BigDecimal("26.5"), results.get(0).getHeadLength());
+        assertEquals(new BigDecimal("23"), results.get(1).getHeadLength());
+        assertEquals(null, results.get(0).getInMatNoProdNo());
+    }
+
+    @Test
+    void skipsStatusModesWhenCoilerNotStartedOrUncoilerDataIsIncomplete() {
+        assertTrue(algorithm.calculate(input(values("C001", BigDecimal.ONE),
+                status("C001", 2, "100", "90", null))).isEmpty());
+        assertTrue(algorithm.calculate(input(values("C001", BigDecimal.ONE),
+                status("C001", 2, "100", "90", "0"))).isEmpty());
+        assertTrue(algorithm.calculate(input(values("C001", BigDecimal.ONE),
+                status("C001", 2, "100", "90", "-1"))).isEmpty());
+        assertTrue(algorithm.calculate(input(values("C001", BigDecimal.ONE),
+                status("C001", 2, null, "90", "1"))).isEmpty());
+        assertTrue(algorithm.calculate(input(values("C001", BigDecimal.ONE),
+                status("C001", 2, "100", null, "1"))).isEmpty());
+        assertTrue(algorithm.calculate(input(values("C001", BigDecimal.ONE), null)).isEmpty());
+    }
+
+    @Test
+    void welderFindsProductNumberFromCurrentBeforeCandidates() {
+        ProcessTrackingConfig config = config();
+        config.getTracking().setLengthMode(LengthMode.WELDER);
+        config.getSegments().get(0).setLengthArrayIndex(0);
+        when(runtimeRepositoryDispatcher.findConfigAs(
+                "CP1", TrackingType.PROCESS, ProcessTrackingConfig.class
+        )).thenReturn(Optional.of(config));
+        StatusTrackingContext context = status("OTHER", 8, "100", "90", "1");
+        context.getCurrent().get(DeviceSide.COILER).setCoilNo("C001");
+        context.getCurrent().get(DeviceSide.COILER).setProductNo(null);
+        context.getCandidates().put("candidate", StatusCandidateRuntime.builder()
+                .coilNo("C001").productNo(9).build());
+
+        List<ProcessResult> currentMatched = algorithm.calculate(input(values("C001", new BigDecimal("12")), context));
+
+        assertEquals(1, currentMatched.size());
+        assertEquals(null, currentMatched.get(0).getInMatNoProdNo());
+
+        context.getCurrent().get(DeviceSide.COILER).setCoilNo("OTHER-2");
+        List<ProcessResult> candidateMatched = algorithm.calculate(input(values("C001", new BigDecimal("12")), context));
+        assertEquals(Integer.valueOf(9), candidateMatched.get(0).getInMatNoProdNo());
+
+        context.getCandidates().clear();
+        List<ProcessResult> notMatched = algorithm.calculate(input(values("C001", new BigDecimal("12")), context));
+        assertEquals(null, notMatched.get(0).getInMatNoProdNo());
+    }
+
     private ProcessTrackingConfig config() {
         PointConfig coilPoint = PointConfig.builder().name("coil").build();
         PointConfig lengthPoint = PointConfig.builder().name("length").build();
@@ -147,6 +244,10 @@ class ProcessTrackingAlgorithmImplTest {
     }
 
     private TrackingInput input(Map<String, Object> values) {
+        return input(values, status("C001", 2, "100", "84.5", "10"));
+    }
+
+    private TrackingInput input(Map<String, Object> values, StatusTrackingContext statusContext) {
         return TrackingInput.builder()
                 .unitCode("CP1")
                 .trackingType(TrackingType.PROCESS)
@@ -154,7 +255,35 @@ class ProcessTrackingAlgorithmImplTest {
                         .values(values)
                         .receivedAt(Instant.now())
                         .build())
+                .statusContext(statusContext)
                 .build();
+    }
+
+    private StatusTrackingContext status(String coilNo,
+                                         Integer productNo,
+                                         String maxLength,
+                                         String uncoilerRemainingLength,
+                                         String coilerRemainingLength) {
+        Map<DeviceSide, StatusCurrentRuntime> current = new LinkedHashMap<>();
+        current.put(DeviceSide.UNCOILER, StatusCurrentRuntime.builder()
+                .side(DeviceSide.UNCOILER)
+                .coilNo(coilNo)
+                .productNo(productNo)
+                .maxLength(decimal(maxLength))
+                .remainingLength(decimal(uncoilerRemainingLength))
+                .build());
+        current.put(DeviceSide.COILER, StatusCurrentRuntime.builder()
+                .side(DeviceSide.COILER)
+                .remainingLength(decimal(coilerRemainingLength))
+                .build());
+        return StatusTrackingContext.builder()
+                .current(current)
+                .candidates(new LinkedHashMap<>())
+                .build();
+    }
+
+    private BigDecimal decimal(String value) {
+        return value == null ? null : new BigDecimal(value);
     }
 
     private Map<String, Object> values(String coilNo, BigDecimal length) {

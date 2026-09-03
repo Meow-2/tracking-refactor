@@ -3,17 +3,20 @@ package com.wisdri.tracking.domain.service.tracking.impl;
 import com.wisdri.tracking.domain.model.config.process.LengthMode;
 import com.wisdri.tracking.domain.model.config.PointConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
-import com.wisdri.tracking.domain.model.config.process.RollingConfig;
 import com.wisdri.tracking.domain.model.config.process.SegmentConfig;
 import com.wisdri.tracking.domain.model.config.StartCondition;
 import com.wisdri.tracking.domain.model.config.process.TrackingPointGroup;
 import com.wisdri.tracking.domain.model.config.process.TrackingSection;
+import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessSegmentRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
+import com.wisdri.tracking.domain.model.tracking.status.StatusTrackingContext;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.abnormal.AbnormalDataHandlerDispatcher;
 import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
@@ -31,6 +34,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -113,12 +117,15 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
             return complete(input, startedAt, "未达到启动条件", tracking, new ArrayList<>());
         }
 
-        // 过滤有效钢卷点位组，后续每个工艺段基于同一组候选点位选择当前钢卷。
-        List<TrackingPointGroup> groups = validGroups(latest, tracking);
-        trackingStepLogger.log(input, "钢卷分组筛选", TrackingStepLogger.details(
-                "groups", groupDetails(latest, tracking, tracking.getPoints(), groups),
-                "eligibleCount", groups.size()
-        ));
+        // 焊缝模式仍通过过程点位选卷；卷取机和轧机模式统一使用固化的状态上下文。
+        List<TrackingPointGroup> groups = new ArrayList<>();
+        if (LengthMode.WELDER == tracking.getLengthMode()) {
+            groups = validGroups(latest, tracking);
+            trackingStepLogger.log(input, "钢卷分组筛选", TrackingStepLogger.details(
+                    "groups", groupDetails(latest, tracking, tracking.getPoints(), groups),
+                    "eligibleCount", groups.size()
+            ));
+        }
         List<ProcessResult> results = new ArrayList<>();
         if (config.getSegments() == null) {
             return complete(input, startedAt, "segments_missing", tracking, results);
@@ -126,12 +133,10 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
 
         // 按工艺段逐段选择钢卷并组装跟踪结果。
         for (SegmentConfig segment : config.getSegments()) {
-            SelectedGroup selected = selectGroup(input, latest, tracking, segment, groups);
+            SelectedMaterial selected = selectMaterial(input, latest, tracking, segment, groups);
             if (selected == null) {
                 continue;
             }
-            String coilNo = PointReader.stringValue(latest,
-                    trackingPointPath(tracking, selected.group.getCoilNo()));
             BigDecimal speed = PointReader.decimalValue(latest,
                     trackingPointPath(tracking, tracking.getSpeedPoint()));
             Integer passNo = passNo(latest, tracking);
@@ -141,7 +146,8 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                     .trackingType(config.getTrackingType())
                     .segmentCode(segment.getCode())
                     .segmentName(segment.getName())
-                    .coilNo(coilNo)
+                    .coilNo(selected.coilNo)
+                    .inMatNoProdNo(selected.productNo)
                     .headLength(selected.headLength)
                     .speed(speed)
                     .passNo(passNo)
@@ -152,7 +158,8 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
             results.add(result);
             trackingStepLogger.log(input, "区段结果生成", segment.getCode(),
                     TrackingStepLogger.details(
-                            "coilNo", coilNo,
+                            "coilNo", selected.coilNo,
+                            "productNo", selected.productNo,
                             "headLength", selected.headLength,
                             "speed", speed,
                             "passNo", passNo,
@@ -271,34 +278,28 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
         return details;
     }
 
-    /**
-     * 根据长度模式选择当前工艺段对应的钢卷点位组。
-     */
-    private SelectedGroup selectGroup(TrackingInput input,
-                                      PointSnapshot latest,
-                                      TrackingSection tracking,
-                                      SegmentConfig segment,
-                                      List<TrackingPointGroup> groups) {
+    /** 根据长度模式选择当前工艺段对应的物料。 */
+    private SelectedMaterial selectMaterial(TrackingInput input,
+                                            PointSnapshot latest,
+                                            TrackingSection tracking,
+                                            SegmentConfig segment,
+                                            List<TrackingPointGroup> groups) {
         LengthMode lengthMode = tracking.getLengthMode();
         if (LengthMode.WELDER == lengthMode) {
             return selectWelder(input, latest, tracking, segment, groups);
         }
-        List<TrackingPointGroup> candidates = groups;
-        if (LengthMode.ROLLING == lengthMode) {
-            candidates = rollingCandidates(input, latest, tracking, groups);
-        }
-        return selectCoiler(input, latest, tracking, segment, candidates);
+        return selectStatusMaterial(input, tracking, segment);
     }
 
     /**
      * 焊缝模式：选择修正后带头长度大于等于 0 且最小的点位组。
      */
-    private SelectedGroup selectWelder(TrackingInput input,
-                                       PointSnapshot latest,
-                                       TrackingSection tracking,
-                                       SegmentConfig segment,
-                                       List<TrackingPointGroup> groups) {
-        SelectedGroup selected = null;
+    private SelectedMaterial selectWelder(TrackingInput input,
+                                          PointSnapshot latest,
+                                          TrackingSection tracking,
+                                          SegmentConfig segment,
+                                          List<TrackingPointGroup> groups) {
+        SelectedMaterial selected = null;
         int index = Optional.ofNullable(segment.getLengthArrayIndex()).orElse(0);
         List<Map<String, Object>> evaluations = new ArrayList<>();
         for (int groupIndex = 0; groupIndex < groups.size(); groupIndex++) {
@@ -326,80 +327,92 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
             evaluations.add(candidateDetail(groupIndex, coilNo, rawLength, headLength,
                     true, "候选钢卷"));
             if (selected == null || headLength.compareTo(selected.headLength) < 0) {
-                selected = new SelectedGroup(group, headLength);
+                selected = new SelectedMaterial(coilNo,
+                        productNo(input.getStatusContext(), coilNo), headLength);
             }
         }
-        logCandidateEvaluation(input, segment, LengthMode.WELDER, index, evaluations, selected, latest, tracking);
+        logCandidateEvaluation(input, segment, LengthMode.WELDER, index, evaluations, selected);
         return selected;
     }
 
     /**
-     * 卷取机模式：选择修正后带头长度满足条件且最大的点位组。
+     * 卷取机、轧机模式使用状态算法识别出的当前开卷端物料。
      */
-    private SelectedGroup selectCoiler(TrackingInput input,
-                                       PointSnapshot latest,
-                                       TrackingSection tracking,
-                                       SegmentConfig segment,
-                                       List<TrackingPointGroup> groups) {
-        SelectedGroup selected = null;
-        List<Map<String, Object>> evaluations = new ArrayList<>();
+    private SelectedMaterial selectStatusMaterial(TrackingInput input,
+                                                  TrackingSection tracking,
+                                                  SegmentConfig segment) {
+        StatusTrackingContext context = input.getStatusContext();
+        Map<DeviceSide, StatusCurrentRuntime> current = context == null ? null : context.getCurrent();
+        StatusCurrentRuntime coiler = current == null ? null : current.get(DeviceSide.COILER);
+        StatusCurrentRuntime uncoiler = current == null ? null : current.get(DeviceSide.UNCOILER);
+        BigDecimal coilerRemainingLength = coiler == null ? null : coiler.getRemainingLength();
         BigDecimal lengthCorrect = Optional.ofNullable(segment.getLengthCorrect()).orElse(BigDecimal.ZERO);
-        for (int groupIndex = 0; groupIndex < groups.size(); groupIndex++) {
-            TrackingPointGroup group = groups.get(groupIndex);
-            String coilNo = PointReader.stringValue(latest, trackingPointPath(tracking, group.getCoilNo()));
-            if (group.getLength() == null || group.getLength().isEmpty()) {
-                evaluations.add(candidateDetail(groupIndex, coilNo, null, null,
-                        false, "缺少长度点位"));
-                continue;
-            }
-            BigDecimal rawLength = PointReader.decimalValue(
-                    latest, trackingPointPath(tracking, group.getLength().get(0)));
-            BigDecimal headLength = rawLength == null ? null : rawLength.add(lengthCorrect);
-            if (headLength == null) {
-                evaluations.add(candidateDetail(groupIndex, coilNo, rawLength, null,
-                        false, "缺少长度值"));
-                continue;
-            }
-            if (headLength.compareTo(lengthCorrect) < 0) {
-                evaluations.add(candidateDetail(groupIndex, coilNo, rawLength, headLength,
-                        false, "修正后长度低于最小值"));
-                continue;
-            }
-            evaluations.add(candidateDetail(groupIndex, coilNo, rawLength, headLength,
-                    true, "候选钢卷"));
-            if (selected == null || headLength.compareTo(selected.headLength) > 0) {
-                selected = new SelectedGroup(group, headLength);
-            }
+        boolean coilerStarted = coilerRemainingLength != null
+                && coilerRemainingLength.compareTo(BigDecimal.ZERO) > 0;
+        boolean uncoilerComplete = uncoiler != null && !blank(uncoiler.getCoilNo())
+                && uncoiler.getMaxLength() != null && uncoiler.getRemainingLength() != null;
+        BigDecimal headLength = uncoilerComplete
+                ? uncoiler.getMaxLength().subtract(uncoiler.getRemainingLength()).add(lengthCorrect)
+                : null;
+        boolean eligible = coilerStarted && uncoilerComplete;
+        trackingStepLogger.log(input, "状态物料检查", segment.getCode(), TrackingStepLogger.details(
+                "lengthMode", tracking.getLengthMode(),
+                "coilerRemainingLength", coilerRemainingLength,
+                "uncoilerCoilNo", uncoiler == null ? null : uncoiler.getCoilNo(),
+                "uncoilerProductNo", uncoiler == null ? null : uncoiler.getProductNo(),
+                "uncoilerMaxLength", uncoiler == null ? null : uncoiler.getMaxLength(),
+                "uncoilerRemainingLength", uncoiler == null ? null : uncoiler.getRemainingLength(),
+                "lengthCorrect", lengthCorrect,
+                "headLength", headLength,
+                "eligible", eligible,
+                "reason", eligible ? "当前卷取端已开始卷取" : statusMaterialReason(coilerStarted, uncoiler)
+        ));
+        return eligible ? new SelectedMaterial(uncoiler.getCoilNo(),
+                uncoiler.getProductNo(), headLength) : null;
+    }
+
+    private String statusMaterialReason(boolean coilerStarted, StatusCurrentRuntime uncoiler) {
+        if (!coilerStarted) {
+            return "卷取端剩余长度未大于零";
         }
-        logCandidateEvaluation(input, segment, tracking.getLengthMode(), 0,
-                evaluations, selected, latest, tracking);
-        return selected;
+        if (uncoiler == null) {
+            return "缺少当前开卷端状态";
+        }
+        if (blank(uncoiler.getCoilNo())) {
+            return "当前开卷端钢卷号为空";
+        }
+        if (uncoiler.getMaxLength() == null) {
+            return "当前开卷端最大长度为空";
+        }
+        return "当前开卷端剩余长度为空";
     }
 
     /**
-     * 轧机模式：根据轧制方向筛选入口侧或出口侧点位组。
+     * 按钢卷号从当前设备、候选设备中查找重复生产次数。
      */
-    private List<TrackingPointGroup> rollingCandidates(TrackingInput input,
-                                                       PointSnapshot latest,
-                                                       TrackingSection tracking,
-                                                       List<TrackingPointGroup> groups) {
-        RollingConfig rolling = tracking.getRolling();
-        boolean direct = rolling != null && Boolean.TRUE.equals(PointReader.booleanValue(latest, trackingPointPath(tracking, rolling.getDirectPoint())));
-        boolean reverse = rolling != null && Boolean.TRUE.equals(rolling.getDirectReverse());
-        boolean targetCoiler = direct ^ reverse;
-        List<TrackingPointGroup> result = new ArrayList<>();
-        for (TrackingPointGroup group : groups) {
-            if (Boolean.TRUE.equals(group.getIsRollingCoiler()) == targetCoiler) {
-                result.add(group);
+    private Integer productNo(StatusTrackingContext context, String coilNo) {
+        if (context == null) {
+            return null;
+        }
+        if (context.getCurrent() != null) {
+            for (StatusCurrentRuntime current : context.getCurrent().values()) {
+                if (current != null && Objects.equals(coilNo, current.getCoilNo())) {
+                    return current.getProductNo();
+                }
             }
         }
-        trackingStepLogger.log(input, "轧制方向判断", TrackingStepLogger.details(
-                "direct", direct,
-                "directReverse", reverse,
-                "targetRollingCoiler", targetCoiler,
-                "eligibleGroups", groupDetails(latest, tracking, groups, result)
-        ));
-        return result;
+        if (context.getCandidates() != null) {
+            for (StatusCandidateRuntime candidate : context.getCandidates().values()) {
+                if (candidate != null && Objects.equals(coilNo, candidate.getCoilNo())) {
+                    return candidate.getProductNo();
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean blank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     private void logCandidateEvaluation(TrackingInput input,
@@ -407,11 +420,8 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                                         LengthMode lengthMode,
                                         int lengthIndex,
                                         List<Map<String, Object>> evaluations,
-                                        SelectedGroup selected,
-                                        PointSnapshot latest,
-                                        TrackingSection tracking) {
-        String selectedCoil = selected == null ? null : PointReader.stringValue(
-                latest, trackingPointPath(tracking, selected.group.getCoilNo()));
+                                        SelectedMaterial selected) {
+        String selectedCoil = selected == null ? null : selected.coilNo;
         trackingStepLogger.log(input, "区段候选钢卷评估", segment.getCode(),
                 TrackingStepLogger.details(
                         "lengthMode", lengthMode,
@@ -487,15 +497,14 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
 
     @Getter
     @AllArgsConstructor
-    private static class SelectedGroup {
-        /**
-         * 被选中的跟踪点位组。
-         */
-        private final TrackingPointGroup group;
+    private static class SelectedMaterial {
+        /** 当前物料钢卷号。 */
+        private final String coilNo;
 
-        /**
-         * 该点位组计算出的带头长度。
-         */
+        /** 当前物料重复生产次数。 */
+        private final Integer productNo;
+
+        /** 当前物料计算出的带头长度。 */
         private final BigDecimal headLength;
     }
 }

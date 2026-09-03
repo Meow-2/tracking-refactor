@@ -6,7 +6,10 @@ import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.SegmentConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
+import com.wisdri.tracking.infrastructure.dto.feign.timeseries.TimeSeriesDataRequest;
+import com.wisdri.tracking.infrastructure.dto.feign.timeseries.TimeSeriesDataValue;
 import com.wisdri.tracking.infrastructure.dto.feign.timeseries.TimeSeriesTableRequest;
+import com.wisdri.tracking.infrastructure.dto.feign.timeseries.TimeSeriesTableRule;
 import com.wisdri.tracking.infrastructure.properties.feign.TimeSeriesStorageProperties;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import com.wisdri.tracking.infrastructure.service.feign.gateway.TimeSeriesStorageGateway;
@@ -14,10 +17,12 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -57,6 +62,38 @@ class ProcessTrackingResultRepositoryImplTest {
         assertEquals("boolean", captor.getValue().getRule().stream()
                 .filter(rule -> "ready".equals(rule.getId()))
                 .findFirst().orElseThrow(AssertionError::new).getDatatype());
+        TimeSeriesTableRule productNo = captor.getValue().getRule().stream()
+                .filter(rule -> "in_mat_prod_no".equals(rule.getId()))
+                .findFirst().orElseThrow(AssertionError::new);
+        assertEquals("int", productNo.getDatatype());
+        assertFalse(productNo.getIsTag());
+    }
+
+    @Test
+    void savesProductNumberAsNonTagValue() {
+        ProcessTrackingResultRepositoryImpl repository = new ProcessTrackingResultRepositoryImpl();
+        TimeSeriesStorageGateway gateway = mock(TimeSeriesStorageGateway.class);
+        ReflectionTestUtils.setField(repository, "timeSeriesStorageGateway", gateway);
+        ReflectionTestUtils.setField(repository, "timeSeriesStorageProperties", new TimeSeriesStorageProperties());
+        ReflectionTestUtils.setField(repository, "trackingProperties", new TrackingProperties());
+        Instant receivedAt = Instant.parse("2026-09-03T01:00:00Z");
+
+        repository.save(Collections.singletonList(ProcessResult.builder()
+                .unitCode("CP1")
+                .trackingType(TrackingType.PROCESS)
+                .segmentCode("S1")
+                .inMatNoProdNo(3)
+                .receivedAt(receivedAt)
+                .build()));
+
+        ArgumentCaptor<TimeSeriesDataRequest> captor = ArgumentCaptor.forClass(TimeSeriesDataRequest.class);
+        verify(gateway).saveColumn(anyString(), captor.capture());
+        TimeSeriesDataValue productNo = captor.getValue().getValues().stream()
+                .filter(value -> "in_mat_prod_no".equals(value.getId()))
+                .findFirst().orElseThrow(AssertionError::new);
+        assertEquals(3, productNo.getV());
+        assertEquals(receivedAt.toEpochMilli(), productNo.getT());
+        assertFalse(productNo.getIsTag());
     }
 
     @Test
