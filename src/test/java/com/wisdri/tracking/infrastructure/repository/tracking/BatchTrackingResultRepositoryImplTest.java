@@ -66,17 +66,17 @@ class BatchTrackingResultRepositoryImplTest {
         TimeSeriesTableRequest request = captor.getValue();
         assertEquals("baf1_batch", request.getMeasurement());
         assertEquals("tracking_db", request.getBucket());
-        assertRule(request.getRule(), "fb_code", "int", false);
+        assertRule(request.getRule(), "fb_code", "int", true);
         assertRule(request.getRule(), "segment_code", "int", false);
-        assertRule(request.getRule(), "coil_no", "string", false);
-        assertRule(request.getRule(), "prod_status", "float", true);
+        assertRule(request.getRule(), "coil_no", "string", true);
+        assertRule(request.getRule(), "prod_status", "float", false);
         assertRule(request.getRule(), "head_length", "float", false);
         assertRule(request.getRule(), "speed", "float", false);
-        assertRule(request.getRule(), "pass_no", "int", false);
-        assertRule(request.getRule(), "shared", "string", true);
-        assertRule(request.getRule(), "north_temp", "float", true);
-        assertRule(request.getRule(), "south_count", "short", true);
-        assertRule(request.getRule(), "south_ready", "boolean", true);
+        assertRule(request.getRule(), "pass_no", "int", true);
+        assertRule(request.getRule(), "shared", "string", false);
+        assertRule(request.getRule(), "north_temp", "float", false);
+        assertRule(request.getRule(), "south_count", "short", false);
+        assertRule(request.getRule(), "south_ready", "boolean", false);
         assertEquals(1, request.getRule().stream()
                 .filter(rule -> "shared".equals(rule.getId()))
                 .count());
@@ -93,11 +93,11 @@ class BatchTrackingResultRepositoryImplTest {
         verify(gateway, times(2)).saveColumn(eq("baf1_batch"), captor.capture());
         TimeSeriesDataRequest northRequest = captor.getAllValues().get(0);
         assertEquals(NORTH_TIMESTAMP, northRequest.getTimestamp());
-        assertValue(northRequest.getValues(), "fb_code", 1, false, NORTH_TIMESTAMP);
+        assertValue(northRequest.getValues(), "fb_code", 1, true, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "segment_code", 1, false, NORTH_TIMESTAMP);
-        assertValue(northRequest.getValues(), "coil_no", "N001", false, NORTH_TIMESTAMP);
-        assertValue(northRequest.getValues(), "prod_status", new BigDecimal("1"), true, NORTH_TIMESTAMP);
-        assertValue(northRequest.getValues(), "shared", "north-value", true, NORTH_TIMESTAMP);
+        assertValue(northRequest.getValues(), "coil_no", "N001", true, NORTH_TIMESTAMP);
+        assertValue(northRequest.getValues(), "prod_status", new BigDecimal("1"), false, NORTH_TIMESTAMP);
+        assertValue(northRequest.getValues(), "shared", "north-value", false, NORTH_TIMESTAMP);
         assertFalse(northRequest.getValues().stream().anyMatch(value -> "empty".equals(value.getId())));
         assertFalse(northRequest.getValues().stream().anyMatch(value -> "head_length".equals(value.getId())));
         assertFalse(northRequest.getValues().stream().anyMatch(value -> "speed".equals(value.getId())));

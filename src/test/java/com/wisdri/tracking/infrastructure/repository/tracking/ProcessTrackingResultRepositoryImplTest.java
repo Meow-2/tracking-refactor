@@ -23,6 +23,7 @@ import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -62,15 +63,27 @@ class ProcessTrackingResultRepositoryImplTest {
         assertEquals("boolean", captor.getValue().getRule().stream()
                 .filter(rule -> "ready".equals(rule.getId()))
                 .findFirst().orElseThrow(AssertionError::new).getDatatype());
+        assertFalse(captor.getValue().getRule().stream()
+                .filter(rule -> "count".equals(rule.getId()))
+                .findFirst().orElseThrow(AssertionError::new).getIsTag());
+        assertFalse(captor.getValue().getRule().stream()
+                .filter(rule -> "ready".equals(rule.getId()))
+                .findFirst().orElseThrow(AssertionError::new).getIsTag());
         TimeSeriesTableRule productNo = captor.getValue().getRule().stream()
                 .filter(rule -> "in_mat_prod_no".equals(rule.getId()))
                 .findFirst().orElseThrow(AssertionError::new);
         assertEquals("int", productNo.getDatatype());
-        assertFalse(productNo.getIsTag());
+        assertTrue(productNo.getIsTag());
+        assertFalse(captor.getValue().getRule().stream()
+                .filter(rule -> "head_length".equals(rule.getId()))
+                .findFirst().orElseThrow(AssertionError::new).getIsTag());
+        assertFalse(captor.getValue().getRule().stream()
+                .filter(rule -> "speed".equals(rule.getId()))
+                .findFirst().orElseThrow(AssertionError::new).getIsTag());
     }
 
     @Test
-    void savesProductNumberAsNonTagValue() {
+    void savesFixedColumnsAsTagsAndDynamicParametersAsFields() {
         ProcessTrackingResultRepositoryImpl repository = new ProcessTrackingResultRepositoryImpl();
         TimeSeriesStorageGateway gateway = mock(TimeSeriesStorageGateway.class);
         ReflectionTestUtils.setField(repository, "timeSeriesStorageGateway", gateway);
@@ -83,6 +96,9 @@ class ProcessTrackingResultRepositoryImplTest {
                 .trackingType(TrackingType.PROCESS)
                 .segmentCode("S1")
                 .inMatNoProdNo(3)
+                .headLength(new java.math.BigDecimal("12.5"))
+                .speed(new java.math.BigDecimal("2.5"))
+                .parameters(Collections.singletonMap("temperature", 850))
                 .receivedAt(receivedAt)
                 .build()));
 
@@ -93,7 +109,17 @@ class ProcessTrackingResultRepositoryImplTest {
                 .findFirst().orElseThrow(AssertionError::new);
         assertEquals(3, productNo.getV());
         assertEquals(receivedAt.toEpochMilli(), productNo.getT());
-        assertFalse(productNo.getIsTag());
+        assertTrue(productNo.getIsTag());
+        assertFalse(captor.getValue().getValues().stream()
+                .filter(value -> "head_length".equals(value.getId()))
+                .findFirst().orElseThrow(AssertionError::new).getIsTag());
+        assertFalse(captor.getValue().getValues().stream()
+                .filter(value -> "speed".equals(value.getId()))
+                .findFirst().orElseThrow(AssertionError::new).getIsTag());
+        TimeSeriesDataValue temperature = captor.getValue().getValues().stream()
+                .filter(value -> "temperature".equals(value.getId()))
+                .findFirst().orElseThrow(AssertionError::new);
+        assertFalse(temperature.getIsTag());
     }
 
     @Test

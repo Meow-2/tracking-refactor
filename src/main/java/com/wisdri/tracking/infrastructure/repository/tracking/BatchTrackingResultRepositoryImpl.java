@@ -39,13 +39,13 @@ public class BatchTrackingResultRepositoryImpl
     private static final String SOUTH_SEGMENT = "south";
     private static final List<String> DYNAMIC_SEGMENT_ORDER = Arrays.asList("common", "north", "south");
     private static final List<TimeSeriesTableRule> FIXED_COLUMNS = Arrays.asList(
-            tableRule("fb_code", TimeSeriesDataType.INT.getCode(), false),
+            tableRule("fb_code", TimeSeriesDataType.INT.getCode(), true),
             tableRule("segment_code", TimeSeriesDataType.INT.getCode(), false),
-            tableRule("coil_no", TimeSeriesDataType.STRING.getCode(), false),
+            tableRule("coil_no", TimeSeriesDataType.STRING.getCode(), true),
             tableRule("head_length", TimeSeriesDataType.FLOAT.getCode(), false),
             tableRule("speed", TimeSeriesDataType.FLOAT.getCode(), false),
-            tableRule("pass_no", TimeSeriesDataType.INT.getCode(), false),
-            tableRule("prod_status", TimeSeriesDataType.FLOAT.getCode(), true)
+            tableRule("pass_no", TimeSeriesDataType.INT.getCode(), true),
+            tableRule("prod_status", TimeSeriesDataType.FLOAT.getCode(), false)
     );
 
     /**
@@ -123,7 +123,7 @@ public class BatchTrackingResultRepositoryImpl
                     continue;
                 }
                 TimeSeriesTableRule rule = tableRule(
-                        point.getName(), TimeSeriesDataType.fromPointDataType(point.getType()).getCode(), true);
+                        point.getName(), TimeSeriesDataType.fromPointDataType(point.getType()).getCode(), false);
                 TimeSeriesTableRule previous = rules.putIfAbsent(point.getName(), rule);
                 if (previous != null && !previous.getDatatype().equals(rule.getDatatype())) {
                     throw new TrackingException("批次动态列类型冲突: " + point.getName());
@@ -156,14 +156,14 @@ public class BatchTrackingResultRepositoryImpl
 
     private List<TimeSeriesDataValue> batchValues(BatchResult result, Long timestamp) {
         List<TimeSeriesDataValue> values = new ArrayList<>();
-        add(values, "fb_code", fbCode(result.getTemplateCode()), false, timestamp);
+        add(values, "fb_code", fbCode(result.getTemplateCode()), true, timestamp);
         add(values, "segment_code", segmentCode(result.getSegmentCode()), false, timestamp);
-        add(values, "coil_no", result.getCoilNo(), false, timestamp);
-        add(values, "prod_status", result.getProductionStatus(), true, timestamp);
+        add(values, "coil_no", result.getCoilNo(), true, timestamp);
+        add(values, "prod_status", result.getProductionStatus(), false, timestamp);
         if (result.getParameters() != null) {
             for (Map.Entry<String, Object> entry : result.getParameters().entrySet()) {
                 if (entry.getValue() != null) {
-                    add(values, entry.getKey(), entry.getValue(), true, timestamp);
+                    add(values, entry.getKey(), entry.getValue(), false, timestamp);
                 }
             }
         }
