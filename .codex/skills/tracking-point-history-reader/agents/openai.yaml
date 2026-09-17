@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tracking Point History"
+  short_description: "通过 Cube 与 DBX 查询跟踪点位历史数据流程"
+  default_prompt: "查询跟踪点位的历史数据"

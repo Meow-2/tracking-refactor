@@ -1,0 +1,7 @@
+interface:
+  display_name: "Tracking 服务日志读取"
+  short_description: "按 unitCode 和 trackingType 定位服务日志"
+  default_prompt: "使用 $tracking-service-log-reader 读取指定 unitCode 和 trackingType 在目标日期的日志。"
+
+policy:
+  allow_implicit_invocation: true

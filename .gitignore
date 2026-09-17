@@ -33,7 +33,12 @@ build/
 .vscode/
 
 ### Codex ###
-.codex/
+.codex/*
+!.codex/skills/
+!.codex/skills/tracking-point-history-reader/
+!.codex/skills/tracking-point-history-reader/**
+!.codex/skills/tracking-service-log-reader/
+!.codex/skills/tracking-service-log-reader/**
 
 ### Runtime logs ###
 logs/
