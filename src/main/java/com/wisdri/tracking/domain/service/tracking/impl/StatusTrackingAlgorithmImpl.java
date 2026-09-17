@@ -34,6 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * 根据连续多帧剩余长度变化识别当前运行的开卷机和卷取机。
@@ -43,6 +44,10 @@ import java.util.Optional;
 public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResult> {
     private static final List<DeviceSide> RESULT_ORDER = Arrays.asList(
             DeviceSide.UNCOILER, DeviceSide.COILER);
+
+    /** 现场点位可能上送的“请求颜色号”占位前缀，不应作为真实钢卷号参与跟踪。 */
+    private static final Pattern INVALID_COIL_NO_PREFIX =
+            Pattern.compile("^request\\s+color\\b", Pattern.CASE_INSENSITIVE);
 
     @Resource
     private TrackingRuntimeRepositoryDispatcher runtimeRepositoryDispatcher;
@@ -474,11 +479,14 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
     }
 
     /**
-     * 空值和仅由英文句点组成的占位值均不是有效钢卷号。
+     * 过滤空值、纯英文句点和现场“request color”占位值，保留合法的字母数字混合钢卷号。
      */
     private String normalizeCoilNo(String value) {
         String trimmed = trimInvisible(value);
         if (trimmed == null || trimmed.isEmpty()) {
+            return null;
+        }
+        if (INVALID_COIL_NO_PREFIX.matcher(trimmed).find()) {
             return null;
         }
         for (int index = 0; index < trimmed.length(); index++) {

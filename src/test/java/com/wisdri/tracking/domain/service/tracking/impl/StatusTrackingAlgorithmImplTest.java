@@ -375,6 +375,27 @@ class StatusTrackingAlgorithmImplTest {
     }
 
     @Test
+    void ignoresRequestColorPlaceholderCoilNumber() {
+        enableCoilerMethods();
+
+        String placeholder = " request   COLOR no. 10 ";
+        List<StatusResult> results = algorithm.calculate(input(values(true,
+                "U1", placeholder, "100",
+                "U2", "COIL-U2", "200",
+                "C1", "COIL-C1", "10")));
+
+        StatusCandidateRuntime candidate = runtime.get().getCandidates().get("U1");
+        assertThat(candidate.getCoilNo()).isNull();
+        assertThat(candidate.getProductNo()).isNull();
+        assertThat(candidate.getDataComplete()).isFalse();
+        assertThat(candidate.getLengths()).isEmpty();
+        assertThat(candidate.getMaxLength()).isNull();
+        assertThat(results).extracting(StatusResult::getDeviceCode)
+                .containsExactly("U2", "C1");
+        verify(qualityRepository, never()).queryProductNo("CP1", placeholder.trim());
+    }
+
+    @Test
     void keepsCalculatingWhenProductNoQueryFails() {
         when(qualityRepository.queryProductNo("CP1", "COIL-U1"))
                 .thenThrow(new IllegalStateException("unavailable"));
