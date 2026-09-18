@@ -23,6 +23,7 @@ class StatusCubeApiTrackingConfigConverterTest {
         assertThat(config.getTrackingType()).isEqualTo(TrackingType.STATUS);
         assertThat(config.getTracking().getSampleCount()).isEqualTo(3);
         assertThat(config.getTracking().getMinLengthChange()).isEqualByComparingTo("0.5");
+        assertThat(config.getTracking().getCurrentClearThreshold()).isEqualTo(1);
         assertThat(config.getTracking().getMonotonicityCheckEnabled()).isFalse();
         assertThat(config.getTracking().getPoints()).hasSize(2);
         assertThat(config.getTracking().getPoints().get(0).getSide()).isEqualTo(DeviceSide.UNCOILER);
@@ -44,6 +45,19 @@ class StatusCubeApiTrackingConfigConverterTest {
         StatusTrackingConfig config = (StatusTrackingConfig) converter.convert("CP1", node(json));
 
         assertThat(config.getTracking().getMonotonicityCheckEnabled()).isTrue();
+    }
+
+    @Test
+    void convertsConfiguredCurrentClearThresholdAndRejectsInvalidValues() throws Exception {
+        String configured = validConfig().replace("\"min_length_change\":0.5",
+                "\"min_length_change\":0.5,\"current_clear_threshold\":3");
+
+        StatusTrackingConfig config = (StatusTrackingConfig) converter.convert("CP1", node(configured));
+
+        assertThat(config.getTracking().getCurrentClearThreshold()).isEqualTo(3);
+        assertInvalid(configured.replace("\"current_clear_threshold\":3", "\"current_clear_threshold\":0"));
+        assertInvalid(configured.replace("\"current_clear_threshold\":3", "\"current_clear_threshold\":-1"));
+        assertInvalid(configured.replace("\"current_clear_threshold\":3", "\"current_clear_threshold\":null"));
     }
 
     @Test

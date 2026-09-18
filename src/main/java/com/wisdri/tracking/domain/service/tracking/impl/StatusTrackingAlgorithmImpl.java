@@ -96,7 +96,8 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         Map<DeviceSide, SelectedCandidate> selected = started
                 ? selectCandidates(input, tracking, candidates, rollingState)
                 : new LinkedHashMap<>();
-        Map<DeviceSide, StatusCurrentRuntime> current = current(input, selected);
+        Map<DeviceSide, StatusCurrentRuntime> current = current(input, selected, previousRuntime,
+                tracking.getCurrentClearThreshold(), !started || rollingState.isWindowReset());
         runtimeRepositoryDispatcher.saveRuntime(StatusTrackingRuntime.builder()
                 .unitCode(input.getUnitCode())
                 .trackingType(TrackingType.STATUS)
@@ -393,28 +394,29 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 ? DeviceSide.COILER : DeviceSide.UNCOILER;
     }
 
+    /**
+     * 按设备端更新当前状态。候选命中时立即替换，未命中时在阈值内保留上次状态；
+     * 停机、换向和换道会跳过保留期并立即清空。
+     */
     private Map<DeviceSide, StatusCurrentRuntime> current(
             TrackingInput input,
-            Map<DeviceSide, SelectedCandidate> selected) {
+            Map<DeviceSide, SelectedCandidate> selected,
+            StatusTrackingRuntime previousRuntime,
+            Integer clearThreshold,
+            boolean forceClear) {
         Map<DeviceSide, StatusCurrentRuntime> current = new LinkedHashMap<>();
         for (DeviceSide side : RESULT_ORDER) {
             SelectedCandidate candidate = selected.get(side);
-            StatusCurrentRuntime runtime = StatusCurrentRuntime.builder()
-                    .side(side)
-                    .running(candidate != null)
-                    .deviceCode(candidate == null ? null : candidate.getGroup().getCode())
-                    .deviceName(candidate == null ? null : candidate.getGroup().getName())
-                    .coilerMethod(candidate == null ? null : candidate.getCoilerMethod())
-                    .coilerMethodName(candidate == null ? null : candidate.getCoilerMethodName())
-                    .coilNo(candidate == null ? null : candidate.getCoilNo())
-                    .productNo(candidate == null ? null : candidate.getProductNo())
-                    .colorNo(candidate == null ? null : candidate.getColorNo())
-                    .remainingLength(candidate == null ? null : candidate.getRemainingLength())
-                    .maxLength(candidate == null ? null : candidate.getMaxLength())
-                    .build();
+            StatusCurrentRuntime previous = previousRuntime == null || previousRuntime.getCurrent() == null
+                    ? null : previousRuntime.getCurrent().get(side);
+            StatusCurrentRuntime runtime = forceClear
+                    ? emptyCurrent(side, 1)
+                    : candidate != null ? selectedCurrent(side, candidate)
+                    : retainedOrEmptyCurrent(side, previous, clearThreshold);
             current.put(side, runtime);
             trackingStepLogger.log(input, "设备端状态生成", side.getCode(), TrackingStepLogger.details(
                     "running", runtime.getRunning(),
+                    "nullCount", runtime.getNullCount(),
                     "deviceCode", runtime.getDeviceCode(),
                     "coilerMethod", runtime.getCoilerMethod(),
                     "coilerMethodName", runtime.getCoilerMethodName(),
@@ -425,6 +427,62 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     "maxLength", runtime.getMaxLength()));
         }
         return current;
+    }
+
+    private StatusCurrentRuntime selectedCurrent(DeviceSide side, SelectedCandidate candidate) {
+        return StatusCurrentRuntime.builder()
+                .side(side)
+                .running(true)
+                .nullCount(1)
+                .deviceCode(candidate.getGroup().getCode())
+                .deviceName(candidate.getGroup().getName())
+                .coilerMethod(candidate.getCoilerMethod())
+                .coilerMethodName(candidate.getCoilerMethodName())
+                .coilNo(candidate.getCoilNo())
+                .productNo(candidate.getProductNo())
+                .colorNo(candidate.getColorNo())
+                .remainingLength(candidate.getRemainingLength())
+                .maxLength(candidate.getMaxLength())
+                .build();
+    }
+
+    private StatusCurrentRuntime retainedOrEmptyCurrent(DeviceSide side,
+                                                        StatusCurrentRuntime previous,
+                                                        Integer clearThreshold) {
+        if (previous == null) {
+            return emptyCurrent(side, 1);
+        }
+        int nullCount = nextNullCount(previous.getNullCount());
+        if (nullCount > clearThreshold) {
+            return emptyCurrent(side, nullCount);
+        }
+        return StatusCurrentRuntime.builder()
+                .side(side)
+                .running(previous.getRunning())
+                .nullCount(nullCount)
+                .deviceCode(previous.getDeviceCode())
+                .deviceName(previous.getDeviceName())
+                .coilerMethod(previous.getCoilerMethod())
+                .coilerMethodName(previous.getCoilerMethodName())
+                .coilNo(previous.getCoilNo())
+                .productNo(previous.getProductNo())
+                .colorNo(previous.getColorNo())
+                .remainingLength(previous.getRemainingLength())
+                .maxLength(previous.getMaxLength())
+                .build();
+    }
+
+    private StatusCurrentRuntime emptyCurrent(DeviceSide side, int nullCount) {
+        return StatusCurrentRuntime.builder()
+                .side(side)
+                .running(false)
+                .nullCount(nullCount)
+                .build();
+    }
+
+    private int nextNullCount(Integer previousNullCount) {
+        int normalized = previousNullCount == null || previousNullCount < 1 ? 1 : previousNullCount;
+        return normalized == Integer.MAX_VALUE ? Integer.MAX_VALUE : normalized + 1;
     }
 
     private int coilerMethodIndex(Boolean selector, CoilerMethodConfig config) {
@@ -526,6 +584,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 || tracking.getStartCondition().getThreshold() == null
                 || tracking.getSampleCount() == null || tracking.getSampleCount() < 2
                 || tracking.getMinLengthChange() == null || tracking.getMinLengthChange().signum() < 0
+                || tracking.getCurrentClearThreshold() == null || tracking.getCurrentClearThreshold() < 1
                 || tracking.getPoints() == null
                 || tracking.getRolling() != null
                 && (tracking.getRolling().getDirectPoint() == null

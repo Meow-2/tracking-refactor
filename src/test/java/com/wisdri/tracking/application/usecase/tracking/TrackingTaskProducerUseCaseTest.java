@@ -85,6 +85,7 @@ class TrackingTaskProducerUseCaseTest {
         assertThat(input.getStatusContext().getCurrent().get(DeviceSide.UNCOILER))
                 .satisfies(current -> {
                     assertThat(current.getRunning()).isTrue();
+                    assertThat(current.getNullCount()).isEqualTo(3);
                     assertThat(current.getDeviceCode()).isEqualTo("U1");
                     assertThat(current.getCoilerMethod()).isEqualTo("11");
                     assertThat(current.getCoilerMethodName()).isEqualTo("上开卷");
@@ -194,6 +195,7 @@ class TrackingTaskProducerUseCaseTest {
         current.put(DeviceSide.UNCOILER, StatusCurrentRuntime.builder()
                 .side(DeviceSide.UNCOILER)
                 .running(true)
+                .nullCount(3)
                 .deviceCode("U1")
                 .coilerMethod("11")
                 .coilerMethodName("上开卷")

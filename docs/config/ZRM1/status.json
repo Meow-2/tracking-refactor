@@ -12,6 +12,7 @@
     },
     "sample_count": 4,
     "min_length_change": 0.5,
+    "current_clear_threshold": 10,
     "monotonicity_check_enabled": false,
     "rolling": {
       "direct_point": {

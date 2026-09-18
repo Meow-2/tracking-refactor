@@ -197,6 +197,7 @@ class TrackingRuntimeRepositoryImplTest {
         StatusCurrentRuntime current = StatusCurrentRuntime.builder()
                 .side(DeviceSide.UNCOILER)
                 .running(true)
+                .nullCount(3)
                 .deviceCode("U1")
                 .coilerMethod("11")
                 .coilerMethodName("上开卷")
@@ -222,6 +223,7 @@ class TrackingRuntimeRepositoryImplTest {
         assertTrue(redis.get("tracking:cp1:status:runtime").contains("\"product_no\" : 2"));
         assertTrue(redis.get("tracking:cp1:status:runtime").contains("\"device_code\" : \"U1\""));
         assertTrue(redis.get("tracking:cp1:status:runtime").contains("\"device_name\" : \"1#开卷机\""));
+        assertTrue(redis.get("tracking:cp1:status:runtime").contains("\"null_count\" : 3"));
         StatusTrackingRuntime cached = repository.findRuntimeAs(
                 "CP1", TrackingType.STATUS, StatusTrackingRuntime.class
         ).orElseThrow(AssertionError::new);
@@ -235,6 +237,7 @@ class TrackingRuntimeRepositoryImplTest {
         assertEquals(Arrays.asList(new BigDecimal("100"), new BigDecimal("95")),
                 cached.getCandidates().get("U1").getLengths());
         assertTrue(cached.getCurrent().get(DeviceSide.UNCOILER).getRunning());
+        assertEquals(3, cached.getCurrent().get(DeviceSide.UNCOILER).getNullCount());
         assertEquals(2, cached.getCurrent().get(DeviceSide.UNCOILER).getProductNo());
         assertEquals("11", cached.getCurrent().get(DeviceSide.UNCOILER).getCoilerMethod());
         assertEquals("上开卷", cached.getCurrent().get(DeviceSide.UNCOILER).getCoilerMethodName());

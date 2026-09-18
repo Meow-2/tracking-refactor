@@ -58,6 +58,9 @@ public class StatusCubeApiTrackingConfigConverter extends AbstractCubeApiTrackin
         if (tracking.getMinLengthChange() == null || tracking.getMinLengthChange().signum() < 0) {
             throw new TrackingException("status.min_length_change 不能小于 0");
         }
+        if (tracking.getCurrentClearThreshold() == null || tracking.getCurrentClearThreshold() < 1) {
+            throw new TrackingException("status.current_clear_threshold 必须大于等于 1");
+        }
         if (tracking.getPoints() == null || tracking.getPoints().isEmpty()) {
             throw new TrackingException("status.points 不能为空");
         }

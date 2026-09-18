@@ -22,6 +22,13 @@ public class StatusTrackingSection {
     private StartCondition startCondition;
     private Integer sampleCount;
     private BigDecimal minLengthChange;
+
+    /**
+     * 当前设备未被识别时允许保留上一状态的最大计数；计数从 1 开始，超过该值后清空状态。
+     */
+    @Builder.Default
+    private Integer currentClearThreshold = 1;
+
     @Builder.Default
     private Boolean monotonicityCheckEnabled = false;
     /**

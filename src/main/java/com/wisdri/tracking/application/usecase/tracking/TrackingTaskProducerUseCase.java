@@ -211,6 +211,7 @@ public class TrackingTaskProducerUseCase {
                 copied.put(side, StatusCurrentRuntime.builder()
                         .side(current.getSide())
                         .running(current.getRunning())
+                        .nullCount(current.getNullCount())
                         .deviceCode(current.getDeviceCode())
                         .deviceName(current.getDeviceName())
                         .coilerMethod(current.getCoilerMethod())
