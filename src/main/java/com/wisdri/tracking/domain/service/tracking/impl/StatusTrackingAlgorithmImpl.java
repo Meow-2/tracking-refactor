@@ -454,7 +454,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         }
         int nullCount = nextNullCount(previous.getNullCount());
         if (nullCount > clearThreshold) {
-            return emptyCurrent(side, nullCount);
+            return emptyCurrent(side, 1);
         }
         return StatusCurrentRuntime.builder()
                 .side(side)

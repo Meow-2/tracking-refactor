@@ -364,9 +364,14 @@ class StatusTrackingAlgorithmImplTest {
 
         Map<DeviceSide, StatusCurrentRuntime> clearedAtFour = calculate(true,
                 "U1", "COIL-U1", "100", "U2", "COIL-U2", "190", "C1", "COIL-C1", "20");
-        assertThat(clearedAtFour.values()).allMatch(item -> item.getNullCount() == 4
+        assertThat(clearedAtFour.values()).allMatch(item -> item.getNullCount() == 1
                 && Boolean.FALSE.equals(item.getRunning()) && item.getDeviceCode() == null
                 && item.getCoilNo() == null && item.getRemainingLength() == null);
+
+        Map<DeviceSide, StatusCurrentRuntime> emptyAtTwo = calculate(true,
+                "U1", "COIL-U1", "100", "U2", "COIL-U2", "190", "C1", "COIL-C1", "20");
+        assertThat(emptyAtTwo.values()).allMatch(item -> item.getNullCount() == 2
+                && Boolean.FALSE.equals(item.getRunning()) && item.getDeviceCode() == null);
     }
 
     @Test
@@ -395,7 +400,7 @@ class StatusTrackingAlgorithmImplTest {
         Map<DeviceSide, StatusCurrentRuntime> current = calculate(true,
                 "U1", "COIL-U1", "100", "U2", "COIL-U2", "190", "C1", "COIL-C1", "20");
 
-        assertThat(current.get(DeviceSide.UNCOILER).getNullCount()).isEqualTo(Integer.MAX_VALUE);
+        assertThat(current.get(DeviceSide.UNCOILER).getNullCount()).isEqualTo(1);
         assertThat(current.get(DeviceSide.UNCOILER).getRunning()).isFalse();
         assertRetainedCurrent(current.get(DeviceSide.COILER), "C1", "COIL-C1", "20", 2);
     }
