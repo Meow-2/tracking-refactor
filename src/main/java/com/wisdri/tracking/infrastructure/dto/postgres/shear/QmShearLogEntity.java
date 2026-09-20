@@ -32,6 +32,9 @@ public class QmShearLogEntity {
     private Integer setNumber;
     /** 触发帧接收时间。 */
     private Instant shearTime;
+    /** 触发剪切事件的设备代码，与 shear_time 一起标识剪刀侧记录来源。 */
+    @TableField("shear_device_code")
+    private String shearDeviceCode;
     /** 物料归属设备代码。 */
     private String inMatDeviceCode;
     /** 物料归属设备颜色号。 */

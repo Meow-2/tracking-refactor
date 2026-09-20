@@ -71,6 +71,7 @@ public class ShearTrackingResultRepositoryImpl
         entity.setShearLength(result.getShearLength());
         entity.setSetNumber(result.getSetNumber());
         entity.setShearTime(result.getShearTime());
+        entity.setShearDeviceCode(result.getDeviceCode());
         entity.setInMatDeviceCode(result.getInMatDeviceCode());
         entity.setInMatDeviceColorNo(result.getInMatDeviceColorNo());
         entity.setInMatDeviceRemainLength(result.getInMatDeviceRemainLength());

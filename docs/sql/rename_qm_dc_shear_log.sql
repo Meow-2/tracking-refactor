@@ -1,5 +1,40 @@
--- 数字钢卷剪切算法 3.0 结果表的全新建表脚本。
--- 本脚本仅适用于尚未创建 qm_dc_shear_log 的数据库，不迁移旧表，也不删除任何数据。
+-- 一次性迁移脚本：保留现有 qm_dc_shear_log 为备份表，并创建空白的 3.0 结果表。
+-- 旧表数据和约束会随表改名保留在 qm_dc_shear_log_old 中；新表不复制旧数据。
+-- 需在目标数据库执行。若旧表不存在或备份表已存在，事务会失败并整体回滚。
+begin;
+
+do $$
+begin
+    if to_regclass('public.qm_dc_shear_log') is null then
+        raise exception 'public.qm_dc_shear_log does not exist; migration aborted';
+    end if;
+
+    if to_regclass('public.qm_dc_shear_log_old') is not null then
+        raise exception 'public.qm_dc_shear_log_old already exists; migration aborted';
+    end if;
+end
+$$;
+
+alter table public.qm_dc_shear_log rename to qm_dc_shear_log_old;
+
+-- 表改名不会自动改名主键索引；仅当旧主键索引占用了新表默认名称时，重命名旧约束。
+do $$
+declare
+    primary_key_name text;
+begin
+    select conname
+      into primary_key_name
+      from pg_constraint
+     where conrelid = 'public.qm_dc_shear_log_old'::regclass
+       and contype = 'p';
+
+    if primary_key_name = 'qm_dc_shear_log_pkey' then
+        alter table public.qm_dc_shear_log_old
+            rename constraint qm_dc_shear_log_pkey to qm_dc_shear_log_old_pkey;
+    end if;
+end
+$$;
+
 create table public.qm_dc_shear_log
 (
     id                          bigint not null primary key,
@@ -57,3 +92,5 @@ comment on column public.qm_dc_shear_log.create_time is '记录创建时间';
 comment on column public.qm_dc_shear_log.update_time is '记录最后更新时间';
 comment on column public.qm_dc_shear_log.create_org is '创建记录的组织标识';
 comment on column public.qm_dc_shear_log.deleted is '逻辑删除标记，0 表示有效';
+
+commit;
