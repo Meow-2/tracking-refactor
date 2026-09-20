@@ -55,17 +55,18 @@ class ShearCubeApiTrackingConfigConverterTest {
     }
 
     @Test
-    void acceptsOrderedDeviceCodesAndKeepsLegacySingleCode() throws Exception {
+    void acceptsSingleDeviceCodeAndOrderedMultiDeviceCodes() throws Exception {
         String plural = validConfig().replace(
                 "\"device_code\":\"take-device-x\"",
                 "\"device_codes\":[\"take-device-a\",\"take-device-x\"]");
 
         ShearTrackingConfig pluralConfig = (ShearTrackingConfig) converter.convert("LINE-X", node(plural));
-        ShearTrackingConfig legacyConfig = (ShearTrackingConfig) converter.convert("LINE-X", node(validConfig()));
+        ShearTrackingConfig singleDeviceConfig =
+                (ShearTrackingConfig) converter.convert("LINE-X", node(validConfig()));
 
         assertThat(pluralConfig.getTracking().getCoilerShearPoint().get(0).getDeviceCodes())
                 .containsExactly("take-device-a", "take-device-x");
-        assertThat(legacyConfig.getTracking().getCoilerShearPoint().get(0).getDeviceCode())
+        assertThat(singleDeviceConfig.getTracking().getCoilerShearPoint().get(0).getDeviceCode())
                 .isEqualTo("take-device-x");
     }
 
@@ -117,17 +118,28 @@ class ShearCubeApiTrackingConfigConverterTest {
     }
 
     @Test
-    void acceptsDefaultSliceWithoutColorOrLengthSettings() throws Exception {
+    void acceptsFixedSliceWithoutUnneededLengthSettings() throws Exception {
         String json = validConfig()
                 .replace("\"shear_settings\":{\"head\":{\"number\":{\"name\":\"head-number\"},\"length\":{\"name\":\"head-length\"}},\"tail\":{\"number\":{\"name\":\"tail-number\"},\"length\":{\"name\":\"tail-length\"}}},\"color_point\":{\"name\":\"entry-color\"}",
                         "\"shear_settings\":{\"default\":\"slice\"}")
                 .replace("\"shear_settings\":{\"front_welder\":{\"sample_pieces\":{\"name\":\"front-sample\"},\"scrap_pieces\":{\"name\":\"front-scrap\"},\"length\":{\"name\":\"front-length\"}},\"behind_welder\":{\"sample_pieces\":{\"name\":\"rear-sample\"},\"scrap_pieces\":{\"name\":\"rear-scrap\"},\"length\":{\"name\":\"rear-length\"}}},\"color_point\":{\"name\":\"exit-color\"}",
-                        "\"shear_settings\":{\"default\":\"slice\"}");
+                        "\"shear_settings\":{\"default\":\"slice\"},\"color_point\":{\"name\":\"exit-color\"}");
 
         ShearTrackingConfig config = (ShearTrackingConfig) converter.convert("LINE-X", node(json));
 
         assertThat(config.getTracking().getUncoilerShearPoint().get(0)
                 .getShearSettings().getDefaultValue().name()).isEqualTo("SLICE");
+        assertThat(config.getTracking().getCoilerShearPoint().get(0).getColorPoint().getName())
+                .isEqualTo("exit-color");
+    }
+
+    @Test
+    void rejectsFixedContinuousCoilerSliceWithoutColorForMaterialSelection() throws Exception {
+        String json = validConfig().replace(
+                "\"shear_settings\":{\"front_welder\":{\"sample_pieces\":{\"name\":\"front-sample\"},\"scrap_pieces\":{\"name\":\"front-scrap\"},\"length\":{\"name\":\"front-length\"}},\"behind_welder\":{\"sample_pieces\":{\"name\":\"rear-sample\"},\"scrap_pieces\":{\"name\":\"rear-scrap\"},\"length\":{\"name\":\"rear-length\"}}},\"color_point\":{\"name\":\"exit-color\"}",
+                "\"shear_settings\":{\"default\":\"slice\"}");
+
+        assertInvalid(json);
     }
 
     private void assertInvalid(String json) throws Exception {

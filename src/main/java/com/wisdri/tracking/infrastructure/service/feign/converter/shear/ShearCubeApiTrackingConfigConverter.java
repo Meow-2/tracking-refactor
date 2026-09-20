@@ -63,6 +63,17 @@ public class ShearCubeApiTrackingConfigConverter extends AbstractCubeApiTracking
         Set<String> names = new HashSet<>();
         validatePoints(tracking.getUncoilerShearPoint(), true, tracking.getMode(), names);
         validatePoints(tracking.getCoilerShearPoint(), false, tracking.getMode(), names);
+        if (tracking.getMode() == ShearMode.DISCONTINUOUS
+                && tracking.getCoilerShearPoint() != null
+                && !tracking.getCoilerShearPoint().isEmpty()) {
+            if (tracking.getUncoilerShearPoint() == null
+                    || tracking.getUncoilerShearPoint().isEmpty()) {
+                throw new TrackingException("discontinuous 出口剪切头需要开卷机侧光栅配置");
+            }
+            for (ShearPointConfig entryPoint : tracking.getUncoilerShearPoint()) {
+                validateGratings(entryPoint);
+            }
+        }
         if (names.isEmpty()) {
             throw new TrackingException("shear 剪刀配置不能为空");
         }
@@ -96,13 +107,12 @@ public class ShearCubeApiTrackingConfigConverter extends AbstractCubeApiTracking
             if (settings == null) {
                 throw new TrackingException("shear_settings 不能为空: " + point.getName());
             }
-            if (settings.getDefaultValue() == null) {
-                if (mode == ShearMode.CONTINUOUS && invalidPoint(point.getColorPoint())) {
-                    throw new TrackingException("continuous 剪刀颜色点无效: " + point.getName());
-                }
-                if (mode == ShearMode.DISCONTINUOUS) {
-                    validateGratings(point);
-                }
+            if (mode == ShearMode.CONTINUOUS && !uncoilerSide
+                    && (settings.getDefaultValue() == null
+                    || settings.getDefaultValue() == ShearKind.HEAD
+                    || settings.getDefaultValue() == ShearKind.SLICE)
+                    && invalidPoint(point.getColorPoint())) {
+                throw new TrackingException("continuous 出口剪切判型或物料选取需要颜色点: " + point.getName());
             }
             if (uncoilerSide || mode == ShearMode.DISCONTINUOUS) {
                 if (settings.getDefaultValue() == null

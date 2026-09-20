@@ -17,7 +17,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ShearSettings {
     /**
-     * 可选固定判型；配置后跳过颜色判型，但仍计算物料归属、刀次和长度。
+     * 可选固定判型；配置后跳过自动判型，但连续线出口固定切头或分切仍按颜色点选取物料。
      */
     @JsonProperty("default")
     private ShearKind defaultValue;

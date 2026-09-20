@@ -34,13 +34,12 @@ public class ShearPointConfig {
      */
     private Boolean normalPos;
     /**
-     * 与 status runtime candidates 键完全一致的设备代码；所在配置集合决定其设备侧。
-     * 保留用于兼容旧配置，新配置优先使用 deviceCodes。
+     * 单设备场景绑定的 status candidates 设备代码；设备侧由本剪刀所在配置集合决定。
+     * 多设备场景使用 {@link #deviceCodes} 明确匹配顺序。
      */
     private String deviceCode;
     /**
-     * 本剪刀允许关联的 status 设备代码范围，顺序同时决定 current 未匹配时的回退优先级；
-     * 算法固定回退到最后一个元素。
+     * 本剪刀允许关联的多个 status 设备代码，按此顺序查找当前 candidates；没有匹配候选时跳过该剪切点。
      */
     private List<String> deviceCodes;
     /**
@@ -48,7 +47,7 @@ public class ShearPointConfig {
      */
     private ShearSettings shearSettings;
     /**
-     * 连续线剪刀处的物料颜色点；用于与 status 中设备颜色比较，默认判型不为空时可省略。
+     * 连续线出口剪刀处的物料颜色点；开卷机侧不依赖此点，出口自动判型、固定切头或固定分切选料时需要。
      */
     private PointConfig colorPoint;
     /**

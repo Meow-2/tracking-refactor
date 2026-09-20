@@ -9,7 +9,6 @@ import com.wisdri.tracking.domain.model.runtime.batch.BatchTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessSegmentRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.shear.ShearCounterRuntime;
-import com.wisdri.tracking.domain.model.runtime.shear.ShearDeviceRuntime;
 import com.wisdri.tracking.domain.model.runtime.shear.ShearTrackingRuntime;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
@@ -37,8 +36,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -144,21 +145,13 @@ class TrackingRuntimeRepositoryImplTest {
                 .unitCode("CP1")
                 .trackingType(TrackingType.SHEAR)
                 .deviceCode("TR-A")
-                .uncoiler(ShearDeviceRuntime.builder()
-                        .side(DeviceSide.UNCOILER)
-                        .running(true)
-                        .deviceCode("POR-1")
-                        .productNo(1)
-                        .head(ShearCounterRuntime.builder().build())
-                        .build())
-                .coiler(ShearDeviceRuntime.builder()
-                        .side(DeviceSide.COILER)
-                        .running(true)
-                        .deviceCode("TR-A")
-                        .productNo(1)
-                        .slice(ShearCounterRuntime.builder().build())
-                        .tail(ShearCounterRuntime.builder().build())
-                        .build())
+                .side(DeviceSide.COILER)
+                .deviceName("1#卷取机")
+                .coilNo("COIL-1")
+                .productNo(1)
+                .head(ShearCounterRuntime.builder().shearNo(0).cutNo(0).build())
+                .slice(ShearCounterRuntime.builder().shearNo(0).cutNo(0).build())
+                .tail(ShearCounterRuntime.builder().shearNo(0).cutNo(0).build())
                 .build();
 
         repository.saveRuntime(runtime);
@@ -167,18 +160,47 @@ class TrackingRuntimeRepositoryImplTest {
         assertTrue(redis.containsKey(key));
         assertFalse(redis.containsKey("tracking:cp1:shear:runtime"));
         assertEquals(key, RedisKeys.trackingRuntime("CP1", TrackingType.SHEAR, "TR-A"));
-        assertTrue(redis.get(key).contains("\"uncoiler\""));
-        assertTrue(redis.get(key).contains("\"coiler\""));
+        assertFalse(redis.get(key).contains("\"uncoiler\""));
+        assertTrue(redis.get(key).contains("\"side\" : \"coiler\""));
         assertTrue(redis.get(key).contains("\"HEAD\""));
         assertTrue(redis.get(key).contains("\"SLICE\""));
         assertTrue(redis.get(key).contains("\"TAIL\""));
-        assertFalse(new ObjectMapper().readTree(redis.get(key)).has("device_code"));
+        assertEquals("TR-A", new ObjectMapper().readTree(redis.get(key)).get("device_code").asText());
         ShearTrackingRuntime cached = repository.findRuntimeAs(
                 "CP1", TrackingType.SHEAR, "TR-A", ShearTrackingRuntime.class)
                 .orElseThrow(AssertionError::new);
         assertEquals("TR-A", cached.getDeviceCode());
-        assertEquals("POR-1", cached.getUncoiler().getDeviceCode());
-        assertEquals("TR-A", cached.getCoiler().getDeviceCode());
+        assertEquals("COIL-1", cached.getCoilNo());
+        assertEquals(DeviceSide.COILER, cached.getSide());
+    }
+
+    @Test
+    void validatesWholeRuntimeBatchBeforeWritingRedis() {
+        TrackingRuntimeRepositoryImpl repository = repository();
+        ShearTrackingRuntime valid = ShearTrackingRuntime.builder()
+                .unitCode("CP1").trackingType(TrackingType.SHEAR).deviceCode("TR-A").build();
+        ShearTrackingRuntime invalid = ShearTrackingRuntime.builder()
+                .unitCode("CP1").trackingType(TrackingType.SHEAR).build();
+
+        assertThrows(RuntimeException.class, () -> repository.saveRuntimes(Arrays.asList(valid, invalid)));
+        assertTrue(redis.isEmpty());
+        assertFalse(repository.findRuntimeAs(
+                "CP1", TrackingType.SHEAR, "TR-A", ShearTrackingRuntime.class).isPresent());
+    }
+
+    @Test
+    void keepsWholeLocalRuntimeBatchWhenRedisWriteFails() {
+        TrackingRuntimeRepositoryImpl repository = repository();
+        ShearTrackingRuntime runtime = ShearTrackingRuntime.builder()
+                .unitCode("CP1").trackingType(TrackingType.SHEAR).deviceCode("TR-A").build();
+        ValueOperations<String, String> valueOperations = redisTemplate.opsForValue();
+        doThrow(new IllegalStateException("redis unavailable"))
+                .when(valueOperations).set(
+                        org.mockito.ArgumentMatchers.eq("tracking:cp1:shear:runtime:tr-a"), anyString());
+
+        assertThrows(RuntimeException.class, () -> repository.saveRuntimes(Arrays.asList(runtime)));
+        assertTrue(repository.findRuntimeAs(
+                "CP1", TrackingType.SHEAR, "TR-A", ShearTrackingRuntime.class).isPresent());
     }
 
     @Test

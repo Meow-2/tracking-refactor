@@ -7,7 +7,6 @@ import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.runtime.shear.ShearCounterRuntime;
-import com.wisdri.tracking.domain.model.runtime.shear.ShearDeviceRuntime;
 import com.wisdri.tracking.domain.model.runtime.shear.ShearTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
@@ -21,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.math.BigDecimal;
 
 /**
  * 点位消息订阅应用用例。
@@ -123,29 +123,22 @@ public class PointSubscriptionUseCase {
                                                    String deviceCode,
                                                    String deviceName,
                                                    boolean uncoilerSide) {
-        ShearDeviceRuntime uncoiler = ShearDeviceRuntime.builder()
-                .side(DeviceSide.UNCOILER)
-                .running(false)
-                .deviceCode(uncoilerSide ? deviceCode : null)
-                .deviceName(uncoilerSide ? deviceName : null)
-                .head(ShearCounterRuntime.builder().build())
-                .slice(uncoilerSide ? ShearCounterRuntime.builder().build() : null)
-                .build();
-        ShearDeviceRuntime coiler = ShearDeviceRuntime.builder()
-                .side(DeviceSide.COILER)
-                .running(false)
-                .deviceCode(uncoilerSide ? null : deviceCode)
-                .deviceName(uncoilerSide ? null : deviceName)
-                .slice(uncoilerSide ? null : ShearCounterRuntime.builder().build())
-                .tail(ShearCounterRuntime.builder().build())
-                .build();
         return ShearTrackingRuntime.builder()
                 .unitCode(unitCode)
                 .trackingType(TrackingType.SHEAR)
                 .deviceCode(deviceCode)
-                .uncoiler(uncoiler)
-                .coiler(coiler)
+                .side(uncoilerSide ? DeviceSide.UNCOILER : DeviceSide.COILER)
+                .deviceName(deviceName)
+                .head(zeroCounter())
+                .slice(zeroCounter())
+                .tail(zeroCounter())
                 .build();
+    }
+
+    /** 新 runtime 显式以 0 表示设备尚未发生对应类型剪切。 */
+    private ShearCounterRuntime zeroCounter() {
+        return ShearCounterRuntime.builder().shearNo(0).cutNo(0)
+                .lastRemainingLength(BigDecimal.ZERO).build();
     }
 
     private Map<String, String> statusDeviceNames(String unitCode) {

@@ -1,5 +1,6 @@
 package com.wisdri.tracking.infrastructure.repository.tracking;
 
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.shear.ShearResult;
 import com.wisdri.tracking.infrastructure.dto.postgres.shear.QmShearLogEntity;
@@ -18,6 +19,12 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 class ShearTrackingResultRepositoryImplTest {
     @Test
+    void mapsEntityToFinalDatabaseTableName() {
+        assertThat(QmShearLogEntity.class.getAnnotation(TableName.class).value())
+                .isEqualTo("qm_dc_shear_log");
+    }
+
+    @Test
     void mapsAllShearBusinessFields() {
         ShearTrackingResultRepositoryImpl repository = new ShearTrackingResultRepositoryImpl();
         Instant time = Instant.parse("2026-01-01T00:00:00Z");
@@ -26,10 +33,12 @@ class ShearTrackingResultRepositoryImplTest {
                 .inMatNo("MAT-1").inMatNoProdNo("3")
                 .shearType("711").shearTypeName("feed-device-x_head")
                 .shearLength(new BigDecimal("2.5")).setNumber(4).shearTime(time)
-                .porCoilNo("POR-1").porColorCode("10")
-                .trCoilNo("TR-1").trColorCode("20")
-                .porRemainLength(new BigDecimal("500")).porMaxLength(new BigDecimal("1000"))
-                .trRemainLength(new BigDecimal("200")).trMaxLength(new BigDecimal("800"))
+                .inMatDeviceCode("por1").inMatDeviceColorNo("10")
+                .inMatDeviceRemainLength(new BigDecimal("500"))
+                .inMatDeviceMaxLength(new BigDecimal("1000"))
+                .shearDeviceCoilNo("TR-1").shearDeviceColorNo("20")
+                .shearDeviceRemainLength(new BigDecimal("200"))
+                .shearDeviceMaxLength(new BigDecimal("800"))
                 .cutNo(2).shearNo(1).build();
 
         QmShearLogEntity entity = ReflectionTestUtils.invokeMethod(repository, "toEntity", result);
@@ -42,8 +51,9 @@ class ShearTrackingResultRepositoryImplTest {
         assertThat(entity.getShearLength()).isEqualByComparingTo("2.5");
         assertThat(entity.getSetNumber()).isEqualTo(4);
         assertThat(entity.getShearTime()).isEqualTo(time);
-        assertThat(entity.getPorCoilNo()).isEqualTo("POR-1");
-        assertThat(entity.getTrCoilNo()).isEqualTo("TR-1");
+        assertThat(entity.getInMatDeviceCode()).isEqualTo("por1");
+        assertThat(entity.getInMatDeviceRemainLength()).isEqualByComparingTo("500");
+        assertThat(entity.getShearDeviceCoilNo()).isEqualTo("TR-1");
         assertThat(entity.getCutNo()).isEqualTo(2);
         assertThat(entity.getShearNo()).isEqualTo(1);
     }

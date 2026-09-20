@@ -37,7 +37,7 @@ public class ShearTrackingResultRepositoryImpl
 
     @Override
     public void createTable(ShearTrackingConfig config) {
-        // qm_dc_shear_log 由数据库脚本预建。
+        // qm_dc_shear_log 的部署建表脚本位于 docs/sql/qm_dc_shear_log.sql。
     }
 
     @Override
@@ -50,13 +50,16 @@ public class ShearTrackingResultRepositoryImpl
             entities.add(toEntity(result));
         }
         transactionTemplate.execute(status -> {
-            saveBatch(entities);
+            if (!saveBatch(entities)) {
+                status.setRollbackOnly();
+                throw new IllegalStateException("批量写入 qm_dc_shear_log 失败");
+            }
             return null;
         });
     }
 
     /**
-     * 将领域结果映射为关系表字段；shearKind 和 shearPointCode 仅服务算法/runtime，不落表。
+     * 将 3.0 领域结果映射为关系表字段；运行态提交对象和剪切点名不落表。
      */
     private QmShearLogEntity toEntity(ShearResult result) {
         QmShearLogEntity entity = new QmShearLogEntity();
@@ -68,14 +71,14 @@ public class ShearTrackingResultRepositoryImpl
         entity.setShearLength(result.getShearLength());
         entity.setSetNumber(result.getSetNumber());
         entity.setShearTime(result.getShearTime());
-        entity.setPorCoilNo(result.getPorCoilNo());
-        entity.setPorColorCode(result.getPorColorCode());
-        entity.setTrCoilNo(result.getTrCoilNo());
-        entity.setTrColorCode(result.getTrColorCode());
-        entity.setPorRemainLength(result.getPorRemainLength());
-        entity.setPorMaxLength(result.getPorMaxLength());
-        entity.setTrRemainLength(result.getTrRemainLength());
-        entity.setTrMaxLength(result.getTrMaxLength());
+        entity.setInMatDeviceCode(result.getInMatDeviceCode());
+        entity.setInMatDeviceColorNo(result.getInMatDeviceColorNo());
+        entity.setInMatDeviceRemainLength(result.getInMatDeviceRemainLength());
+        entity.setInMatDeviceMaxLength(result.getInMatDeviceMaxLength());
+        entity.setShearDeviceCoilNo(result.getShearDeviceCoilNo());
+        entity.setShearDeviceColorNo(result.getShearDeviceColorNo());
+        entity.setShearDeviceRemainLength(result.getShearDeviceRemainLength());
+        entity.setShearDeviceMaxLength(result.getShearDeviceMaxLength());
         entity.setCutNo(result.getCutNo());
         entity.setShearNo(result.getShearNo());
         return entity;

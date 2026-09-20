@@ -26,6 +26,7 @@ import org.springframework.stereotype.Repository;
 import javax.annotation.Resource;
 import java.io.IOException;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -122,20 +123,44 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
      */
     @Override
     public void saveRuntime(TrackingRuntime runtime) {
-        if (runtime == null || runtime.getUnitCode() == null || runtime.getTrackingType() == null) {
-            throw new TrackingException("保存跟踪运行态失败: 缺少机组或跟踪类型");
+        saveRuntimes(java.util.Collections.singletonList(runtime));
+    }
+
+    /**
+     * 先校验并序列化整批状态，再一次性替换本地缓存引用并写 Redis。
+     * Redis 客户端没有跨 key 事务保证；写入失败时本地状态仍保留，可阻止已入库事件重复计算。
+     */
+    @Override
+    public void saveRuntimes(java.util.List<? extends TrackingRuntime> runtimes) {
+        if (runtimes == null || runtimes.isEmpty()) {
+            return;
         }
-        String instanceCode = runtimeInstanceCode(runtime);
-        validateInstanceCode(runtime.getTrackingType(), instanceCode);
-        String key = runtimeKey(runtime.getUnitCode(), runtime.getTrackingType(), instanceCode);
-        runtimeCache.put(key, runtime);
+        Map<String, String> serialized = new LinkedHashMap<>();
+        Map<String, TrackingRuntime> pendingCache = new LinkedHashMap<>();
+        for (TrackingRuntime runtime : runtimes) {
+            if (runtime == null || runtime.getUnitCode() == null || runtime.getTrackingType() == null) {
+                throw new TrackingException("保存跟踪运行态失败: 缺少机组或跟踪类型");
+            }
+            String instanceCode = runtimeInstanceCode(runtime);
+            validateInstanceCode(runtime.getTrackingType(), instanceCode);
+            String key = runtimeKey(runtime.getUnitCode(), runtime.getTrackingType(), instanceCode);
+            try {
+                String json = TrackingType.STATUS == runtime.getTrackingType()
+                        ? JsonUtils.toPrettyJsonWithInlineArrays(objectMapper, runtime)
+                        : JsonUtils.toPrettyJson(objectMapper, runtime);
+                serialized.put(key, json);
+                pendingCache.put(key, runtime);
+            } catch (IOException e) {
+                throw new TrackingException("序列化跟踪运行态失败: " + key, e);
+            }
+        }
+        runtimeCache.putAll(pendingCache);
         try {
-            String json = TrackingType.STATUS == runtime.getTrackingType()
-                    ? JsonUtils.toPrettyJsonWithInlineArrays(objectMapper, runtime)
-                    : JsonUtils.toPrettyJson(objectMapper, runtime);
-            stringRedisTemplate.opsForValue().set(key, json);
-        } catch (IOException e) {
-            throw new TrackingException("写入跟踪运行态到 Redis 失败: " + key, e);
+            for (Map.Entry<String, String> entry : serialized.entrySet()) {
+                stringRedisTemplate.opsForValue().set(entry.getKey(), entry.getValue());
+            }
+        } catch (RuntimeException e) {
+            throw new TrackingException("批量写入跟踪运行态到 Redis 失败", e);
         }
     }
 

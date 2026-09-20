@@ -5,6 +5,7 @@ import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 
 import java.util.Optional;
+import java.util.List;
 
 /**
  * 跟踪配置和算法运行态仓储端口。
@@ -74,6 +75,12 @@ public interface TrackingRuntimeRepository {
      * 保存当前算法运行态。
      */
     void saveRuntime(TrackingRuntime runtime);
+
+    /**
+     * 批量保存同一帧产生的 runtime；实现必须先校验并序列化完整集合，再更新本地状态。
+     * 运行态仓储需要在此入口内统一完成 Redis 写入，避免逐条保存留下半帧状态。
+     */
+    void saveRuntimes(List<? extends TrackingRuntime> runtimes);
 
     /**
      * 从外部配置源刷新全部配置。

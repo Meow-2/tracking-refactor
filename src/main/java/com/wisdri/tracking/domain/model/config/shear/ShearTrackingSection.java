@@ -25,7 +25,7 @@ public class ShearTrackingSection {
      */
     private ShearMode mode;
     /**
-     * 切尾经验阈值，单位与 status 中开卷机剩余长度一致；用于区分入口切尾和分切。
+     * 切尾经验阈值，单位与 status 中开卷机长度一致；用于判断开卷机侧切尾和切头。
      */
     private BigDecimal tailExperience;
     /**

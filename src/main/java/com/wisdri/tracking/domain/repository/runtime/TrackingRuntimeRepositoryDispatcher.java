@@ -91,6 +91,28 @@ public class TrackingRuntimeRepositoryDispatcher {
         repository.saveRuntime(runtime);
     }
 
+    /** 将同一跟踪类型的一帧 runtime 集合分发给对应仓储。 */
+    public void saveRuntimes(List<? extends TrackingRuntime> runtimes) {
+        if (runtimes == null || runtimes.isEmpty()) {
+            return;
+        }
+        TrackingType trackingType = null;
+        for (TrackingRuntime runtime : runtimes) {
+            if (runtime == null || runtime.getTrackingType() == null) {
+                throw new IllegalArgumentException("批量跟踪运行态和跟踪类型不能为空");
+            }
+            if (trackingType == null) {
+                trackingType = runtime.getTrackingType();
+            } else if (trackingType != runtime.getTrackingType()) {
+                throw new IllegalArgumentException("批量运行态必须属于同一跟踪类型");
+            }
+        }
+        TrackingType resolvedType = trackingType;
+        TrackingRuntimeRepository repository = repository(resolvedType)
+                .orElseThrow(() -> new TrackingException("不支持的跟踪运行态类型: " + resolvedType));
+        repository.saveRuntimes(runtimes);
+    }
+
     /**
      * 刷新所有运行态仓储管理的配置。
      */

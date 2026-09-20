@@ -10,23 +10,27 @@ import com.wisdri.tracking.domain.model.config.shear.ShearSettings;
 import com.wisdri.tracking.domain.model.config.shear.ShearTrackingConfig;
 import com.wisdri.tracking.domain.model.config.shear.ShearTrackingSection;
 import com.wisdri.tracking.domain.model.config.shear.ShearTypeCodes;
-import com.wisdri.tracking.domain.model.config.shear.WelderShearSettings;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingSection;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.shear.ShearCounterRuntime;
 import com.wisdri.tracking.domain.model.runtime.shear.ShearTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
-import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
+import com.wisdri.tracking.domain.model.tracking.shear.ShearDeviceSnapshot;
 import com.wisdri.tracking.domain.model.tracking.shear.ShearKind;
 import com.wisdri.tracking.domain.model.tracking.shear.ShearResult;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.tracking.status.StatusTrackingContext;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
+import com.wisdri.tracking.domain.service.tracking.shear.ShearDecisionService;
+import com.wisdri.tracking.domain.service.tracking.shear.ShearDeviceResolver;
+import com.wisdri.tracking.domain.service.tracking.shear.ShearRuntimeService;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +39,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,613 +47,397 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+/** 剪切算法 3.0 的触发、刀次、幂等和 runtime 提交回归测试。 */
 class ShearTrackingAlgorithmImplTest {
     private static final String UNIT = "LINE-X";
+    private static final Instant RECEIVED_AT = Instant.parse("2026-01-01T00:00:00Z");
     private final Map<String, ShearTrackingRuntime> runtimes = new LinkedHashMap<>();
     private TrackingRuntimeRepositoryDispatcher repository;
     private ShearTrackingAlgorithmImpl algorithm;
-    private ShearTrackingConfig config;
     private TrackingProperties properties;
+    private ShearTrackingConfig config;
+    private int frameNumber;
 
     @BeforeEach
     void setUp() {
         repository = mock(TrackingRuntimeRepositoryDispatcher.class);
-        config = config();
+        frameNumber = 0;
+        config = shearConfig();
         when(repository.findConfigAs(UNIT, TrackingType.SHEAR, ShearTrackingConfig.class))
                 .thenReturn(Optional.of(config));
         when(repository.findConfigAs(UNIT, TrackingType.STATUS, StatusTrackingConfig.class))
                 .thenReturn(Optional.of(statusConfig()));
         when(repository.findRuntimeAs(eq(UNIT), eq(TrackingType.SHEAR), anyString(),
-                eq(ShearTrackingRuntime.class))).thenAnswer(invocation -> {
-            String deviceCode = invocation.getArgument(2);
-            return Optional.ofNullable(runtimes.get(deviceCode));
-        });
+                eq(ShearTrackingRuntime.class))).thenAnswer(invocation ->
+                Optional.ofNullable(runtimes.get(invocation.getArgument(2))));
         doAnswer(invocation -> {
-            ShearTrackingRuntime saved = invocation.getArgument(0);
-            runtimes.put(saved.getDeviceCode(), saved);
+            List<TrackingRuntime> values = invocation.getArgument(0);
+            for (TrackingRuntime value : values) {
+                ShearTrackingRuntime runtime = (ShearTrackingRuntime) value;
+                runtimes.put(runtime.getDeviceCode(), runtime);
+            }
             return null;
-        }).when(repository).saveRuntime(any(TrackingRuntime.class));
+        }).when(repository).saveRuntimes(anyList());
 
-        properties = new TrackingProperties();
+        ShearDeviceResolver resolver = new ShearDeviceResolver();
+        ShearRuntimeService runtimeService = new ShearRuntimeService();
+        ReflectionTestUtils.setField(runtimeService, "runtimeRepositoryDispatcher", repository);
         algorithm = new ShearTrackingAlgorithmImpl();
         ReflectionTestUtils.setField(algorithm, "runtimeRepositoryDispatcher", repository);
         ReflectionTestUtils.setField(algorithm, "trackingStepLogger", mock(TrackingStepLogger.class));
+        properties = new TrackingProperties();
         ReflectionTestUtils.setField(algorithm, "trackingProperties", properties);
+        ReflectionTestUtils.setField(algorithm, "shearDeviceResolver", resolver);
+        ReflectionTestUtils.setField(algorithm, "shearDecisionService", new ShearDecisionService(resolver));
+        ReflectionTestUtils.setField(algorithm, "shearRuntimeService", runtimeService);
     }
 
     @Test
-    void detectsConfiguredEdgeAndUsesConfiguredTypeCode() {
-        ShearResult first = only(calculate(entryValues(true, "10", "2.5"),
-                entryValues(false, "10.0", "2.5"), context("10", "20", "500")));
-
-        assertThat(first.getShearPointCode()).isEqualTo("entry-cut-x");
-        assertThat(first.getDeviceCode()).isEqualTo("feed-device-x");
-        assertThat(first.getShearKind()).isEqualTo(ShearKind.HEAD);
-        assertThat(first.getShearType()).isEqualTo("711");
-        assertThat(first.getShearTypeName()).isEqualTo("feed-device-x_head");
-        assertThat(first.getInMatNo()).isEqualTo("FEED-COIL");
+    void firstSliceAndFirstCutOfNextGroupHaveZeroLength() {
+        ShearResult first = only(algorithm.calculate(input("500")));
+        assertThat(first.getShearKind()).isEqualTo(ShearKind.SLICE);
+        assertThat(first.getShearNo()).isEqualTo(1);
         assertThat(first.getCutNo()).isEqualTo(1);
-        assertThat(first.getShearLength()).isEqualByComparingTo("2.5");
-        assertThat(first.getSetNumber()).isEqualTo(2);
-        assertThat(runtimes.get("feed-device-x").getUncoiler()
-                .getHead().getCutNo()).isEqualTo(1);
+        assertThat(first.getShearLength()).isEqualByComparingTo("0");
+        algorithm.afterPersist(input("500"), Arrays.asList(first));
 
-        ShearResult second = only(calculate(entryValues(true, "10", "2.5"),
-                entryValues(false, "10", "2.5"), context("10", "20", "450")));
-
-        assertThat(second.getShearNo()).isEqualTo(1);
-        assertThat(second.getCutNo()).isEqualTo(2);
-        assertThat(second.getShearLength()).isEqualByComparingTo("2.5");
-        assertThat(second.getSetNumber()).isEqualTo(2);
+        ShearResult nextGroup = only(algorithm.calculate(input("300")));
+        assertThat(nextGroup.getShearNo()).isEqualTo(2);
+        assertThat(nextGroup.getCutNo()).isEqualTo(1);
+        assertThat(nextGroup.getShearLength()).isEqualByComparingTo("0");
     }
 
     @Test
-    void skipsRepeatedMessageAfterFirstResultIsPersisted() {
-        TrackingInput input = input(entryValues(true, "10", "2.5"),
-                entryValues(false, "10", "2.5"), context("10", "20", "500"));
+    void sameGroupUsesAbsoluteLengthDifference() {
+        ShearResult first = only(algorithm.calculate(input("500")));
+        algorithm.afterPersist(input("500"), Arrays.asList(first));
 
+        ShearResult next = only(algorithm.calculate(input("550")));
+        assertThat(next.getShearNo()).isEqualTo(1);
+        assertThat(next.getCutNo()).isEqualTo(2);
+        assertThat(next.getShearLength()).isEqualByComparingTo("50");
+    }
+
+    @Test
+    void doesNotCommitCalculatedCounterUntilPersistenceCallback() {
+        ShearResult firstAttempt = only(algorithm.calculate(input("500")));
+        ShearResult retryBeforePersist = only(algorithm.calculate(input("500")));
+
+        assertThat(firstAttempt.getCutNo()).isEqualTo(1);
+        assertThat(retryBeforePersist.getCutNo()).isEqualTo(1);
+        assertThat(runtimes).doesNotContainKey("por1");
+    }
+
+    @Test
+    void duplicateTriggerFrameDoesNotIncrementOrPersistTwice() {
+        TrackingInput input = input("500");
         List<ShearResult> first = algorithm.calculate(input);
         algorithm.afterPersist(input, first);
-        List<ShearResult> repeated = algorithm.calculate(input);
 
-        assertThat(first).hasSize(1);
-        assertThat(repeated).isEmpty();
-        ShearTrackingRuntime runtime = runtimes.get("feed-device-x");
-        assertThat(runtime.getUncoiler().getHead().getCutNo()).isEqualTo(1);
-        assertThat(runtime.getLastPersistedTriggerTime())
-                .isEqualTo(Instant.parse("2026-01-01T00:00:00Z"));
+        assertThat(algorithm.calculate(input)).isEmpty();
+        ShearTrackingRuntime runtime = runtimes.get("por1");
+        assertThat(runtime.getSlice().getShearNo()).isEqualTo(1);
+        assertThat(runtime.getSlice().getCutNo()).isEqualTo(1);
+        assertThat(runtime.getLastPersistedTriggerTime()).isEqualTo(RECEIVED_AT);
     }
 
     @Test
-    void classifiesUncoilerTailAndSliceAtConfiguredBoundary() {
-        ShearResult tail = only(calculate(entryValues(true, "10", "2.5"),
-                entryValues(false, "10", "2.5"), context("10", "10", "50")));
-        assertThat(tail.getShearKind()).isEqualTo(ShearKind.TAIL);
-        assertThat(tail.getShearType()).isEqualTo("719");
-        assertThat(tail.getInMatNo()).isEqualTo("TAKE-COIL");
-        assertThat(tail.getShearLength()).isEqualByComparingTo("3.5");
-        assertThat(tail.getSetNumber()).isEqualTo(3);
-        ShearResult secondTail = only(calculate(entryValues(true, "10", "2.5"),
-                entryValues(false, "10", "2.5"), context("10", "10", "40")));
-        assertThat(secondTail.getShearLength()).isEqualByComparingTo("3.5");
-        assertThat(secondTail.getSetNumber()).isEqualTo(3);
-
-        ShearResult slice = only(calculate(entryValues(true, "10", "2.5"),
-                entryValues(false, "10", "2.5"), context("10", "10", "51")));
-        assertThat(slice.getShearKind()).isEqualTo(ShearKind.SLICE);
-        assertThat(slice.getShearType()).isEqualTo("715");
-        assertThat(slice.getInMatNo()).isEqualTo("FEED-COIL");
-        assertThat(slice.getSetNumber()).isNull();
-    }
-
-    @Test
-    void switchesCoilerFromTailToHeadUsingConfiguredPieceLimit() {
-        Map<String, Object> previous = exitValues(true, "30", "0", "0", "1.2", "1.8");
-        Map<String, Object> latest = exitValues(false, "30", "0", "0", "1.2", "1.8");
-        ShearResult tail = only(calculate(previous, latest, context("10", "20", "500")));
-        assertThat(tail.getShearKind()).isEqualTo(ShearKind.TAIL);
-        assertThat(tail.getShearType()).isEqualTo("939");
-        assertThat(tail.getShearLength()).isEqualByComparingTo("1.2");
-        assertThat(tail.getSetNumber()).isZero();
-        ShearResult head = only(calculate(previous, latest, context("10", "20", "450")));
-        assertThat(head.getShearKind()).isEqualTo(ShearKind.HEAD);
-        assertThat(head.getShearType()).isEqualTo("931");
-        assertThat(head.getInMatNo()).isEqualTo("FEED-COIL");
-        assertThat(head.getShearLength()).isEqualByComparingTo("1.8");
-        assertThat(head.getSetNumber()).isEqualTo(5);
-    }
-
-    @Test
-    void addsOddWelderPiecesToFrontSetNumberUsingIntegerSplit() {
-        Map<String, Object> previous = exitValues(true, "30", "1", "1", "1.2", "1.8");
-        Map<String, Object> latest = exitValues(false, "30", "1", "1", "1.2", "1.8");
-        previous.put("/line-x/shear/welder-pieces", 5);
-        latest.put("/line-x/shear/welder-pieces", 5);
-        ShearResult first = only(calculate(previous, latest, context("10", "20", "500")));
-        ShearResult second = only(calculate(previous, latest, context("10", "20", "450")));
-
-        assertThat(second.getShearKind()).isEqualTo(ShearKind.TAIL);
-        assertThat(second.getShearLength()).isEqualByComparingTo("1.2");
-        assertThat(second.getSetNumber()).isEqualTo(4);
-    }
-
-    @Test
-    void assignsOddWelderPieceRemainderToBehindSetNumber() {
-        config.getTracking().getCoilerShearPoint().get(0)
-                .getShearSettings().setDefaultValue(ShearKind.HEAD);
-        Map<String, Object> previous = exitValues(true, "30", "1", "1", "1.2", "1.8");
-        Map<String, Object> latest = exitValues(false, "30", "1", "1", "1.2", "1.8");
-        previous.put("/line-x/shear/welder-pieces", 5);
-        latest.put("/line-x/shear/welder-pieces", 5);
-
-        ShearResult result = only(calculate(previous, latest, context("10", "20", "500")));
-
-        assertThat(result.getShearKind()).isEqualTo(ShearKind.HEAD);
-        assertThat(result.getSetNumber()).isEqualTo(8);
-    }
-
-    @Test
-    void selectsSampleAndScrapLengthByWelderPieceSequence() {
-        WelderShearSettings front = config.getTracking().getCoilerShearPoint().get(0)
-                .getShearSettings().getFrontWelder();
-        front.setLength(null);
-        front.setSampleLength(point("sample-piece-length"));
-        front.setScrapLength(point("scrap-piece-length"));
-        Map<String, Object> previous = exitValues(true, "30", "1", "1", "1.2", "1.8");
-        previous.put("/line-x/shear/sample-piece-length", new BigDecimal("4.2"));
-        previous.put("/line-x/shear/scrap-piece-length", new BigDecimal("0.8"));
-        Map<String, Object> latest = exitValues(false, "30", "1", "1", "1.2", "1.8");
-        latest.put("/line-x/shear/sample-piece-length", new BigDecimal("4.2"));
-        latest.put("/line-x/shear/scrap-piece-length", new BigDecimal("0.8"));
-
-        ShearResult first = only(calculate(previous, latest, context("10", "20", "500")));
-        ShearResult sample = only(calculate(previous, latest, context("10", "20", "450")));
-        assertThat(sample.getShearLength()).isEqualByComparingTo("4.2");
-
-        ShearResult scrap = only(calculate(previous, latest, context("10", "20", "400")));
-        assertThat(scrap.getShearLength()).isEqualByComparingTo("0.8");
-        assertThat(scrap.getSetNumber()).isEqualTo(2);
-    }
-
-    @Test
-    void classifiesDiscontinuousUncoilerByAllGratingsAndReadsFirstCutSettings() {
-        configureDiscontinuous();
-
-        ShearResult head = only(calculate(discontinuousEntryValues(true, true),
-                discontinuousEntryValues(false, true), context("10", "20", "500")));
-        ShearResult tail = only(calculate(discontinuousEntryValues(true, false),
-                discontinuousEntryValues(false, false), context("10", "20", "450")));
-
-        assertThat(head.getShearKind()).isEqualTo(ShearKind.HEAD);
-        assertThat(head.getShearLength()).isEqualByComparingTo("2.5");
-        assertThat(head.getSetNumber()).isEqualTo(2);
-        assertThat(tail.getShearKind()).isEqualTo(ShearKind.TAIL);
-        assertThat(tail.getShearLength()).isEqualByComparingTo("3.5");
-        assertThat(tail.getSetNumber()).isEqualTo(3);
-    }
-
-    @Test
-    void usesStrictTailBoundaryForDiscontinuousUncoilerAndKeepsSliceNumberNull() {
-        configureDiscontinuous();
-        StatusTrackingContext atBoundary = sameMaterialContext("50");
-
-        ShearResult slice = only(calculate(discontinuousEntryValues(true, true),
-                discontinuousEntryValues(false, true), atBoundary));
-
-        assertThat(slice.getShearKind()).isEqualTo(ShearKind.SLICE);
-        assertThat(slice.getShearLength()).isEqualByComparingTo("0");
-        assertThat(slice.getSetNumber()).isNull();
-
-        ShearResult tail = only(calculate(discontinuousEntryValues(true, true),
-                discontinuousEntryValues(false, true), sameMaterialContext("49")));
-        assertThat(tail.getShearKind()).isEqualTo(ShearKind.TAIL);
-        assertThat(tail.getSetNumber()).isEqualTo(3);
-    }
-
-    @Test
-    void classifiesDiscontinuousCoilerAndUsesCutSettingsInsteadOfWelderSettings() {
-        configureDiscontinuous();
-
-        ShearResult tail = only(calculate(discontinuousExitValues(true, true),
-                discontinuousExitValues(false, true), context("10", "20", "500")));
-        ShearResult head = only(calculate(discontinuousExitValues(true, false),
-                discontinuousExitValues(false, false), context("10", "20", "450")));
-        ShearResult slice = only(calculate(discontinuousExitValues(true, true),
-                discontinuousExitValues(false, true), sameMaterialContext("400")));
-
-        assertThat(tail.getShearKind()).isEqualTo(ShearKind.TAIL);
-        assertThat(tail.getShearLength()).isEqualByComparingTo("6.5");
-        assertThat(tail.getSetNumber()).isEqualTo(6);
-        assertThat(head.getShearKind()).isEqualTo(ShearKind.HEAD);
-        assertThat(head.getShearLength()).isEqualByComparingTo("4.5");
-        assertThat(head.getSetNumber()).isEqualTo(4);
-        assertThat(slice.getShearKind()).isEqualTo(ShearKind.SLICE);
-        assertThat(slice.getSetNumber()).isNull();
-    }
-
-    @Test
-    void supportsDefaultSliceAndSkipsMissingGratingValueInDiscontinuousMode() {
-        configureDiscontinuous();
-        ShearPointConfig exit = config.getTracking().getCoilerShearPoint().get(0);
-        exit.setShearSettings(ShearSettings.builder().defaultValue(ShearKind.SLICE).build());
-        Map<String, Object> withoutGratings = exitValues(false, "30", "0", "0", "1.2", "1.8");
-
-        ShearResult slice = only(calculate(exitValues(true, "30", "0", "0", "1.2", "1.8"),
-                withoutGratings, context("10", "20", "500")));
-        assertThat(slice.getShearKind()).isEqualTo(ShearKind.SLICE);
-        assertThat(slice.getSetNumber()).isNull();
-
-        config.getTracking().getUncoilerShearPoint().get(0).getShearSettings().setDefaultValue(null);
-        Map<String, Object> missing = discontinuousEntryValues(false, true);
-        missing.remove("/line-x/shear/entry-grating-b");
-        assertThat(calculate(discontinuousEntryValues(true, true), missing,
-                context("10", "20", "500"))).isEmpty();
-    }
-
-    @Test
-    void ignoresFirstFrameReturnEdgeAndMissingStatusContext() {
-        assertThat(algorithm.calculate(TrackingInput.builder()
-                .unitCode(UNIT).trackingType(TrackingType.SHEAR)
-                .latestSnapshot(snapshot(entryValues(false, "10", "2.5")))
-                .statusContext(context("10", "20", "500")).build())).isEmpty();
-
-        assertThat(calculate(entryValues(false, "10", "2.5"),
-                entryValues(true, "10", "2.5"), context("10", "20", "500"))).isEmpty();
-        assertThat(calculate(entryValues(true, "10", "2.5"),
-                entryValues(false, "10", "2.5"), null)).isEmpty();
-
-        Map<String, Object> invalid = entryValues(false, "10", "2.5");
-        invalid.put("/line-x/shear/entry-cut-x", "invalid");
-        assertThat(calculate(entryValues(true, "10", "2.5"), invalid,
-                context("10", "20", "500"))).isEmpty();
-    }
-
-    @Test
-    void skipsTriggeredShearWhenConfiguredCandidateIsIncompleteInCurrentFrame() {
-        StatusTrackingContext context = context("10", "20", "500");
-        context.getCurrent().get(DeviceSide.UNCOILER).setDeviceCode(null);
-        context.getCandidates().get("feed-device-x").setDataComplete(false);
-
-        List<ShearResult> results = calculate(entryValues(true, "10", "2.5"),
-                entryValues(false, "10", "2.5"), context);
-
-        assertThat(results).isEmpty();
-    }
-
-    @Test
-    void matchesConfiguredCodesAgainstCurrentAndFallsBackToLastCode() {
-        ShearPointConfig exit = config.getTracking().getCoilerShearPoint().get(0);
-        exit.setDeviceCodes(Arrays.asList("take-device-current", "take-device-x"));
-
-        StatusTrackingContext currentMatched = context("10", "20", "500");
-        currentMatched.getCurrent().get(DeviceSide.COILER).setDeviceCode("take-device-current");
-        assertThat(calculate(exitValues(true, "30", "0", "0", "1.2", "1.8"),
-                exitValues(false, "30", "0", "0", "1.2", "1.8"), currentMatched))
-                .singleElement().extracting(ShearResult::getShearTypeName)
-                .isEqualTo("take-device-current_tail");
-
-        StatusTrackingContext fallback = context("10", "20", "500");
-        fallback.getCurrent().get(DeviceSide.COILER).setDeviceCode(null);
-        ShearResult result = only(calculate(exitValues(true, "30", "0", "0", "1.2", "1.8"),
-                exitValues(false, "30", "0", "0", "1.2", "1.8"), fallback));
-        assertThat(result.getTrCoilNo()).isEqualTo("TAKE-COIL");
-        assertThat(result.getShearTypeName()).isEqualTo("take-device-x_tail");
-    }
-
-    @Test
-    void synchronizesDeviceShapedRuntimeOnFirstFrameWithoutShearTrigger() {
-        List<ShearResult> results = algorithm.calculate(TrackingInput.builder()
-                .unitCode(UNIT)
-                .trackingType(TrackingType.SHEAR)
-                .latestSnapshot(snapshot(entryValues(false, "10", "2.5")))
-                .statusContext(context("10", "20", "500"))
-                .build());
-
-        assertThat(results).isEmpty();
-        ShearTrackingRuntime runtime = runtimes.get("feed-device-x");
-        assertThat(runtime).isNotNull();
-        assertThat(runtime.getUncoiler().getDeviceCode()).isEqualTo("feed-device-x");
-        assertThat(runtime.getUncoiler().getDeviceName()).isEqualTo("1#开卷机");
-        assertThat(runtime.getUncoiler().getProductNo()).isEqualTo(3);
-        assertThat(runtime.getUncoiler().getHead()).isNotNull();
-        assertThat(runtime.getUncoiler().getSlice()).isNotNull();
-        assertThat(runtime.getUncoiler().getTail()).isNull();
-        assertThat(runtime.getCoiler().getDeviceCode()).isEqualTo("take-device-x");
-        assertThat(runtime.getCoiler().getDeviceName()).isEqualTo("2#卷取机");
-        assertThat(runtime.getCoiler().getTail()).isNotNull();
-        assertThat(runtime.getCoiler().getHead()).isNull();
-    }
-
-    @Test
-    void refreshesAllRuntimeHeartbeatsWhenDeviceStateIsUnchanged() {
-        TrackingInput input = TrackingInput.builder()
-                .unitCode(UNIT)
-                .trackingType(TrackingType.SHEAR)
-                .latestSnapshot(snapshot(entryValues(false, "10", "2.5")))
-                .statusContext(context("10", "20", "500"))
-                .build();
-        algorithm.calculate(input);
-        clearInvocations(repository);
-
-        algorithm.calculate(input);
-
-        verify(repository, times(3)).saveRuntime(any(TrackingRuntime.class));
-        assertThat(runtimes.values()).allMatch(runtime -> runtime.getUpdatedAt() != null);
-    }
-
-    @Test
-    void prefersCandidateDeviceNameFromStatusSnapshot() {
-        StatusTrackingContext context = context("10", "20", "500");
-        context.getCurrent().get(DeviceSide.UNCOILER).setDeviceCode(null);
-        context.getCandidates().get("feed-device-x").setDeviceCode("feed-device-x");
-        context.getCandidates().get("feed-device-x").setDeviceName("快照开卷机");
-
-        algorithm.calculate(TrackingInput.builder()
-                .unitCode(UNIT)
-                .trackingType(TrackingType.SHEAR)
-                .latestSnapshot(snapshot(entryValues(false, "10", "2.5")))
-                .statusContext(context)
-                .build());
-
-        assertThat(runtimes.get("feed-device-x").getUncoiler().getDeviceName())
-                .isEqualTo("快照开卷机");
-    }
-
-    @Test
-    void keepsCountersIndependentForEachConfiguredDeviceCode() {
-        Map<String, Object> previous = exitValues(true, "30", "0", "0", "1.2", "1.8");
-        Map<String, Object> latest = exitValues(false, "30", "0", "0", "1.2", "1.8");
-        StatusTrackingContext firstContext = context("10", "20", "500");
-        firstContext.getCurrent().get(DeviceSide.COILER).setDeviceCode("take-device-y");
-
-        ShearResult first = only(calculate(previous, latest, firstContext));
-        assertThat(runtimes.get("take-device-y").getCoiler().getTail().getCutNo()).isEqualTo(1);
-
-        StatusTrackingContext secondContext = context("10", "20", "450");
-        secondContext.getCurrent().get(DeviceSide.COILER).setDeviceCode(null);
-        ShearResult second = only(calculate(previous, latest, secondContext));
-
-        assertThat(first.getDeviceCode()).isEqualTo("take-device-y");
-        assertThat(second.getDeviceCode()).isEqualTo("take-device-x");
-        assertThat(first.getCutNo()).isEqualTo(1);
-        assertThat(second.getCutNo()).isEqualTo(1);
-        assertThat(runtimes).containsKeys("feed-device-x", "take-device-y", "take-device-x");
-        assertThat(runtimes.get("take-device-x").getCoiler().getTail().getCutNo()).isEqualTo(1);
-    }
-
-    @Test
-    void equalExperienceStartsNewCompleteShear() {
-        Map<String, Object> previous = entryValues(true, "10", "2.5");
-        Map<String, Object> latest = entryValues(false, "10", "2.5");
-        ShearResult first = only(calculate(previous, latest, context("10", "20", "500")));
-        ShearResult next = only(calculate(previous, latest, context("10", "20", "400")));
-        assertThat(next.getShearNo()).isEqualTo(2);
-        assertThat(next.getCutNo()).isEqualTo(1);
-    }
-
-    @Test
-    void supportsReverseNormalPositionAndMultipleShearsInOneFrame() {
-        config.getTracking().getUncoilerShearPoint().get(0).setNormalPos(false);
-        Map<String, Object> previous = entryValues(false, "10", "2.5");
-        previous.putAll(exitValues(true, "20", "0", "0", "1.2", "1.8"));
-        Map<String, Object> latest = entryValues(true, "10", "2.5");
-        latest.putAll(exitValues(false, "20", "0", "0", "1.2", "1.8"));
-
-        List<ShearResult> results = calculate(previous, latest, context("10", "20", "500"));
-
-        assertThat(results).extracting(ShearResult::getShearPointCode)
-                .containsExactly("entry-cut-x", "exit-cut-x");
-        assertThat(results).extracting(ShearResult::getShearType)
-                .containsExactly("711", "935");
-    }
-
-    @Test
-    void disabledStorageDoesNotCommitRuntime() {
+    void storageDisabledStillCommitsCountersWithoutIdempotencyTime() {
         properties.getStorage().getShear().setEnabled(false);
-        Map<String, Object> previous = entryValues(true, "10", "2.5");
-        Map<String, Object> latest = entryValues(false, "10", "2.5");
-        ShearResult result = only(calculate(previous, latest, context("10", "20", "500")));
+        ShearResult result = only(algorithm.calculate(input("500")));
 
-        assertThat(runtimes).isEmpty();
+        assertThat(result.getRuntimeCommit()).isNull();
+        assertThat(runtimes.get("por1").getSlice().getCutNo()).isEqualTo(1);
+        assertThat(runtimes.get("por1").getLastPersistedTriggerTime()).isNull();
     }
 
-    private List<ShearResult> calculate(Map<String, Object> previous,
-                                        Map<String, Object> latest,
-                                        StatusTrackingContext context) {
-        return algorithm.calculate(input(previous, latest, context));
+    @Test
+    void updatesDeviceMaterialAndClearsCountersWhenMaterialChanges() {
+        ShearResult first = only(algorithm.calculate(input("500")));
+        algorithm.afterPersist(input("500"), Arrays.asList(first));
+
+        TrackingInput changed = input("300");
+        StatusCandidateRuntime candidate = changed.getStatusContext().getCandidates().get("por1");
+        candidate.setCoilNo("NEW-COIL");
+        candidate.setProductNo(2);
+        candidate.setLengths(Arrays.asList(new BigDecimal("300")));
+        ShearResult newMaterial = only(algorithm.calculate(changed));
+        assertThat(newMaterial.getShearNo()).isEqualTo(1);
+        assertThat(newMaterial.getCutNo()).isEqualTo(1);
+        assertThat(newMaterial.getShearLength()).isEqualByComparingTo("0");
     }
 
-    private TrackingInput input(Map<String, Object> previous,
-                                Map<String, Object> latest,
-                                StatusTrackingContext context) {
-        return TrackingInput.builder()
-                .unitCode(UNIT)
-                .trackingType(TrackingType.SHEAR)
-                .previousSnapshot(snapshot(previous))
-                .latestSnapshot(snapshot(latest))
-                .statusContext(context)
+    @Test
+    void storesCounterOnMaterialDeviceAndIdempotencyTimeOnTriggerDevice() {
+        ShearTrackingRuntime triggerRuntime = ShearTrackingRuntime.builder()
+                .unitCode(UNIT).trackingType(TrackingType.SHEAR).deviceCode("tr1")
+                .side(DeviceSide.COILER).coilNo("COIL-2").productNo(1)
+                .tail(ShearCounterRuntime.builder().shearNo(1).cutNo(5)
+                        .lastRemainingLength(new BigDecimal("200")).build()).build();
+        runtimes.put("tr1", triggerRuntime);
+
+        TrackingInput input = input("500");
+        Map<String, Object> previous = new LinkedHashMap<>(input.getPreviousSnapshot().getValues());
+        Map<String, Object> latest = new LinkedHashMap<>(input.getLatestSnapshot().getValues());
+        previous.put("/line-x/shear/exit-cut", true);
+        latest.put("/line-x/shear/exit-cut", false);
+        latest.put("/line-x/shear/exit-color", "30");
+        latest.put("/line-x/shear/welder-pieces", 0);
+        latest.put("/line-x/shear/front-sample", 1);
+        latest.put("/line-x/shear/front-scrap", 1);
+        latest.put("/line-x/shear/front-length", new BigDecimal("1.2"));
+        input.setPreviousSnapshot(PointSnapshot.builder().values(previous).build());
+        input.setLatestSnapshot(PointSnapshot.builder().values(latest)
+                .receivedAt(RECEIVED_AT.plusSeconds(frameNumber++)).build());
+
+        ShearResult result = algorithm.calculate(input).stream()
+                .filter(value -> "exit-cut".equals(value.getShearPointCode()))
+                .findFirst().orElseThrow(AssertionError::new);
+        assertThat(result.getDeviceCode()).isEqualTo("tr1");
+        assertThat(result.getInMatDeviceCode()).isEqualTo("tr2");
+        assertThat(result.getShearKind()).isEqualTo(ShearKind.HEAD);
+
+        algorithm.afterPersist(input, Arrays.asList(result));
+        assertThat(runtimes.get("tr2").getHead().getCutNo()).isEqualTo(1);
+        assertThat(runtimes.get("tr1").getLastPersistedTriggerTime())
+                .isEqualTo(input.getLatestSnapshot().getReceivedAt());
+    }
+
+    @Test
+    void continuousCoilerSliceSelectsFirstOtherCandidateWithSameColor() {
+        TrackingInput input = input("500");
+        input.getStatusContext().getCandidates().get("tr2").setColorNo("20");
+        triggerExit(input, "20");
+
+        ShearResult result = exitResult(algorithm.calculate(input));
+        assertThat(result.getShearKind()).isEqualTo(ShearKind.SLICE);
+        assertThat(result.getDeviceCode()).isEqualTo("tr1");
+        assertThat(result.getInMatDeviceCode()).isEqualTo("tr2");
+        assertThat(result.getShearLength()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void fixedContinuousCoilerSliceStillUsesColorToSelectMaterial() {
+        config.getTracking().getCoilerShearPoint().get(0).getShearSettings()
+                .setDefaultValue(ShearKind.SLICE);
+        TrackingInput input = input("500");
+        input.getStatusContext().getCandidates().get("tr2").setColorNo("20");
+        triggerExit(input, "20");
+
+        ShearResult result = exitResult(algorithm.calculate(input));
+
+        assertThat(result.getShearKind()).isEqualTo(ShearKind.SLICE);
+        assertThat(result.getInMatDeviceCode()).isEqualTo("tr2");
+    }
+
+    @Test
+    void resolvesCandidatesInStatusOrderWithoutCurrentOrUnconfiguredFallback() {
+        TrackingInput input = input("500");
+        Map<String, StatusCandidateRuntime> candidates = input.getStatusContext().getCandidates();
+        StatusCandidateRuntime por1 = candidates.get("por1");
+        StatusCandidateRuntime tr1 = candidates.get("tr1");
+        StatusCandidateRuntime tr2 = candidates.get("tr2");
+        Map<String, StatusCandidateRuntime> reordered = new LinkedHashMap<>();
+        reordered.put("tr2", tr2);
+        reordered.put("extra", StatusCandidateRuntime.builder().deviceCode("extra")
+                .deviceName("未配置设备").dataComplete(true).coilNo("COIL-X").productNo(1)
+                .lengths(Arrays.asList(new BigDecimal("1"))).build());
+        reordered.put("tr1", tr1);
+        reordered.put("por1", por1);
+        input.getStatusContext().setCandidates(reordered);
+        Map<DeviceSide, StatusCurrentRuntime> current = new EnumMap<>(DeviceSide.class);
+        current.put(DeviceSide.COILER, StatusCurrentRuntime.builder()
+                .side(DeviceSide.COILER).deviceCode("por1").build());
+        input.getStatusContext().setCurrent(current);
+
+        List<ShearDeviceSnapshot> devices = new ShearDeviceResolver().resolveCandidates(
+                input.getStatusContext(), statusConfig());
+
+        assertThat(devices).extracting(ShearDeviceSnapshot::getDeviceCode)
+                .containsExactly("por1", "tr1", "tr2");
+        assertThat(devices.get(0).getSide()).isEqualTo(DeviceSide.UNCOILER);
+    }
+
+    @Test
+    void countsUniqueOccupiedUncoilerDevicesBeforeUsingShortestLengthFallback() {
+        ShearPointConfig firstEntryPoint = ShearPointConfig.builder().deviceCode("por1")
+                .gratingPoints(Arrays.asList(GratingPointConfig.builder().name("grating-a")
+                        .hasCoil(true).build())).build();
+        ShearPointConfig secondEntryPoint = ShearPointConfig.builder().deviceCode("por1")
+                .gratingPoints(Arrays.asList(GratingPointConfig.builder().name("grating-b")
+                        .hasCoil(true).build())).build();
+        ShearTrackingSection tracking = ShearTrackingSection.builder()
+                .pointPrefix("/line-x/shear/")
+                .uncoilerShearPoint(Arrays.asList(firstEntryPoint, secondEntryPoint)).build();
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("/line-x/shear/grating-a", true);
+        values.put("/line-x/shear/grating-b", true);
+        PointSnapshot snapshot = PointSnapshot.builder().values(values).build();
+        ShearDeviceSnapshot occupied = ShearDeviceSnapshot.builder().side(DeviceSide.UNCOILER)
+                .deviceCode("por1").coilNo("COIL-1").productNo(1)
+                .remainingLength(new BigDecimal("500")).dataComplete(true).build();
+        ShearDeviceSnapshot shortest = ShearDeviceSnapshot.builder().side(DeviceSide.UNCOILER)
+                .deviceCode("por2").coilNo("COIL-2").productNo(1)
+                .remainingLength(new BigDecimal("100")).dataComplete(true).build();
+
+        ShearDeviceSnapshot selected = new ShearDeviceResolver().selectHeadMaterial(
+                snapshot, tracking, Arrays.asList(occupied, shortest));
+
+        assertThat(selected.getDeviceCode()).isEqualTo("por1");
+    }
+
+    @Test
+    void discontinuousCoilerDistinguishesEmptySameAndDifferentCoil() {
+        config.getTracking().setMode(ShearMode.DISCONTINUOUS);
+
+        TrackingInput emptyCoil = input("500");
+        StatusCandidateRuntime emptyTrigger = emptyCoil.getStatusContext().getCandidates().get("tr1");
+        emptyTrigger.setCoilNo(null);
+        emptyTrigger.setProductNo(null);
+        emptyTrigger.setDataComplete(false);
+        emptyTrigger.setLengths(java.util.Collections.emptyList());
+        triggerExit(emptyCoil, null);
+        ShearResult head = exitResult(algorithm.calculate(emptyCoil));
+        assertThat(head.getShearKind()).isEqualTo(ShearKind.HEAD);
+        assertThat(head.getInMatDeviceCode()).isEqualTo("por1");
+
+        TrackingInput sameCoil = input("500");
+        sameCoil.getStatusContext().getCandidates().get("tr2").setCoilNo("COIL-2");
+        triggerExit(sameCoil, null);
+        ShearResult slice = exitResult(algorithm.calculate(sameCoil));
+        assertThat(slice.getShearKind()).isEqualTo(ShearKind.SLICE);
+        assertThat(slice.getInMatDeviceCode()).isEqualTo("tr2");
+
+        TrackingInput differentCoil = input("500");
+        triggerExit(differentCoil, null);
+        ShearResult tail = exitResult(algorithm.calculate(differentCoil));
+        assertThat(tail.getShearKind()).isEqualTo(ShearKind.TAIL);
+        assertThat(tail.getInMatDeviceCode()).isEqualTo("tr1");
+    }
+
+    private TrackingInput input(String remainingLength) {
+        Map<String, Object> previous = new LinkedHashMap<>();
+        previous.put("/line-x/shear/entry-cut", true);
+        Map<String, Object> latest = new LinkedHashMap<>();
+        latest.put("/line-x/shear/entry-cut", false);
+        previous.put("/line-x/shear/exit-cut", true);
+        latest.put("/line-x/shear/exit-cut", true);
+        latest.put("/line-x/shear/entry-grating", true);
+        latest.put("/line-x/shear/head-length", new BigDecimal("2.5"));
+        latest.put("/line-x/shear/head-number", 2);
+        latest.put("/line-x/shear/tail-length", new BigDecimal("3.5"));
+        latest.put("/line-x/shear/tail-number", 3);
+        latest.put("/line-x/shear/exit-head-length", new BigDecimal("4.5"));
+        latest.put("/line-x/shear/exit-head-number", 4);
+        latest.put("/line-x/shear/exit-tail-length", new BigDecimal("6.5"));
+        latest.put("/line-x/shear/exit-tail-number", 6);
+        StatusCandidateRuntime feed = StatusCandidateRuntime.builder().deviceCode("por1")
+                .deviceName("1#开卷机").dataComplete(true).coilNo("COIL-1").productNo(1)
+                .colorNo("10").lengths(Arrays.asList(new BigDecimal(remainingLength)))
+                .maxLength(new BigDecimal("1000")).build();
+        StatusCandidateRuntime take = StatusCandidateRuntime.builder().deviceCode("tr1")
+                .deviceName("1#卷取机").dataComplete(true).coilNo("COIL-2").productNo(1)
+                .colorNo("20").lengths(Arrays.asList(new BigDecimal("200")))
+                .maxLength(new BigDecimal("800")).build();
+        Map<String, StatusCandidateRuntime> candidates = new LinkedHashMap<>();
+        candidates.put("por1", feed);
+        candidates.put("tr1", take);
+        candidates.put("tr2", StatusCandidateRuntime.builder().deviceCode("tr2")
+                .deviceName("2#卷取机").dataComplete(true).coilNo("COIL-3").productNo(1)
+                .colorNo("30").lengths(Arrays.asList(new BigDecimal("100")))
+                .maxLength(new BigDecimal("800")).build());
+        return TrackingInput.builder().unitCode(UNIT).trackingType(TrackingType.SHEAR)
+                .previousSnapshot(PointSnapshot.builder().values(previous).build())
+                .latestSnapshot(PointSnapshot.builder().values(latest)
+                        .receivedAt(RECEIVED_AT.plusSeconds(frameNumber++)).build())
+                .statusContext(StatusTrackingContext.builder().candidates(candidates).build()).build();
+    }
+
+    private ShearTrackingConfig shearConfig() {
+        ShearPointConfig point = ShearPointConfig.builder().name("entry-cut")
+                .type(PointDataType.BOOLEAN).normalPos(true).deviceCode("por1")
+                .gratingPoints(Arrays.asList(GratingPointConfig.builder().name("entry-grating")
+                        .type(PointDataType.BOOLEAN).hasCoil(true).build()))
+                .typeCodes(ShearTypeCodes.builder().head("111").slice("115").tail("119").build())
+                .shearSettings(ShearSettings.builder()
+                        .head(CutSetting.builder().number(point("head-number"))
+                                .length(point("head-length")).build())
+                        .tail(CutSetting.builder().number(point("tail-number"))
+                                .length(point("tail-length")).build()).build())
+                .build();
+        return ShearTrackingConfig.builder().unitCode(UNIT).trackingType(TrackingType.SHEAR)
+                .enable(true).tracking(ShearTrackingSection.builder().pointPrefix("/line-x/shear/")
+                        .mode(ShearMode.CONTINUOUS).tailExperience(new BigDecimal("50"))
+                        .shearExperience(new BigDecimal("100"))
+                        .uncoilerShearPoint(Arrays.asList(point))
+                        .coilerShearPoint(Arrays.asList(exitPoint())).build()).build();
+    }
+
+    private StatusTrackingConfig statusConfig() {
+        return StatusTrackingConfig.builder().unitCode(UNIT)
+                .tracking(StatusTrackingSection.builder().points(Arrays.asList(
+                        StatusPointGroup.builder().code("por1").name("1#开卷机")
+                                .side(DeviceSide.UNCOILER).build(),
+                        StatusPointGroup.builder().code("tr1").name("1#卷取机")
+                                .side(DeviceSide.COILER).build(),
+                        StatusPointGroup.builder().code("tr2").name("2#卷取机")
+                                .side(DeviceSide.COILER).build())).build()).build();
+    }
+
+    private ShearPointConfig exitPoint() {
+        return ShearPointConfig.builder().name("exit-cut").type(PointDataType.BOOLEAN)
+                .normalPos(true).deviceCodes(Arrays.asList("tr1", "tr2"))
+                .typeCodes(ShearTypeCodes.builder().head("901").slice("905").tail("909").build())
+                .colorPoint(point("exit-color"))
+                .shearSettings(ShearSettings.builder().welderPieces(point("welder-pieces"))
+                .frontWelder(com.wisdri.tracking.domain.model.config.shear.WelderShearSettings.builder()
+                                .samplePieces(point("front-sample")).scrapPieces(point("front-scrap"))
+                                .length(point("front-length")).build())
+                        .behindWelder(com.wisdri.tracking.domain.model.config.shear.WelderShearSettings.builder()
+                                .samplePieces(point("front-sample")).scrapPieces(point("front-scrap"))
+                                .length(point("front-length")).build())
+                        .head(CutSetting.builder().number(point("exit-head-number"))
+                                .length(point("exit-head-length")).build())
+                        .tail(CutSetting.builder().number(point("exit-tail-number"))
+                                .length(point("exit-tail-length")).build()).build())
                 .build();
     }
 
-    private PointSnapshot snapshot(Map<String, Object> values) {
-        return PointSnapshot.builder().values(values).receivedAt(Instant.parse("2026-01-01T00:00:00Z")).build();
+    private void triggerExit(TrackingInput input, String shearColor) {
+        Map<String, Object> previous = new LinkedHashMap<>(input.getPreviousSnapshot().getValues());
+        Map<String, Object> latest = new LinkedHashMap<>(input.getLatestSnapshot().getValues());
+        previous.put("/line-x/shear/exit-cut", true);
+        latest.put("/line-x/shear/exit-cut", false);
+        if (shearColor != null) {
+            latest.put("/line-x/shear/exit-color", shearColor);
+        }
+        latest.put("/line-x/shear/welder-pieces", 0);
+        latest.put("/line-x/shear/front-sample", 1);
+        latest.put("/line-x/shear/front-scrap", 1);
+        latest.put("/line-x/shear/front-length", new BigDecimal("1.2"));
+        input.setPreviousSnapshot(PointSnapshot.builder().values(previous).build());
+        input.setLatestSnapshot(PointSnapshot.builder().values(latest)
+                .receivedAt(RECEIVED_AT.plusSeconds(frameNumber++)).build());
     }
 
-    private StatusTrackingContext context(String feedColor, String takeColor, String feedLength) {
-        Map<String, StatusCandidateRuntime> candidates = new LinkedHashMap<>();
-        candidates.put("feed-device-x", StatusCandidateRuntime.builder()
-                .dataComplete(true)
-                .coilNo("FEED-COIL").productNo(3).colorNo(feedColor)
-                .lengths(Arrays.asList(new BigDecimal(feedLength))).maxLength(new BigDecimal("1000")).build());
-        candidates.put("take-device-x", StatusCandidateRuntime.builder()
-                .dataComplete(true)
-                .coilNo("TAKE-COIL").productNo(4).colorNo(takeColor)
-                .lengths(Arrays.asList(new BigDecimal("200"))).maxLength(new BigDecimal("800")).build());
-        Map<DeviceSide, StatusCurrentRuntime> current = new LinkedHashMap<>();
-        current.put(DeviceSide.UNCOILER, StatusCurrentRuntime.builder()
-                .side(DeviceSide.UNCOILER).running(true)
-                .deviceCode("feed-device-x").deviceName("1#开卷机")
-                .coilNo("FEED-COIL").productNo(3).colorNo(feedColor)
-                .remainingLength(new BigDecimal(feedLength)).maxLength(new BigDecimal("1000")).build());
-        current.put(DeviceSide.COILER, StatusCurrentRuntime.builder()
-                .side(DeviceSide.COILER).running(true)
-                .deviceCode("take-device-x").deviceName("2#卷取机")
-                .coilNo("TAKE-COIL").productNo(4).colorNo(takeColor)
-                .remainingLength(new BigDecimal("200")).maxLength(new BigDecimal("800")).build());
-        return StatusTrackingContext.builder().candidates(candidates).current(current).build();
+    private ShearResult exitResult(List<ShearResult> results) {
+        return results.stream().filter(result -> "exit-cut".equals(result.getShearPointCode()))
+                .findFirst().orElseThrow(AssertionError::new);
     }
 
-    private Map<String, Object> entryValues(boolean signal, String color, String headLength) {
-        Map<String, Object> values = new LinkedHashMap<>();
-        values.put("/line-x/shear/entry-cut-x", signal);
-        values.put("/line-x/shear/entry-color", color);
-        values.put("/line-x/shear/head-length", new BigDecimal(headLength));
-        values.put("/line-x/shear/head-number", 2);
-        values.put("/line-x/shear/tail-length", new BigDecimal("3.5"));
-        values.put("/line-x/shear/tail-number", 3);
-        return values;
-    }
-
-    private Map<String, Object> exitValues(boolean signal,
-                                           String color,
-                                           String sample,
-                                           String scrap,
-                                           String frontLength,
-                                           String rearLength) {
-        Map<String, Object> values = new LinkedHashMap<>();
-        values.put("/line-x/shear/exit-cut-x", signal);
-        values.put("/line-x/shear/exit-color", color);
-        values.put("/line-x/shear/front-sample", new BigDecimal(sample));
-        values.put("/line-x/shear/front-scrap", new BigDecimal(scrap));
-        values.put("/line-x/shear/front-length", new BigDecimal(frontLength));
-        values.put("/line-x/shear/rear-sample", 2);
-        values.put("/line-x/shear/rear-scrap", 3);
-        values.put("/line-x/shear/rear-length", new BigDecimal(rearLength));
-        values.put("/line-x/shear/welder-pieces", 0);
-        return values;
-    }
-
-    private void configureDiscontinuous() {
-        config.getTracking().setMode(ShearMode.DISCONTINUOUS);
-        ShearPointConfig entry = config.getTracking().getUncoilerShearPoint().get(0);
-        entry.setColorPoint(null);
-        entry.setGratingPoints(Arrays.asList(
-                grating("entry-grating-a", true), grating("entry-grating-b", false)));
-
-        ShearPointConfig exit = config.getTracking().getCoilerShearPoint().get(0);
-        exit.setColorPoint(null);
-        exit.setGratingPoints(Arrays.asList(
-                grating("exit-grating-a", true), grating("exit-grating-b", false)));
-        exit.setShearSettings(ShearSettings.builder()
-                .head(CutSetting.builder().number(point("exit-head-number"))
-                        .length(point("exit-head-length")).build())
-                .tail(CutSetting.builder().number(point("exit-tail-number"))
-                        .length(point("exit-tail-length")).build())
-                .build());
-    }
-
-    private Map<String, Object> discontinuousEntryValues(boolean signal, boolean occupied) {
-        Map<String, Object> values = entryValues(signal, "ignored", "2.5");
-        values.put("/line-x/shear/entry-grating-a", true);
-        values.put("/line-x/shear/entry-grating-b", occupied ? false : true);
-        return values;
-    }
-
-    private Map<String, Object> discontinuousExitValues(boolean signal, boolean occupied) {
-        Map<String, Object> values = exitValues(signal, "ignored", "0", "0", "1.2", "1.8");
-        values.put("/line-x/shear/exit-grating-a", true);
-        values.put("/line-x/shear/exit-grating-b", occupied ? false : true);
-        values.put("/line-x/shear/exit-head-length", new BigDecimal("4.5"));
-        values.put("/line-x/shear/exit-head-number", 4);
-        values.put("/line-x/shear/exit-tail-length", new BigDecimal("6.5"));
-        values.put("/line-x/shear/exit-tail-number", 6);
-        return values;
-    }
-
-    private StatusTrackingContext sameMaterialContext(String feedLength) {
-        StatusTrackingContext context = context("10", "20", feedLength);
-        context.getCurrent().get(DeviceSide.COILER).setCoilNo("FEED-COIL");
-        return context;
-    }
-
-    private GratingPointConfig grating(String name, boolean hasCoil) {
-        return GratingPointConfig.builder().name(name).type(PointDataType.BOOLEAN)
-                .hasCoil(hasCoil).build();
+    private PointConfig point(String name) {
+        return PointConfig.builder().name(name).type(PointDataType.FLOAT).build();
     }
 
     private ShearResult only(List<ShearResult> results) {
         assertThat(results).hasSize(1);
         return results.get(0);
-    }
-
-    private ShearTrackingConfig config() {
-        ShearPointConfig entry = ShearPointConfig.builder()
-                .name("entry-cut-x").type(PointDataType.BOOLEAN).normalPos(true)
-                .deviceCode("feed-device-x")
-                .typeCodes(ShearTypeCodes.builder().head("711").slice("715").tail("719").build())
-                .colorPoint(point("entry-color"))
-                .shearSettings(ShearSettings.builder()
-                        .head(CutSetting.builder().number(point("head-number"))
-                                .length(point("head-length")).build())
-                        .tail(CutSetting.builder().number(point("tail-number"))
-                                .length(point("tail-length")).build())
-                        .build())
-                .build();
-        ShearPointConfig exit = ShearPointConfig.builder()
-                .name("exit-cut-x").type(PointDataType.BOOLEAN).normalPos(true)
-                .deviceCodes(Arrays.asList("take-device-y", "take-device-x"))
-                .typeCodes(ShearTypeCodes.builder().head("931").slice("935").tail("939").build())
-                .colorPoint(point("exit-color"))
-                .shearSettings(ShearSettings.builder()
-                        .welderPieces(point("welder-pieces"))
-                        .frontWelder(WelderShearSettings.builder()
-                                .samplePieces(point("front-sample"))
-                                .scrapPieces(point("front-scrap"))
-                                .length(point("front-length")).build())
-                        .behindWelder(WelderShearSettings.builder()
-                                .samplePieces(point("rear-sample"))
-                                .scrapPieces(point("rear-scrap"))
-                                .length(point("rear-length")).build())
-                        .build())
-                .build();
-        return ShearTrackingConfig.builder()
-                .unitCode(UNIT).trackingType(TrackingType.SHEAR).enable(true).mqttTopic("line-x-shear")
-                .tracking(ShearTrackingSection.builder()
-                        .pointPrefix("/line-x/shear/").mode(ShearMode.CONTINUOUS)
-                        .tailExperience(new BigDecimal("50"))
-                        .shearExperience(new BigDecimal("100"))
-                        .uncoilerShearPoint(Arrays.asList(entry))
-                        .coilerShearPoint(Arrays.asList(exit))
-                        .build())
-                .build();
-    }
-
-    private StatusTrackingConfig statusConfig() {
-        return StatusTrackingConfig.builder()
-                .unitCode(UNIT)
-                .trackingType(TrackingType.STATUS)
-                .tracking(StatusTrackingSection.builder()
-                        .points(Arrays.asList(
-                                StatusPointGroup.builder().code("feed-device-x")
-                                        .name("1#开卷机").side(DeviceSide.UNCOILER).build(),
-                                StatusPointGroup.builder().code("take-device-y")
-                                        .name("1#卷取机").side(DeviceSide.COILER).build(),
-                                StatusPointGroup.builder().code("take-device-x")
-                                        .name("2#卷取机").side(DeviceSide.COILER).build()))
-                        .build())
-                .build();
-    }
-
-    private PointConfig point(String name) {
-        return PointConfig.builder().name(name).type(PointDataType.FLOAT).build();
     }
 }
