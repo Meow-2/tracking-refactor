@@ -117,6 +117,20 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
             return complete(input, startedAt, "未达到启动条件", tracking, new ArrayList<>());
         }
 
+        // status 与 process 使用不同消息；换道或换向时不能沿用上一状态帧的设备。
+        if (LengthMode.ROLLING == tracking.getLengthMode()
+                && !rollingStatusMatches(input.getStatusContext(), latest, tracking)) {
+            trackingStepLogger.log(input, "轧制状态不匹配", TrackingStepLogger.details(
+                    "processPassNo", passNo(latest, tracking),
+                    "statusPassNo", input.getStatusContext() == null ? null : input.getStatusContext().getPassNo(),
+                    "processDirection", rollingDirection(latest, tracking),
+                    "statusDirection", input.getStatusContext() == null
+                            ? null : input.getStatusContext().getRollingDirection(),
+                    "statusDirectReverse", input.getStatusContext() == null
+                            ? null : input.getStatusContext().getRollingDirectReverse()));
+            return complete(input, startedAt, "等待同道次同方向的状态", tracking, new ArrayList<>());
+        }
+
         // 焊缝模式仍通过过程点位选卷；卷取机和轧机模式统一使用固化的状态上下文。
         List<TrackingPointGroup> groups = new ArrayList<>();
         if (LengthMode.WELDER == tracking.getLengthMode()) {
@@ -475,6 +489,50 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
         }
         BigDecimal passNo = PointReader.decimalValue(latest, trackingPointPath(tracking, tracking.getRolling().getPassNoPoint()));
         return passNo == null ? null : passNo.intValue();
+    }
+
+    /**
+     * 校验固化的 status 状态与当前 process 帧是否属于同一道次、同一原始方向及反转配置。
+     * <p>status 与 process 分别订阅消息，校验失败时本轮不生成结果，等待匹配的状态帧。</p>
+     */
+    private boolean rollingStatusMatches(StatusTrackingContext context,
+                                         PointSnapshot latest,
+                                         TrackingSection tracking) {
+        Integer processPassNo = passNo(latest, tracking);
+        Boolean processDirection = rollingDirection(latest, tracking);
+        boolean reverse = tracking.getRolling() != null
+                && Boolean.TRUE.equals(tracking.getRolling().getDirectReverse());
+        return context != null && processPassNo != null && processPassNo > 0
+                && processDirection != null
+                && processPassNo.equals(context.getPassNo())
+                && processDirection.equals(context.getRollingDirection())
+                && Boolean.valueOf(reverse).equals(context.getRollingDirectReverse());
+    }
+
+    /** 将布尔值、0/1 数值及文本方向点统一为原始布尔值；无效值返回 null。 */
+    private Boolean rollingDirection(PointSnapshot latest, TrackingSection tracking) {
+        if (tracking.getRolling() == null) {
+            return null;
+        }
+        Object raw = PointReader.rawValue(latest,
+                trackingPointPath(tracking, tracking.getRolling().getDirectPoint()));
+        if (raw instanceof Boolean) {
+            return (Boolean) raw;
+        }
+        if (raw instanceof Number) {
+            return ((Number) raw).intValue() != 0;
+        }
+        if (raw == null) {
+            return null;
+        }
+        String value = String.valueOf(raw).trim();
+        if ("true".equalsIgnoreCase(value) || "1".equals(value)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(value) || "0".equals(value)) {
+            return false;
+        }
+        return null;
     }
 
     /**

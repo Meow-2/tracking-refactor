@@ -1,13 +1,19 @@
 package com.wisdri.tracking.infrastructure.service.feign.converter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.wisdri.tracking.common.exception.TrackingException;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
+import com.wisdri.tracking.domain.model.config.status.DevicePosition;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeNode;
 import com.wisdri.tracking.infrastructure.service.feign.converter.status.StatusCubeApiTrackingConfigConverter;
 import org.junit.jupiter.api.Test;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -78,6 +84,26 @@ class StatusCubeApiTrackingConfigConverterTest {
 
         assertInvalid(json.replace("\"name\":\"rolling_direction\"", "\"name\":\"\""));
         assertInvalid(json.replace("\"pass_no_point\"", "\"missing_pass_no_point\""));
+    }
+
+    @Test
+    void validatesZrm1PositionConfiguration() throws Exception {
+        String json = new String(Files.readAllBytes(Paths.get("docs/config/ZRM1/status.json")),
+                StandardCharsets.UTF_8);
+        StatusTrackingConfig config = (StatusTrackingConfig) converter.convert("ZRM1", node(json));
+        assertThat(config.getTracking().getPoints()).hasSize(3);
+        assertThat(config.getTracking().getPoints().get(0).getPosition()).isEqualTo(DevicePosition.RIGHT);
+        assertThat(config.getTracking().getPoints().get(2).getPosition()).isEqualTo(DevicePosition.LEFT);
+        assertInvalid(json.replace("\"position\": \"left\"", "\"position\": \"right\""));
+        assertInvalid(json.replace("\"code\": \"por1\"", "\"code\": \"tr0\""));
+        assertInvalid(json.replace("\"position\": \"right\"", "\"position\": \"center\""));
+        StatusTrackingConfig reversed = (StatusTrackingConfig) converter.convert("ZRM1", node(
+                json.replace("\"direct_reverse\": false", "\"direct_reverse\": true")));
+        assertThat(reversed.getTracking().getRolling().getDirectReverse()).isTrue();
+        ObjectNode leftPor = (ObjectNode) objectMapper.readTree(json);
+        ((ObjectNode) leftPor.path("tracking").path("points").get(0)).put("position", "left");
+        StatusTrackingConfig leftStart = (StatusTrackingConfig) converter.convert("ZRM1", node(leftPor.toString()));
+        assertThat(leftStart.getTracking().getPoints().get(0).getPosition()).isEqualTo(DevicePosition.LEFT);
     }
 
     @Test

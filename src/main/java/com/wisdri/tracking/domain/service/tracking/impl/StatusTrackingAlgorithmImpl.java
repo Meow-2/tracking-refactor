@@ -3,6 +3,7 @@ package com.wisdri.tracking.domain.service.tracking.impl;
 import com.wisdri.tracking.domain.model.config.PointConfig;
 import com.wisdri.tracking.domain.model.config.StartCondition;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
+import com.wisdri.tracking.domain.model.config.status.DevicePosition;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodConfig;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodDefinition;
 import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
@@ -32,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -81,6 +83,24 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 input.getUnitCode(), TrackingType.STATUS, StatusTrackingRuntime.class)
                 .orElse(null);
         RollingState rollingState = rollingState(input, tracking, previousRuntime);
+        // 位置模式必须先有有效道次、方向及两端设备；缺任一项时不能沿用上一帧的设备。
+        boolean positionMode = positionMode(tracking);
+        boolean rollingInputsValid = !positionMode || validPositionSelection(rollingState);
+        boolean configuredPairPresent = !positionMode || !rollingInputsValid
+                || configuredPairPresent(tracking, rollingState);
+        boolean validRollingSelection = rollingInputsValid && configuredPairPresent;
+        if (positionMode && !validRollingSelection) {
+            trackingStepLogger.log(input, "轧制设备选择无效", TrackingStepLogger.details(
+                    "passNo", rollingState.getPassNo(),
+                    "rollingDirection", rollingState.getDirection(),
+                    "effectiveDirection", rollingState.getDirection() == null ? null
+                            : rollingState.getDirection() ^ rollingState.isReverse(),
+                    "uncoilerConfigured", !rollingInputsValid ? null
+                            : configuredSidePresent(tracking, rollingState, DeviceSide.UNCOILER),
+                    "coilerConfigured", !rollingInputsValid ? null
+                            : configuredSidePresent(tracking, rollingState, DeviceSide.COILER),
+                    "reason", !rollingInputsValid ? "道次或方向无效" : "该方向缺少开卷或卷取设备配置"));
+        }
         BigDecimal startValue = startConditionValue(input.getLatestSnapshot(), tracking);
         boolean started = started(startValue, tracking.getStartCondition());
         trackingStepLogger.log(input, "启动条件检查", TrackingStepLogger.details(
@@ -96,8 +116,21 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         Map<DeviceSide, SelectedCandidate> selected = started
                 ? selectCandidates(input, tracking, candidates, rollingState)
                 : new LinkedHashMap<>();
+        // 配置存在但尚未形成有效长度趋势时，分别记录哪一侧未选中，便于区分配置缺失。
+        if (positionMode && started && validRollingSelection) {
+            for (DeviceSide side : RESULT_ORDER) {
+                if (!selected.containsKey(side)) {
+                    trackingStepLogger.log(input, "轧制设备未选中", side.getCode(),
+                            TrackingStepLogger.details(
+                                    "passNo", rollingState.getPassNo(),
+                                    "effectiveDirection", rollingState.getDirection() ^ rollingState.isReverse(),
+                                    "reason", "设备点位或长度趋势尚未满足条件"));
+                }
+            }
+        }
         Map<DeviceSide, StatusCurrentRuntime> current = current(input, selected, previousRuntime,
-                tracking.getCurrentClearThreshold(), !started || rollingState.isWindowReset());
+                tracking.getCurrentClearThreshold(), !started || rollingState.isWindowReset()
+                        || !validRollingSelection);
         runtimeRepositoryDispatcher.saveRuntime(StatusTrackingRuntime.builder()
                 .unitCode(input.getUnitCode())
                 .trackingType(TrackingType.STATUS)
@@ -105,6 +138,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                         ? null : input.getLatestSnapshot().getReceivedAt())
                 .startConditionPointValue(startValue)
                 .rollingDirection(rollingState.getDirection())
+                .rollingDirectReverse(tracking.getRolling() == null ? null : rollingState.isReverse())
                 .passNo(rollingState.getPassNo())
                 .candidates(candidates)
                 .current(current)
@@ -131,7 +165,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 ? null : previousRuntime.getCandidates();
         Map<String, StatusCandidateRuntime> updated = new LinkedHashMap<>();
         for (StatusPointGroup group : tracking.getPoints()) {
-            DeviceSide side = actualSide(group.getSide(), rollingState);
+            DeviceSide side = actualSide(group, tracking, rollingState);
             String coilNo = normalizeCoilNo(PointReader.stringValue(input.getLatestSnapshot(),
                     pointPath(tracking, group.getCoilNo())));
             String colorNo = trimInvisible(PointReader.stringValue(input.getLatestSnapshot(),
@@ -145,7 +179,8 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             Integer productNo = !coilNoValid
                     ? null
                     : sameCoil ? old.getProductNo() : queryProductNo(input, group, coilNo);
-            CoilerMethodValue coilerMethod = sameCoil && !rollingState.isWindowReset()
+            // 本道次不参与的设备不生成方式及开卷卷取结果；换道或换向后按新侧别重新取方式。
+            CoilerMethodValue coilerMethod = side == null ? null : sameCoil && !rollingState.isWindowReset()
                     && coilerMethodPresent(old)
                     ? coilerMethod(old)
                     : resolveCoilerMethod(input.getLatestSnapshot(), tracking, group, side);
@@ -177,7 +212,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     .maxLength(maxLength)
                     .lengths(lengths)
                     .build();
-            if (coilNoValid && (!sameCoil || rollingState.isPassChanged())) {
+            if (side != null && coilNoValid && (!sameCoil || rollingState.isWindowReset())) {
                 StatusResult result = StatusResult.from(candidate, group, side,
                         rollingState.getPassNo(), input.getUnitCode(), generatedAt, receivedAt(input));
                 if (result != null && !blank(result.getCoilerMethod())
@@ -301,7 +336,10 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                                                                  RollingState rollingState) {
         Map<DeviceSide, SelectedCandidate> selected = new LinkedHashMap<>();
         for (StatusPointGroup group : tracking.getPoints()) {
-            DeviceSide side = actualSide(group.getSide(), rollingState);
+            DeviceSide side = actualSide(group, tracking, rollingState);
+            if (side == null) {
+                continue;
+            }
             StatusCandidateRuntime runtime = candidates.get(group.getCode());
             if (runtime == null || Boolean.FALSE.equals(runtime.getDataComplete())
                     || runtime.getLengths() == null
@@ -368,8 +406,11 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         boolean reverse = Boolean.TRUE.equals(tracking.getRolling().getDirectReverse());
         boolean currentSideReversed = direction != null && direction ^ reverse;
         boolean previousSideReversed = previousDirection != null && previousDirection ^ reverse;
-        boolean directionChanged = hasPreviousCandidates && direction != null
-                && currentSideReversed != previousSideReversed;
+        // 配置热更新可能只改变 direct_reverse，方向点本身不变也必须重置旧采样窗口。
+        boolean reverseChanged = hasPreviousCandidates && previous.getRollingDirectReverse() != null
+                && previous.getRollingDirectReverse() != reverse;
+        boolean directionChanged = (hasPreviousCandidates && direction != null
+                && currentSideReversed != previousSideReversed) || reverseChanged;
         boolean passChanged = hasPreviousCandidates && currentPassNo != null
                 && !currentPassNo.equals(previousPassNo);
         boolean windowReset = directionChanged || passChanged;
@@ -380,18 +421,82 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 "sideReversed", currentSideReversed,
                 "passNo", passNo,
                 "directionChanged", directionChanged,
+                "directReverseChanged", reverseChanged,
                 "passChanged", passChanged,
                 "windowReset", windowReset));
         return new RollingState(direction, passNo, reverse, passChanged, windowReset);
     }
 
-    private DeviceSide actualSide(DeviceSide configuredSide, RollingState rollingState) {
+    /**
+     * 返回设备在本道次的实际侧别；null 表示设备不参与当前轧制。
+     * <p>位置模式若缺少完整设备对，全部跳过，避免只发布单侧状态；其他机组沿用原侧别交换。</p>
+     */
+    private DeviceSide actualSide(StatusPointGroup group,
+                                  StatusTrackingSection tracking,
+                                  RollingState rollingState) {
+        if (positionMode(tracking)) {
+            if (!validPositionSelection(rollingState) || !configuredPairPresent(tracking, rollingState)) {
+                return null;
+            }
+            return positionSide(group, rollingState);
+        }
+        DeviceSide configuredSide = group.getSide();
         if (configuredSide == null || rollingState.getDirection() == null
                 || !(rollingState.getDirection() ^ rollingState.isReverse())) {
             return configuredSide;
         }
         return configuredSide == DeviceSide.UNCOILER
                 ? DeviceSide.COILER : DeviceSide.UNCOILER;
+    }
+
+    /** 只要配置了位置，就按物理位置选设备；转换配置时会校验所有设备的位置。 */
+    private boolean positionMode(StatusTrackingSection tracking) {
+        return tracking.getPoints().stream().anyMatch(group -> group.getPosition() != null);
+    }
+
+    /** 没有有效道次或方向时无法确定物料源端，不参与位置选设备。 */
+    private boolean validPositionSelection(RollingState rollingState) {
+        Integer passNo = rollingState.getPassNo();
+        Boolean direction = rollingState.getDirection();
+        return passNo != null && passNo > 0 && direction != null;
+    }
+
+    /**
+     * 按道次、实际方向和物理位置确定设备职责。
+     * <p>首道次源端只能选 por、目标端只能选 tr；后续道次两端都选 tr。
+     * 实际方向为 direct_point XOR direct_reverse，false 时从右往左，true 时从左往右。</p>
+     */
+    private DeviceSide positionSide(StatusPointGroup group, RollingState rollingState) {
+        DevicePosition source = rollingState.getDirection() ^ rollingState.isReverse()
+                ? DevicePosition.LEFT : DevicePosition.RIGHT;
+        boolean sourceDevice = group.getPosition() == source;
+        String code = group.getCode().toLowerCase(Locale.ROOT);
+        if (rollingState.getPassNo() == 1) {
+            if (sourceDevice && code.startsWith("por")) {
+                return DeviceSide.UNCOILER;
+            }
+            return !sourceDevice && code.startsWith("tr") ? DeviceSide.COILER : null;
+        }
+        return code.startsWith("tr")
+                ? sourceDevice ? DeviceSide.UNCOILER : DeviceSide.COILER : null;
+    }
+
+    /** 两端都有符合本道次类别和物理位置的设备配置时才允许形成当前设备对。 */
+    private boolean configuredPairPresent(StatusTrackingSection tracking, RollingState rollingState) {
+        return configuredSidePresent(tracking, rollingState, DeviceSide.UNCOILER)
+                && configuredSidePresent(tracking, rollingState, DeviceSide.COILER);
+    }
+
+    /** 检查指定侧别在当前方向是否有可参与的设备，不依赖设备实时点位值。 */
+    private boolean configuredSidePresent(StatusTrackingSection tracking,
+                                          RollingState rollingState,
+                                          DeviceSide expectedSide) {
+        for (StatusPointGroup group : tracking.getPoints()) {
+            if (positionSide(group, rollingState) == expectedSide) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

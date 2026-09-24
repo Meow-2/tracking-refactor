@@ -142,14 +142,74 @@ class ProcessTrackingAlgorithmImplTest {
         values.put("direction", true);
         values.put("pass", 3);
 
-        List<ProcessResult> results = algorithm.calculate(input(values,
-                status("STATUS-COIL", 7, "120", "20", "5")));
+        StatusTrackingContext context = status("STATUS-COIL", 7, "120", "20", "5");
+        context.setPassNo(3);
+        context.setRollingDirection(true);
+        context.setRollingDirectReverse(false);
+        List<ProcessResult> results = algorithm.calculate(input(values, context));
 
         assertEquals(1, results.size());
         assertEquals("STATUS-COIL", results.get(0).getCoilNo());
         assertEquals(Integer.valueOf(7), results.get(0).getInMatNoProdNo());
         assertEquals(new BigDecimal("100"), results.get(0).getHeadLength());
         assertEquals(Integer.valueOf(3), results.get(0).getPassNo());
+    }
+
+    @Test
+    void rollingWaitsForMatchingStatusPassAndDirection() {
+        ProcessTrackingConfig config = config();
+        config.getTracking().setLengthMode(LengthMode.ROLLING);
+        config.getTracking().setRolling(RollingConfig.builder()
+                .directPoint(PointConfig.builder().name("direction").build())
+                .passNoPoint(PointConfig.builder().name("pass").build())
+                .build());
+        when(runtimeRepositoryDispatcher.findConfigAs(
+                "CP1", TrackingType.PROCESS, ProcessTrackingConfig.class
+        )).thenReturn(Optional.of(config));
+        Map<String, Object> values = values("POINT-COIL", BigDecimal.ONE);
+        values.put("pass", 2);
+        values.put("direction", true);
+        StatusTrackingContext context = status("OLD-COIL", 1, "100", "80", "10");
+        context.setPassNo(1);
+        context.setRollingDirection(false);
+        context.setRollingDirectReverse(false);
+
+        assertTrue(algorithm.calculate(input(values, context)).isEmpty());
+        context.setPassNo(2);
+        assertTrue(algorithm.calculate(input(values, context)).isEmpty());
+        context.setRollingDirection(true);
+        assertEquals(1, algorithm.calculate(input(values, context)).size());
+    }
+
+    @Test
+    void rollingFirstPassHonorsDirectReverse() {
+        ProcessTrackingConfig config = config();
+        config.getTracking().setLengthMode(LengthMode.ROLLING);
+        config.getTracking().setRolling(RollingConfig.builder()
+                .directPoint(PointConfig.builder().name("direction").build())
+                .passNoPoint(PointConfig.builder().name("pass").build())
+                .directReverse(true)
+                .build());
+        when(runtimeRepositoryDispatcher.findConfigAs(
+                "CP1", TrackingType.PROCESS, ProcessTrackingConfig.class
+        )).thenReturn(Optional.of(config));
+        Map<String, Object> values = values("POINT-COIL", BigDecimal.ONE);
+        values.put("pass", 1);
+        values.put("direction", true);
+        StatusTrackingContext context = status("POR-COIL", 4, "100", "80", "10");
+        context.setPassNo(1);
+        context.setRollingDirection(true);
+        context.setRollingDirectReverse(true);
+
+        assertEquals("POR-COIL", algorithm.calculate(input(values, context)).get(0).getCoilNo());
+        values.put("direction", false);
+        context.setRollingDirection(false);
+        assertEquals(1, algorithm.calculate(input(values, context)).size());
+        values.put("pass", 2);
+        context.setPassNo(2);
+        assertEquals(1, algorithm.calculate(input(values, context)).size());
+        context.setRollingDirectReverse(false);
+        assertTrue(algorithm.calculate(input(values, context)).isEmpty());
     }
 
     @Test

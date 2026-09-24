@@ -33,6 +33,15 @@ public class StatusTrackingContext {
      */
     private BigDecimal startConditionPointValue;
 
+    /** 生成该状态时最后有效的原始方向点值；与 directReverse 异或后得到实际方向。 */
+    private Boolean rollingDirection;
+
+    /** 生成该状态时采用的方向反转配置，用于校验 process 配置是否一致。 */
+    private Boolean rollingDirectReverse;
+
+    /** 生成该状态时的轧制道次号；为空表示尚未取得有效道次。 */
+    private Integer passNo;
+
     /**
      * 各设备的连续采样窗口快照。
      */

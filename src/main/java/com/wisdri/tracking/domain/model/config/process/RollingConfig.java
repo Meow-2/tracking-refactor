@@ -28,7 +28,8 @@ public class RollingConfig {
     private PointConfig passNoPoint;
 
     /**
-     * 是否反转轧制方向判断结果。
+     * 是否反转方向点含义：false 时点值 false 为右往左，true 为左往右；
+     * 配置 true 时交换上述含义，实际方向为方向点值与本字段异或。
      */
     private Boolean directReverse;
 }

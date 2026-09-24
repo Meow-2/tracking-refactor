@@ -168,6 +168,9 @@ public class TrackingTaskProducerUseCase {
         return StatusTrackingContext.builder()
                 .receivedAt(runtime.getReceivedAt())
                 .startConditionPointValue(runtime.getStartConditionPointValue())
+                .rollingDirection(runtime.getRollingDirection())
+                .rollingDirectReverse(runtime.getRollingDirectReverse())
+                .passNo(runtime.getPassNo())
                 .candidates(copyCandidates(runtime.getCandidates()))
                 .current(copyCurrent(runtime.getCurrent()))
                 .build();

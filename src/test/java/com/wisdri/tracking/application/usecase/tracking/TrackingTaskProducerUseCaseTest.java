@@ -75,6 +75,9 @@ class TrackingTaskProducerUseCaseTest {
         assertThat(input.getStatusContext().getReceivedAt())
                 .isEqualTo(Instant.parse("2026-07-17T08:00:01Z"));
         assertThat(input.getStatusContext().getStartConditionPointValue()).isEqualByComparingTo("1");
+        assertThat(input.getStatusContext().getPassNo()).isEqualTo(2);
+        assertThat(input.getStatusContext().getRollingDirection()).isFalse();
+        assertThat(input.getStatusContext().getRollingDirectReverse()).isFalse();
         assertThat(input.getStatusContext().getCandidates().get("U1").getDeviceCode()).isEqualTo("U1");
         assertThat(input.getStatusContext().getCandidates().get("U1").getDeviceName()).isEqualTo("1#开卷机");
         assertThat(input.getStatusContext().getCandidates().get("U1").getColorNo()).isEqualTo("12");
@@ -216,6 +219,9 @@ class TrackingTaskProducerUseCaseTest {
                 .trackingType(TrackingType.STATUS)
                 .receivedAt(Instant.parse("2026-07-17T08:00:01Z"))
                 .startConditionPointValue(BigDecimal.ONE)
+                .passNo(2)
+                .rollingDirection(false)
+                .rollingDirectReverse(false)
                 .candidates(Collections.singletonMap("U1", StatusCandidateRuntime.builder()
                         .deviceCode("U1")
                         .deviceName("1#开卷机")

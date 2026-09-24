@@ -7,6 +7,8 @@ import com.wisdri.tracking.domain.model.config.PointDataType;
 import com.wisdri.tracking.domain.model.config.StartCondition;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
+import com.wisdri.tracking.domain.model.config.status.DevicePosition;
+import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodConfig;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodDefinition;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodDefinitions;
@@ -83,6 +85,41 @@ public class StatusCubeApiTrackingConfigConverter extends AbstractCubeApiTrackin
             if (!codes.add(group.getCode().toLowerCase(Locale.ROOT))) {
                 throw new TrackingException("status.points 设备编码重复: " + group.getCode());
             }
+        }
+        validatePositionSelection(tracking);
+    }
+
+    /**
+     * 校验位置模式的设备拓扑，防止同一物理侧配置两台 tr 造成当前侧别竞争。
+     * <p>开卷机可以在左侧、右侧或两侧配置；某个首道次方向无对应 por 时由运行算法记录并跳过。</p>
+     */
+    private void validatePositionSelection(StatusTrackingSection tracking) {
+        if (tracking.getPoints().stream().noneMatch(group -> group.getPosition() != null)) {
+            return;
+        }
+        if (tracking.getRolling() == null || tracking.getPoints().size() < 3) {
+            throw new TrackingException("status.points 位置模式需要 rolling、开卷机及左右两侧卷取机");
+        }
+        int porCount = 0;
+        int rightTr = 0;
+        int leftTr = 0;
+        for (StatusPointGroup group : tracking.getPoints()) {
+            String code = group.getCode().toLowerCase(Locale.ROOT);
+            if (code.startsWith("por") && group.getSide() == DeviceSide.UNCOILER
+                    && group.getPosition() != null) {
+                porCount++;
+            } else if (code.startsWith("tr") && group.getSide() == DeviceSide.COILER
+                    && group.getPosition() == DevicePosition.RIGHT) {
+                rightTr++;
+            } else if (code.startsWith("tr") && group.getSide() == DeviceSide.COILER
+                    && group.getPosition() == DevicePosition.LEFT) {
+                leftTr++;
+            } else {
+                throw new TrackingException("status.points 设备编码、初始类别与位置不匹配: " + group.getCode());
+            }
+        }
+        if (porCount < 1 || rightTr != 1 || leftTr != 1) {
+            throw new TrackingException("status.points 位置模式必须配置至少一台 por，且左右两侧各一台 tr");
         }
     }
 

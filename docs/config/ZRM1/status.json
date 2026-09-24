@@ -11,7 +11,7 @@
       "threshold": 0
     },
     "sample_count": 4,
-    "min_length_change": 0.5,
+    "min_length_change": 0.01,
     "current_clear_threshold": 10,
     "monotonicity_check_enabled": false,
     "rolling": {
@@ -50,8 +50,27 @@
     "points": [
       {
         "code": "por1",
-        "name": "入口卷取机",
+        "name": "开卷机",
+        "position": "right",
         "side": "uncoiler",
+        "coil_no": {
+          "name": "por_coil_no",
+          "type": "string"
+        },
+        "remaining_length": {
+          "name": "por_coil_length",
+          "type": "float"
+        },
+        "coiler_method": {
+          "default": false,
+          "false_index": 0
+        }
+      },
+      {
+        "code": "tr1",
+        "name": "入口-右边卷取机",
+        "position": "right",
+        "side": "coiler",
         "coil_no": {
           "name": "entry_tr_coil_no",
           "type": "string"
@@ -66,8 +85,9 @@
         }
       },
       {
-        "code": "tr1",
-        "name": "出口卷取机",
+        "code": "tr2",
+        "name": "出口-左边卷取机",
+        "position": "left",
         "side": "coiler",
         "coil_no": {
           "name": "exit_tr_coil_no",

@@ -29,6 +29,8 @@ public class StatusTrackingRuntime extends TrackingRuntime {
     private BigDecimal startConditionPointValue;
     /** 最近一次有效的原始轧制方向点值。 */
     private Boolean rollingDirection;
+    /** 本轮计算采用的方向反转配置；热更新后若值变化，必须清空旧方向的采样窗口。 */
+    private Boolean rollingDirectReverse;
     /** 最近一次有效的轧制道次号。 */
     private Integer passNo;
     private Map<String, StatusCandidateRuntime> candidates = new LinkedHashMap<>();

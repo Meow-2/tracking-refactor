@@ -8,6 +8,7 @@ import com.wisdri.tracking.domain.model.config.status.CoilerMethodConfig;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodDefinition;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodDefinitions;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
+import com.wisdri.tracking.domain.model.config.status.DevicePosition;
 import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingSection;
@@ -24,6 +25,7 @@ import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDi
 import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -38,6 +40,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -50,6 +53,7 @@ class StatusTrackingAlgorithmImplTest {
     private StatusTrackingAlgorithmImpl algorithm;
     private StatusTrackingConfig statusConfig;
     private QualityRepository qualityRepository;
+    private TrackingStepLogger trackingStepLogger;
 
     @BeforeEach
     void setUp() {
@@ -68,7 +72,8 @@ class StatusTrackingAlgorithmImplTest {
         qualityRepository = mock(QualityRepository.class);
         when(qualityRepository.queryProductNo(anyString(), anyString())).thenReturn(1);
         ReflectionTestUtils.setField(algorithm, "runtimeRepositoryDispatcher", repository);
-        ReflectionTestUtils.setField(algorithm, "trackingStepLogger", mock(TrackingStepLogger.class));
+        trackingStepLogger = mock(TrackingStepLogger.class);
+        ReflectionTestUtils.setField(algorithm, "trackingStepLogger", trackingStepLogger);
         ReflectionTestUtils.setField(algorithm, "qualityRepository", qualityRepository);
     }
 
@@ -560,6 +565,165 @@ class StatusTrackingAlgorithmImplTest {
                 .passNoPoint(point("pass_no"))
                 .directReverse(directReverse)
                 .build());
+    }
+
+    @Test
+    void positionModeSelectsFirstPassAndBothLaterDirections() {
+        enablePositionMode();
+
+        List<StatusResult> first = algorithm.calculate(rollingInput(false, 1,
+                "por1", "COIL-A", "100", "tr1", "COIL-B", "0", "tr2", "COIL-A", "5"));
+        assertThat(first).extracting(StatusResult::getDeviceCode).containsExactly("por1", "tr2");
+        assertThat(first).extracting(StatusResult::getSide)
+                .containsExactly(DeviceSide.UNCOILER, DeviceSide.COILER);
+        assertThat(first.get(0).getCoilerMethod()).isEqualTo("11");
+        assertThat(first.get(1).getCoilerMethod()).isEqualTo("19");
+        algorithm.calculate(rollingInput(false, 1,
+                "por1", "COIL-A", "90", "tr1", "COIL-B", "0", "tr2", "COIL-A", "15"));
+        algorithm.calculate(rollingInput(false, 1,
+                "por1", "COIL-A", "80", "tr1", "COIL-B", "0", "tr2", "COIL-A", "25"));
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("por1");
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getMaxLength())
+                .isEqualByComparingTo("100");
+        assertThat(runtime.get().getCurrent().get(DeviceSide.COILER).getDeviceCode()).isEqualTo("tr2");
+
+        List<StatusResult> second = algorithm.calculate(rollingInput(true, 2,
+                "por1", "COIL-A", "80", "tr1", "COIL-A", "5", "tr2", "COIL-A", "25"));
+        assertThat(second).extracting(StatusResult::getDeviceCode).containsExactly("tr1", "tr2");
+        assertThat(second).extracting(StatusResult::getSide)
+                .containsExactly(DeviceSide.COILER, DeviceSide.UNCOILER);
+        assertEmptySides(runtime.get().getCurrent());
+        algorithm.calculate(rollingInput(true, 2,
+                "por1", "COIL-A", "80", "tr1", "COIL-A", "15", "tr2", "COIL-A", "15"));
+        algorithm.calculate(rollingInput(true, 2,
+                "por1", "COIL-A", "80", "tr1", "COIL-A", "25", "tr2", "COIL-A", "5"));
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("tr2");
+        assertThat(runtime.get().getCurrent().get(DeviceSide.COILER).getDeviceCode()).isEqualTo("tr1");
+
+        List<StatusResult> third = algorithm.calculate(rollingInput(false, 3,
+                "por1", "COIL-A", "80", "tr1", "COIL-A", "25", "tr2", "COIL-A", "5"));
+        assertThat(third).extracting(StatusResult::getDeviceCode).containsExactly("tr1", "tr2");
+        assertEmptySides(runtime.get().getCurrent());
+        algorithm.calculate(rollingInput(false, 3,
+                "por1", "COIL-A", "80", "tr1", "COIL-A", "15", "tr2", "COIL-A", "15"));
+        algorithm.calculate(rollingInput(false, 3,
+                "por1", "COIL-A", "80", "tr1", "COIL-A", "5", "tr2", "COIL-A", "25"));
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("tr1");
+        assertThat(runtime.get().getCurrent().get(DeviceSide.COILER).getDeviceCode()).isEqualTo("tr2");
+    }
+
+    @Test
+    void positionModeLogsMissingSourceDeviceAndMissingPass() {
+        enablePositionMode();
+        algorithm.calculate(rollingInput(false, 1,
+                "por1", "COIL-A", "100", "tr1", "COIL-B", "0", "tr2", "COIL-A", "5"));
+        algorithm.calculate(rollingInput(false, 1,
+                "por1", "COIL-A", "90", "tr1", "COIL-B", "0", "tr2", "COIL-A", "15"));
+        algorithm.calculate(rollingInput(false, 1,
+                "por1", "COIL-A", "80", "tr1", "COIL-B", "0", "tr2", "COIL-A", "25"));
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("por1");
+        assertThat(algorithm.calculate(rollingInput(true, 1,
+                "por1", "COIL-A", "70", "tr1", "COIL-B", "0", "tr2", "COIL-A", "35"))).isEmpty();
+        assertEmptySides(runtime.get().getCurrent());
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Map> details = ArgumentCaptor.forClass(Map.class);
+        verify(trackingStepLogger).log(any(TrackingInput.class),
+                eq("轧制设备选择无效"), details.capture());
+        assertThat(details.getValue().get("reason")).isEqualTo("该方向缺少开卷或卷取设备配置");
+        assertThat(details.getValue().get("uncoilerConfigured")).isEqualTo(false);
+        assertThat(details.getValue().get("coilerConfigured")).isEqualTo(true);
+        Map<String, Object> missingPass = values(true,
+                "por1", "COIL-A", "80", "tr1", "COIL-B", "0", "tr2", "COIL-A", "25");
+        missingPass.put("/status/rolling_direction", false);
+        runtime.set(null);
+        assertThat(algorithm.calculate(input(missingPass))).isEmpty();
+        assertEmptySides(runtime.get().getCurrent());
+    }
+
+    @Test
+    void positionModeCanStartFirstPassFromLeftPor() {
+        statusConfig.getTracking().setPoints(Arrays.asList(
+                positionedGroup("por2", DeviceSide.UNCOILER, DevicePosition.LEFT),
+                positionedGroup("tr1", DeviceSide.COILER, DevicePosition.RIGHT),
+                positionedGroup("tr2", DeviceSide.COILER, DevicePosition.LEFT)));
+        enableCoilerMethods();
+        enableRolling(false);
+
+        List<StatusResult> first = algorithm.calculate(rollingInput(true, 1,
+                "por2", "COIL-A", "100", "tr1", "COIL-A", "5", "tr2", "COIL-B", "0"));
+        assertThat(first).extracting(StatusResult::getDeviceCode).containsExactly("por2", "tr1");
+        assertThat(first).extracting(StatusResult::getSide)
+                .containsExactly(DeviceSide.UNCOILER, DeviceSide.COILER);
+        algorithm.calculate(rollingInput(true, 1,
+                "por2", "COIL-A", "90", "tr1", "COIL-A", "15", "tr2", "COIL-B", "0"));
+        algorithm.calculate(rollingInput(true, 1,
+                "por2", "COIL-A", "80", "tr1", "COIL-A", "25", "tr2", "COIL-B", "0"));
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("por2");
+        assertThat(runtime.get().getCurrent().get(DeviceSide.COILER).getDeviceCode()).isEqualTo("tr1");
+    }
+
+    @Test
+    void positionModeHonorsReversedDirectionPoint() {
+        enablePositionMode();
+        statusConfig.getTracking().getRolling().setDirectReverse(true);
+
+        List<StatusResult> first = algorithm.calculate(rollingInput(true, 1,
+                "por1", "COIL-A", "100", "tr1", "COIL-B", "0", "tr2", "COIL-A", "5"));
+        assertThat(first).extracting(StatusResult::getDeviceCode).containsExactly("por1", "tr2");
+        algorithm.calculate(rollingInput(true, 1,
+                "por1", "COIL-A", "90", "tr1", "COIL-B", "0", "tr2", "COIL-A", "15"));
+        algorithm.calculate(rollingInput(true, 1,
+                "por1", "COIL-A", "80", "tr1", "COIL-B", "0", "tr2", "COIL-A", "25"));
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("por1");
+
+        assertThat(algorithm.calculate(rollingInput(false, 1,
+                "por1", "COIL-A", "70", "tr1", "COIL-B", "0", "tr2", "COIL-A", "35"))).isEmpty();
+        assertEmptySides(runtime.get().getCurrent());
+
+        List<StatusResult> later = algorithm.calculate(rollingInput(false, 2,
+                "por1", "COIL-A", "70", "tr1", "COIL-A", "5", "tr2", "COIL-A", "35"));
+        assertThat(later).extracting(StatusResult::getSide)
+                .containsExactly(DeviceSide.COILER, DeviceSide.UNCOILER);
+    }
+
+    @Test
+    void changingDirectReverseResetsPositionSelection() {
+        enablePositionMode();
+        algorithm.calculate(rollingInput(false, 2,
+                "por1", "COIL-A", "100", "tr1", "COIL-A", "80", "tr2", "COIL-A", "5"));
+        algorithm.calculate(rollingInput(false, 2,
+                "por1", "COIL-A", "100", "tr1", "COIL-A", "70", "tr2", "COIL-A", "15"));
+        algorithm.calculate(rollingInput(false, 2,
+                "por1", "COIL-A", "100", "tr1", "COIL-A", "60", "tr2", "COIL-A", "25"));
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("tr1");
+
+        statusConfig.getTracking().getRolling().setDirectReverse(true);
+        List<StatusResult> reversed = algorithm.calculate(rollingInput(false, 2,
+                "por1", "COIL-A", "100", "tr1", "COIL-A", "60", "tr2", "COIL-A", "25"));
+        assertThat(reversed).extracting(StatusResult::getSide)
+                .containsExactly(DeviceSide.COILER, DeviceSide.UNCOILER);
+        assertEmptySides(runtime.get().getCurrent());
+        algorithm.calculate(rollingInput(false, 2,
+                "por1", "COIL-A", "100", "tr1", "COIL-A", "70", "tr2", "COIL-A", "15"));
+        algorithm.calculate(rollingInput(false, 2,
+                "por1", "COIL-A", "100", "tr1", "COIL-A", "80", "tr2", "COIL-A", "5"));
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("tr2");
+        assertThat(runtime.get().getCurrent().get(DeviceSide.COILER).getDeviceCode()).isEqualTo("tr1");
+    }
+
+    private void enablePositionMode() {
+        statusConfig.getTracking().setPoints(Arrays.asList(
+                positionedGroup("por1", DeviceSide.UNCOILER, DevicePosition.RIGHT),
+                positionedGroup("tr1", DeviceSide.COILER, DevicePosition.RIGHT),
+                positionedGroup("tr2", DeviceSide.COILER, DevicePosition.LEFT)));
+        enableCoilerMethods();
+        enableRolling(false);
+    }
+
+    private StatusPointGroup positionedGroup(String code, DeviceSide side, DevicePosition position) {
+        StatusPointGroup group = group(code, side);
+        group.setPosition(position);
+        return group;
     }
 
     private TrackingInput rollingInput(boolean direction, int passNo, String... groups) {
