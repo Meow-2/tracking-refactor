@@ -322,6 +322,86 @@ class ShearTrackingAlgorithmImplTest {
         assertThat(tail.getInMatDeviceCode()).isEqualTo("tr1");
     }
 
+    @Test
+    void csl1DiscontinuousMatchesDifferentLengthCoilNumbersByCommonPrefix() {
+        TrackingInput input = csl1Input("COIL-2-EXT", "COIL-2", "100");
+
+        ShearResult result = exitResult(algorithm.calculate(input));
+
+        assertThat(result.getShearKind()).isEqualTo(ShearKind.SLICE);
+        assertThat(result.getInMatDeviceCode()).isEqualTo("tr2");
+        assertThat(result.getInMatNo()).isEqualTo("COIL-2");
+
+        TrackingInput reversed = csl1Input("COIL-2", "COIL-2-EXT", "100");
+        ShearResult reversedResult = exitResult(algorithm.calculate(reversed));
+        assertThat(reversedResult.getShearKind()).isEqualTo(ShearKind.SLICE);
+        assertThat(reversedResult.getInMatDeviceCode()).isEqualTo("tr2");
+    }
+
+    @Test
+    void csl1DiscontinuousKeepsExactMatchForEqualLengthCoilNumbers() {
+        TrackingInput input = csl1Input("COIL-2", "COIL-3", "100");
+
+        ShearResult result = exitResult(algorithm.calculate(input));
+
+        assertThat(result.getShearKind()).isEqualTo(ShearKind.TAIL);
+        assertThat(result.getInMatDeviceCode()).isEqualTo("tr1");
+    }
+
+    @Test
+    void csl1DiscontinuousTreatsZeroRemainingLengthAsEmptyCoil() {
+        TrackingInput input = csl1Input("COIL-2", "COIL-2", "100");
+        input.getStatusContext().getCandidates().get("tr1")
+                .setLengths(Arrays.asList(BigDecimal.ZERO));
+
+        ShearResult result = exitResult(algorithm.calculate(input));
+
+        assertThat(result.getShearKind()).isEqualTo(ShearKind.HEAD);
+        assertThat(result.getInMatDeviceCode()).isEqualTo("por1");
+        assertThat(result.getShearDeviceCoilNo()).isNull();
+        algorithm.afterPersist(input, Arrays.asList(result));
+        assertThat(runtimes.get("tr1").getCoilNo()).isNull();
+    }
+
+    @Test
+    void csl1DiscontinuousDoesNotSelectZeroLengthCandidateAsSameCoil() {
+        TrackingInput input = csl1Input("COIL-2", "COIL-2-EXT", "0");
+
+        ShearResult result = exitResult(algorithm.calculate(input));
+
+        assertThat(result.getShearKind()).isEqualTo(ShearKind.TAIL);
+        assertThat(result.getInMatDeviceCode()).isEqualTo("tr1");
+    }
+
+    @Test
+    void otherDiscontinuousUnitsStillRequireExactCoilNumbers() {
+        config.getTracking().setMode(ShearMode.DISCONTINUOUS);
+        TrackingInput input = input("500");
+        input.getStatusContext().getCandidates().get("tr2").setCoilNo("COIL-2-EXT");
+        triggerExit(input, null);
+
+        ShearResult result = exitResult(algorithm.calculate(input));
+
+        assertThat(result.getShearKind()).isEqualTo(ShearKind.TAIL);
+    }
+
+    /** 用相同的测试配置模拟 CSL1 非连续线出口剪，并保持候选顺序与触发帧一致。 */
+    private TrackingInput csl1Input(String triggerCoil, String otherCoil, String otherLength) {
+        config.getTracking().setMode(ShearMode.DISCONTINUOUS);
+        when(repository.findConfigAs("CSL1", TrackingType.SHEAR, ShearTrackingConfig.class))
+                .thenReturn(Optional.of(config));
+        when(repository.findConfigAs("CSL1", TrackingType.STATUS, StatusTrackingConfig.class))
+                .thenReturn(Optional.of(statusConfig()));
+        TrackingInput input = input("500");
+        input.setUnitCode("CSL1");
+        input.getStatusContext().getCandidates().get("tr1").setCoilNo(triggerCoil);
+        StatusCandidateRuntime other = input.getStatusContext().getCandidates().get("tr2");
+        other.setCoilNo(otherCoil);
+        other.setLengths(Arrays.asList(new BigDecimal(otherLength)));
+        triggerExit(input, null);
+        return input;
+    }
+
     private TrackingInput input(String remainingLength) {
         Map<String, Object> previous = new LinkedHashMap<>();
         previous.put("/line-x/shear/entry-cut", true);

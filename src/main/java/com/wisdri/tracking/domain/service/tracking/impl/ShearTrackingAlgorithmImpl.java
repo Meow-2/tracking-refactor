@@ -1,6 +1,7 @@
 package com.wisdri.tracking.domain.service.tracking.impl;
 
 import com.wisdri.tracking.domain.model.config.shear.ShearPointConfig;
+import com.wisdri.tracking.domain.model.config.shear.ShearMode;
 import com.wisdri.tracking.domain.model.config.shear.ShearTrackingConfig;
 import com.wisdri.tracking.domain.model.config.shear.ShearTrackingSection;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
@@ -87,13 +88,17 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
             skip(input, null, "status 设备配置不存在，无法确定候选设备顺序");
             return results;
         }
-        List<ShearDeviceSnapshot> devices = shearDeviceResolver.resolveCandidates(context, statusConfig);
+        // CSL1 重卷机组的空卷及同卷识别规则只适用于非连续线。
+        boolean csl1Discontinuous = "CSL1".equalsIgnoreCase(input.getUnitCode())
+                && tracking.getMode() == ShearMode.DISCONTINUOUS;
+        List<ShearDeviceSnapshot> devices = shearDeviceResolver.resolveCandidates(
+                context, statusConfig, csl1Discontinuous);
         ShearRuntimeCommit commit = shearRuntimeService.prepare(input.getUnitCode(), devices, tracking);
         Set<String> processedTriggerDevices = new HashSet<>();
         processPoints(input, tracking, devices, commit,
-                tracking.getUncoilerShearPoint(), true, processedTriggerDevices, results);
+                tracking.getUncoilerShearPoint(), true, csl1Discontinuous, processedTriggerDevices, results);
         processPoints(input, tracking, devices, commit,
-                tracking.getCoilerShearPoint(), false, processedTriggerDevices, results);
+                tracking.getCoilerShearPoint(), false, csl1Discontinuous, processedTriggerDevices, results);
 
         if (results.isEmpty() || !trackingProperties.shearStorageEnabled()) {
             shearRuntimeService.commitCalculated(commit);
@@ -114,6 +119,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                                ShearRuntimeCommit commit,
                                List<ShearPointConfig> points,
                                boolean uncoilerSide,
+                               boolean compareCommonCoilPrefix,
                                Set<String> processedTriggerDevices,
                                List<ShearResult> results) {
         if (points == null) {
@@ -144,7 +150,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                     continue;
                 }
                 ShearDecision decision = shearDecisionService.decide(input.getLatestSnapshot(),
-                        tracking, point, uncoilerSide, input.getStatusContext(), devices,
+                        tracking, point, uncoilerSide, compareCommonCoilPrefix, devices,
                         commit.getRuntimes());
                 ShearResult result = buildResult(input, point, decision);
                 shearRuntimeService.stage(commit, decision.getInMatDevice(), decision.getKind(),

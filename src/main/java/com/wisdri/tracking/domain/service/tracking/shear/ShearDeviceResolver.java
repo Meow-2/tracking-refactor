@@ -38,6 +38,17 @@ public class ShearDeviceResolver {
      */
     public List<ShearDeviceSnapshot> resolveCandidates(StatusTrackingContext context,
                                                         StatusTrackingConfig config) {
+        return resolveCandidates(context, config, false);
+    }
+
+    /**
+     * CSL1 非连续线把剩余长度为零的设备视为空卷，统一用于判型、选料和 runtime 更新。
+     *
+     * @param zeroLengthAsEmptyCoil 为 true 时将零长度候选的卷号置空；其他机组保持原始卷号
+     */
+    public List<ShearDeviceSnapshot> resolveCandidates(StatusTrackingContext context,
+                                                        StatusTrackingConfig config,
+                                                        boolean zeroLengthAsEmptyCoil) {
         if (context == null || context.getCandidates() == null || config == null
                 || config.getTracking() == null || config.getTracking().getPoints() == null) {
             return Collections.emptyList();
@@ -52,7 +63,7 @@ public class ShearDeviceResolver {
             if (candidate == null || !group.getCode().equals(candidate.getDeviceCode())) {
                 continue;
             }
-            devices.add(snapshot(group, candidate));
+            devices.add(snapshot(group, candidate, zeroLengthAsEmptyCoil));
         }
         return devices;
     }
@@ -107,19 +118,32 @@ public class ShearDeviceResolver {
      * @param devices status 配置顺序的设备快照
      * @param coilNo 需要匹配的卷号
      * @param excludedDeviceCode 不参与匹配的触发设备代码
+     * @param compareCommonPrefix 为 true 时，不同长度的卷号按较短卷号的完整前缀比较
      * @return 首个匹配物料；没有匹配时返回 {@code null}
      */
     public ShearDeviceSnapshot findOtherMaterialByCoil(List<ShearDeviceSnapshot> devices,
                                                         String coilNo,
-                                                        String excludedDeviceCode) {
+                                                        String excludedDeviceCode,
+                                                        boolean compareCommonPrefix) {
         for (ShearDeviceSnapshot device : devices) {
             if (!Objects.equals(excludedDeviceCode, device.getDeviceCode())
                     && device.hasCompleteMaterial()
-                    && Objects.equals(coilNo, device.getCoilNo())) {
+                    && sameCoil(coilNo, device.getCoilNo(), compareCommonPrefix)) {
                 return device;
             }
         }
         return null;
+    }
+
+    /** CSL1 卷号长度不同可能带有附加后缀；调用方仅在 CSL1 非连续线启用前缀匹配。 */
+    private boolean sameCoil(String first, String second, boolean compareCommonPrefix) {
+        if (!hasText(first) || !hasText(second)) {
+            return false;
+        }
+        if (!compareCommonPrefix || first.length() == second.length()) {
+            return first.equals(second);
+        }
+        return first.regionMatches(0, second, 0, Math.min(first.length(), second.length()));
     }
 
     /**
@@ -239,18 +263,21 @@ public class ShearDeviceResolver {
     }
 
     private ShearDeviceSnapshot snapshot(StatusPointGroup group,
-                                         StatusCandidateRuntime candidate) {
+                                         StatusCandidateRuntime candidate,
+                                         boolean zeroLengthAsEmptyCoil) {
         List<BigDecimal> lengths = candidate.getLengths();
         BigDecimal remainingLength = lengths == null || lengths.isEmpty()
                 ? null : lengths.get(lengths.size() - 1);
+        String coilNo = zeroLengthAsEmptyCoil && remainingLength != null
+                && remainingLength.compareTo(BigDecimal.ZERO) == 0 ? null : candidate.getCoilNo();
         boolean complete = !Boolean.FALSE.equals(candidate.getDataComplete())
-                && hasText(candidate.getCoilNo()) && candidate.getProductNo() != null
+                && hasText(coilNo) && candidate.getProductNo() != null
                 && remainingLength != null;
         return ShearDeviceSnapshot.builder()
                 .side(group.getSide())
                 .deviceCode(candidate.getDeviceCode())
                 .deviceName(candidate.getDeviceName() == null ? group.getName() : candidate.getDeviceName())
-                .coilNo(candidate.getCoilNo())
+                .coilNo(coilNo)
                 .productNo(candidate.getProductNo())
                 .colorNo(normalizedColor(candidate.getColorNo()))
                 .remainingLength(remainingLength)

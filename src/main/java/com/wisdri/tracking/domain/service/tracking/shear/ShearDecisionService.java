@@ -13,7 +13,6 @@ import com.wisdri.tracking.domain.model.runtime.shear.ShearTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.shear.ShearDecision;
 import com.wisdri.tracking.domain.model.tracking.shear.ShearDeviceSnapshot;
 import com.wisdri.tracking.domain.model.tracking.shear.ShearKind;
-import com.wisdri.tracking.domain.model.tracking.status.StatusTrackingContext;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import org.springframework.stereotype.Component;
 
@@ -46,7 +45,7 @@ public class ShearDecisionService {
      * @param tracking 剪切算法配置
      * @param point 当前剪刀配置
      * @param uncoilerSide 当前剪刀配置所在设备侧
-     * @param statusContext 当前状态候选
+     * @param compareCommonCoilPrefix 是否按较短卷号的完整前缀匹配 CSL1 同卷设备
      * @param devices 按 status 配置顺序排列的有效设备快照
      * @param runtimes 本帧尚未正式提交的设备 runtime 副本
      * @return 完整剪切判定；必要输入不完整时抛出异常，由调用方隔离当前剪切点
@@ -55,7 +54,7 @@ public class ShearDecisionService {
                                 ShearTrackingSection tracking,
                                 ShearPointConfig point,
                                 boolean uncoilerSide,
-                                StatusTrackingContext statusContext,
+                                boolean compareCommonCoilPrefix,
                                 List<ShearDeviceSnapshot> devices,
                                 Map<String, ShearTrackingRuntime> runtimes) {
         ShearKind kind = point.getShearSettings().getDefaultValue();
@@ -74,10 +73,10 @@ public class ShearDecisionService {
         }
         if (kind == null) {
             kind = classify(snapshot, tracking, point, uncoilerSide, shearDevice,
-                    shearColor, devices, runtimes);
+                    shearColor, devices, runtimes, compareCommonCoilPrefix);
         }
         ShearDeviceSnapshot inMatDevice = selectMaterial(snapshot, tracking, point,
-                uncoilerSide, kind, shearDevice, shearColor, devices);
+                uncoilerSide, kind, shearDevice, shearColor, devices, compareCommonCoilPrefix);
         if (inMatDevice == null || !inMatDevice.hasCompleteMaterial()) {
             throw new IllegalArgumentException("剪切归属物料设备不存在或数据不完整");
         }
@@ -107,7 +106,8 @@ public class ShearDecisionService {
                                ShearDeviceSnapshot shearDevice,
                                String shearColor,
                                List<ShearDeviceSnapshot> devices,
-                               Map<String, ShearTrackingRuntime> runtimes) {
+                               Map<String, ShearTrackingRuntime> runtimes,
+                               boolean compareCommonCoilPrefix) {
         if (tracking.getMode() == ShearMode.CONTINUOUS && uncoilerSide) {
             return classifyUncoiler(shearDevice, tracking.getTailExperience());
         }
@@ -146,7 +146,7 @@ public class ShearDecisionService {
             return ShearKind.HEAD;
         }
         return deviceResolver.findOtherMaterialByCoil(
-                devices, shearDevice.getCoilNo(), shearDevice.getDeviceCode()) == null
+                devices, shearDevice.getCoilNo(), shearDevice.getDeviceCode(), compareCommonCoilPrefix) == null
                 ? ShearKind.TAIL : ShearKind.SLICE;
     }
 
@@ -170,7 +170,8 @@ public class ShearDecisionService {
                                                ShearKind kind,
                                                ShearDeviceSnapshot shearDevice,
                                                String shearColor,
-                                               List<ShearDeviceSnapshot> devices) {
+                                               List<ShearDeviceSnapshot> devices,
+                                               boolean compareCommonCoilPrefix) {
         if (uncoilerSide) {
             return shearDevice;
         }
@@ -190,7 +191,7 @@ public class ShearDecisionService {
         }
         if (kind == ShearKind.SLICE && hasText(shearDevice.getCoilNo())) {
             ShearDeviceSnapshot sameCoil = deviceResolver.findOtherMaterialByCoil(
-                    devices, shearDevice.getCoilNo(), shearDevice.getDeviceCode());
+                    devices, shearDevice.getCoilNo(), shearDevice.getDeviceCode(), compareCommonCoilPrefix);
             if (sameCoil != null) {
                 return sameCoil;
             }
