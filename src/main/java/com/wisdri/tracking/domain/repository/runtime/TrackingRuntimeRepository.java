@@ -33,7 +33,7 @@ public interface TrackingRuntimeRepository {
     }
 
     /**
-     * 读取当前算法运行态，本地缓存未命中时从共享存储恢复。
+     * 读取当前算法运行态；具体是否从共享存储恢复由仓储实现和跟踪类型决定。
      */
     Optional<TrackingRuntime> findRuntime(String unitCode, TrackingType trackingType);
 

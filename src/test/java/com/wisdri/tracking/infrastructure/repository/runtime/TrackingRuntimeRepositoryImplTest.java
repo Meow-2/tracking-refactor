@@ -5,6 +5,9 @@ import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.batch.BatchTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
+import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
+import com.wisdri.tracking.domain.model.config.status.StatusTrackingSection;
+import com.wisdri.tracking.domain.model.config.process.RollingConfig;
 import com.wisdri.tracking.domain.model.runtime.batch.BatchTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessSegmentRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
@@ -25,7 +28,9 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
@@ -41,6 +46,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -269,6 +275,128 @@ class TrackingRuntimeRepositoryImplTest {
                 cached.getCurrent().get(DeviceSide.UNCOILER).getMaxLength());
         assertFalse(repository().findRuntimeAs(
                 "CP1", TrackingType.STATUS, StatusTrackingRuntime.class).isPresent());
+    }
+
+    @Test
+    void restoresStatusFromRedisAtOneMinuteBoundary() {
+        Instant now = Instant.parse("2026-09-24T06:00:00Z");
+        StatusTrackingRuntime status = StatusTrackingRuntime.builder()
+                .unitCode("CP1")
+                .trackingType(TrackingType.STATUS)
+                .receivedAt(now.minusSeconds(60))
+                .rollingDirection(false)
+                .rollingDirectReverse(true)
+                .passNo(2)
+                .candidates(Collections.singletonMap("TR1", StatusCandidateRuntime.builder()
+                        .deviceCode("TR1")
+                        .coilNo("C001")
+                        .maxLength(new BigDecimal("100"))
+                        .lengths(Arrays.asList(new BigDecimal("100"), new BigDecimal("95")))
+                        .build()))
+                .current(Collections.singletonMap(DeviceSide.UNCOILER, StatusCurrentRuntime.builder()
+                        .side(DeviceSide.UNCOILER)
+                        .deviceCode("TR1")
+                        .coilNo("C001")
+                        .remainingLength(new BigDecimal("95"))
+                        .maxLength(new BigDecimal("100"))
+                        .build()))
+                .build();
+        repository().saveRuntime(status);
+        TrackingRuntimeRepositoryImpl restarted = repository();
+        ReflectionTestUtils.setField(restarted, "clock", Clock.fixed(now, ZoneOffset.UTC));
+
+        StatusTrackingRuntime restored = restarted.findRuntimeAs(
+                "CP1", TrackingType.STATUS, StatusTrackingRuntime.class).orElseThrow(AssertionError::new);
+
+        assertEquals(now.minusSeconds(60), restored.getReceivedAt());
+        assertEquals(false, restored.getRollingDirection());
+        assertEquals(true, restored.getRollingDirectReverse());
+        assertEquals(2, restored.getPassNo());
+        assertEquals(Arrays.asList(new BigDecimal("100"), new BigDecimal("95")),
+                restored.getCandidates().get("TR1").getLengths());
+        assertEquals(new BigDecimal("95"),
+                restored.getCurrent().get(DeviceSide.UNCOILER).getRemainingLength());
+        assertSame(restored, restarted.findRuntimeAs(
+                "CP1", TrackingType.STATUS, StatusTrackingRuntime.class).orElseThrow(AssertionError::new));
+        verify(redisTemplate.opsForValue(), times(1)).get("tracking:cp1:status:runtime");
+    }
+
+    @Test
+    void ignoresExpiredFutureMissingAndMalformedStatusRuntime() {
+        Instant now = Instant.parse("2026-09-24T06:00:00Z");
+        String key = "tracking:cp1:status:runtime";
+        for (Instant receivedAt : Arrays.asList(now.minusSeconds(61), now.plusSeconds(1))) {
+            repository().saveRuntime(StatusTrackingRuntime.builder()
+                    .unitCode("CP1").trackingType(TrackingType.STATUS)
+                    .receivedAt(receivedAt).build());
+            TrackingRuntimeRepositoryImpl restarted = restartedAt(now);
+            assertFalse(restarted.findRuntimeAs(
+                    "CP1", TrackingType.STATUS, StatusTrackingRuntime.class).isPresent());
+            StatusTrackingRuntime fresh = StatusTrackingRuntime.builder()
+                    .unitCode("CP1").trackingType(TrackingType.STATUS).receivedAt(now).build();
+            restarted.saveRuntime(fresh);
+            assertSame(fresh, restarted.findRuntimeAs(
+                    "CP1", TrackingType.STATUS, StatusTrackingRuntime.class).orElseThrow(AssertionError::new));
+        }
+        repository().saveRuntime(StatusTrackingRuntime.builder()
+                .unitCode("CP1").trackingType(TrackingType.STATUS).build());
+        assertFalse(restartedAt(now).findRuntimeAs(
+                "CP1", TrackingType.STATUS, StatusTrackingRuntime.class).isPresent());
+
+        redis.put(key, "{invalid json");
+        assertFalse(restartedAt(now).findRuntimeAs(
+                "CP1", TrackingType.STATUS, StatusTrackingRuntime.class).isPresent());
+    }
+
+    @Test
+    void ignoresRecentStatusWhenDeviceListOrDirectionConfigChanged() {
+        Instant now = Instant.parse("2026-09-24T06:00:00Z");
+        repository().saveRuntime(StatusTrackingRuntime.builder()
+                .unitCode("CP1").trackingType(TrackingType.STATUS)
+                .receivedAt(now.minusSeconds(10))
+                .rollingDirectReverse(false)
+                .candidates(Collections.singletonMap("TR1", StatusCandidateRuntime.builder()
+                        .deviceCode("TR1").build()))
+                .build());
+
+        StatusTrackingConfig changedDevices = StatusTrackingConfig.builder()
+                .unitCode("CP1").trackingType(TrackingType.STATUS)
+                .tracking(StatusTrackingSection.builder()
+                        .rolling(RollingConfig.builder().directReverse(false).build())
+                        .points(Arrays.asList(StatusPointGroup.builder().code("TR1").build(),
+                                StatusPointGroup.builder().code("TR2").build()))
+                        .build())
+                .build();
+        assertFalse(restartedWithConfig(now, changedDevices).findRuntimeAs(
+                "CP1", TrackingType.STATUS, StatusTrackingRuntime.class).isPresent());
+
+        StatusTrackingConfig changedDirection = StatusTrackingConfig.builder()
+                .unitCode("CP1").trackingType(TrackingType.STATUS)
+                .tracking(StatusTrackingSection.builder()
+                        .rolling(RollingConfig.builder().directReverse(true).build())
+                        .points(Collections.singletonList(StatusPointGroup.builder().code("TR1").build()))
+                        .build())
+                .build();
+        assertFalse(restartedWithConfig(now, changedDirection).findRuntimeAs(
+                "CP1", TrackingType.STATUS, StatusTrackingRuntime.class).isPresent());
+    }
+
+    private TrackingRuntimeRepositoryImpl restartedWithConfig(Instant now, StatusTrackingConfig config) {
+        TrackingRuntimeRepositoryImpl restarted = restartedAt(now);
+        CubeApiGateway gateway = mock(CubeApiGateway.class);
+        ReflectionTestUtils.setField(restarted, "cubeApiGateway", gateway);
+        ReflectionTestUtils.setField(restarted, "trackingResultRepositoryDispatcher",
+                mock(TrackingResultRepositoryDispatcher.class));
+        when(gateway.fetchTrackingConfigs()).thenReturn(
+                Collections.<TrackingType, TrackingConfig>singletonMap(TrackingType.STATUS, config));
+        restarted.refreshConfig();
+        return restarted;
+    }
+
+    private TrackingRuntimeRepositoryImpl restartedAt(Instant now) {
+        TrackingRuntimeRepositoryImpl restarted = repository();
+        ReflectionTestUtils.setField(restarted, "clock", Clock.fixed(now, ZoneOffset.UTC));
+        return restarted;
     }
 
     @Test

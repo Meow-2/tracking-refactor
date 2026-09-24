@@ -8,6 +8,7 @@ import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.runtime.shear.ShearCounterRuntime;
 import com.wisdri.tracking.domain.model.runtime.shear.ShearTrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
@@ -54,6 +55,11 @@ public class PointSubscriptionUseCase {
      */
     public void start() {
         trackingRuntimeRepositoryDispatcher.refreshConfig();
+        // process 类型排在 status 之前订阅；先恢复 status，避免启动瞬间的 process 消息看到空上下文。
+        trackingRuntimeRepositoryDispatcher.findConfig(trackingProperties.getUnit(), TrackingType.STATUS)
+                .filter(config -> Boolean.TRUE.equals(config.getEnable()))
+                .ifPresent(config -> trackingRuntimeRepositoryDispatcher.findRuntimeAs(
+                        config.getUnitCode(), TrackingType.STATUS, StatusTrackingRuntime.class));
         for (TrackingType trackingType : TrackingType.values()) {
             Optional<TrackingConfig> configOptional = trackingRuntimeRepositoryDispatcher.findConfig(
                     trackingProperties.getUnit(),

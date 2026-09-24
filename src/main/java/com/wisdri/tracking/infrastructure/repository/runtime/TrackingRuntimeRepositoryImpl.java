@@ -10,10 +10,14 @@ import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.batch.BatchTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
+import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
+import com.wisdri.tracking.domain.model.config.status.StatusTrackingSection;
 import com.wisdri.tracking.domain.model.config.shear.ShearTrackingConfig;
 import com.wisdri.tracking.domain.model.config.trimming.TrimmingTrackingConfig;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.shear.ShearTrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepository;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepositoryDispatcher;
@@ -22,20 +26,30 @@ import com.wisdri.tracking.infrastructure.service.redis.RedisKeys;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
+import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.Resource;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 基于 Redis 和本地缓存的跟踪配置、算法运行态仓储实现。
  */
 @Repository
+@Slf4j
 public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository {
+    /** status 运行态仅在最近一帧距当前时间不超过一分钟时允许跨进程恢复。 */
+    private static final Duration STATUS_RESTORE_MAX_AGE = Duration.ofMinutes(1);
+
     /**
      * 配置缓存。
      */
@@ -45,6 +59,12 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
      * 算法运行态本地缓存。
      */
     private final Map<String, TrackingRuntime> runtimeCache = new ConcurrentHashMap<>();
+
+    /** 每个 status key 只尝试从 Redis 恢复一次，避免过期数据被反复读取。 */
+    private final Set<String> statusRestoreAttempted = ConcurrentHashMap.newKeySet();
+
+    /** 恢复时效的时间源，测试中可固定时间以覆盖一分钟边界。 */
+    private Clock clock = Clock.systemUTC();
 
     /**
      * 跟踪类型与配置模型类型映射。
@@ -98,24 +118,106 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
         return Optional.ofNullable(configCache.get(configKey(unitCode, trackingType)));
     }
 
-    /**
-     * 从本地缓存读取运行态；进程启动后不从 Redis 恢复历史运行态。
-     */
+    /** 从本地缓存读取运行态；status 首次读取时可从 Redis 恢复一分钟内的状态。 */
     @Override
     public Optional<TrackingRuntime> findRuntime(String unitCode, TrackingType trackingType) {
         return findRuntime(unitCode, trackingType, null);
     }
 
-    /**
-     * 从本地缓存读取模板实例运行态；进程启动后不从 Redis 恢复历史运行态。
-     */
+    /** 从本地缓存读取运行态；仅 status 支持在缓存未命中时恢复。 */
     @Override
     public Optional<TrackingRuntime> findRuntime(String unitCode,
                                                   TrackingType trackingType,
                                                   String templateCode) {
         validateTemplateCode(trackingType, templateCode);
         String key = runtimeKey(unitCode, trackingType, templateCode);
-        return Optional.ofNullable(runtimeCache.get(key));
+        TrackingRuntime cached = runtimeCache.get(key);
+        if (cached != null) {
+            return Optional.of(cached);
+        }
+        return TrackingType.STATUS == trackingType
+                ? restoreStatusRuntime(key, unitCode) : Optional.empty();
+    }
+
+    /**
+     * Redis 恢复仅用于进程首次读取 status；无效、过期或损坏的历史状态不影响重新采样。
+     * 同步保护首次读取，避免并发消息在恢复完成前看到部分初始化状态。
+     */
+    private synchronized Optional<TrackingRuntime> restoreStatusRuntime(String key, String unitCode) {
+        TrackingRuntime cached = runtimeCache.get(key);
+        if (cached != null) {
+            return Optional.of(cached);
+        }
+        if (!statusRestoreAttempted.add(key)) {
+            return Optional.empty();
+        }
+        try {
+            String json = stringRedisTemplate.opsForValue().get(key);
+            if (json == null || json.trim().isEmpty()) {
+                return Optional.empty();
+            }
+            StatusTrackingRuntime restored = objectMapper.readValue(json, StatusTrackingRuntime.class);
+            if (!unitCode.equalsIgnoreCase(restored.getUnitCode())
+                    || restored.getTrackingType() != TrackingType.STATUS || !recentStatus(restored)
+                    || !compatibleStatusConfig(unitCode, restored)) {
+                log.info("跳过过期、身份不匹配或与当前配置不兼容的 status 运行态，key={}，receivedAt={}",
+                        key, restored.getReceivedAt());
+                return Optional.empty();
+            }
+            // 保存新点位帧可能与恢复并发，已产生的新状态优先于 Redis 旧快照。
+            TrackingRuntime existing = runtimeCache.putIfAbsent(key, restored);
+            if (existing != null) {
+                return Optional.of(existing);
+            }
+            log.info("已从 Redis 恢复 status 运行态，key={}，receivedAt={}", key, restored.getReceivedAt());
+            return Optional.of(restored);
+        } catch (IOException | RuntimeException e) {
+            log.warn("读取 Redis status 运行态失败，将从新点位重新采样，key={}", key, e);
+            return Optional.empty();
+        }
+    }
+
+    /** 仅接受收到时间在当前时刻之前、且年龄不超过一分钟的 status 帧。 */
+    private boolean recentStatus(StatusTrackingRuntime runtime) {
+        Instant receivedAt = runtime.getReceivedAt();
+        if (receivedAt == null) {
+            return false;
+        }
+        Duration age = Duration.between(receivedAt, clock.instant());
+        return !age.isNegative() && age.compareTo(STATUS_RESTORE_MAX_AGE) <= 0;
+    }
+
+    /** 防止部署时设备列表或换向配置改变后，恢复上一版本的设备窗口和当前侧别。 */
+    private boolean compatibleStatusConfig(String unitCode, StatusTrackingRuntime runtime) {
+        TrackingConfig config = configCache.get(configKey(unitCode, TrackingType.STATUS));
+        if (!(config instanceof StatusTrackingConfig)) {
+            return true;
+        }
+        StatusTrackingSection tracking = ((StatusTrackingConfig) config).getTracking();
+        if (tracking == null || tracking.getPoints() == null) {
+            return true;
+        }
+        Set<String> deviceCodes = new HashSet<>();
+        for (StatusPointGroup group : tracking.getPoints()) {
+            deviceCodes.add(group.getCode());
+        }
+        if (runtime.getCandidates() != null && !runtime.getCandidates().isEmpty()
+                && !deviceCodes.equals(runtime.getCandidates().keySet())) {
+            return false;
+        }
+        if (runtime.getCurrent() != null) {
+            for (StatusCurrentRuntime current : runtime.getCurrent().values()) {
+                if (current != null && current.getDeviceCode() != null
+                        && !deviceCodes.contains(current.getDeviceCode())) {
+                    return false;
+                }
+            }
+        }
+        if (tracking.getRolling() == null) {
+            return runtime.getRollingDirectReverse() == null;
+        }
+        return Boolean.valueOf(Boolean.TRUE.equals(tracking.getRolling().getDirectReverse()))
+                .equals(runtime.getRollingDirectReverse());
     }
 
     /**

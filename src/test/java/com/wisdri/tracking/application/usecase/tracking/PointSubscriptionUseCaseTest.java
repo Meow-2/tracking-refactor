@@ -6,8 +6,10 @@ import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.config.shear.ShearPointConfig;
 import com.wisdri.tracking.domain.model.config.shear.ShearTrackingConfig;
 import com.wisdri.tracking.domain.model.config.shear.ShearTrackingSection;
+import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.shear.ShearTrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.infrastructure.dto.mqtt.TrackingSubscription;
@@ -16,6 +18,7 @@ import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import com.wisdri.tracking.infrastructure.service.mqtt.MqttSubscriptionRegistry;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.integration.mqtt.inbound.MqttPahoMessageDrivenChannelAdapter;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -29,11 +32,46 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class PointSubscriptionUseCaseTest {
+
+    @Test
+    void restoresStatusRuntimeBeforeRegisteringStatusSubscription() {
+        TrackingRuntimeRepositoryDispatcher dispatcher = mock(TrackingRuntimeRepositoryDispatcher.class);
+        MqttSubscriptionRegistry registry = mock(MqttSubscriptionRegistry.class);
+        StatusTrackingConfig status = StatusTrackingConfig.builder()
+                .unitCode("ZRM1")
+                .trackingType(TrackingType.STATUS)
+                .enable(true)
+                .mqttTopic("zrm1_status_tracking")
+                .build();
+        ProcessTrackingConfig process = ProcessTrackingConfig.builder()
+                .unitCode("ZRM1")
+                .trackingType(TrackingType.PROCESS)
+                .enable(true)
+                .mqttTopic("zrm1_process_tracking")
+                .build();
+        when(dispatcher.findConfig("ZRM1", TrackingType.PROCESS)).thenReturn(Optional.of(process));
+        when(dispatcher.findConfig("ZRM1", TrackingType.STATUS)).thenReturn(Optional.of(status));
+        TrackingProperties properties = new TrackingProperties();
+        properties.setUnit("ZRM1");
+        PointSubscriptionUseCase useCase = new PointSubscriptionUseCase();
+        ReflectionTestUtils.setField(useCase, "trackingProperties", properties);
+        ReflectionTestUtils.setField(useCase, "trackingRuntimeRepositoryDispatcher", dispatcher);
+        ReflectionTestUtils.setField(useCase, "mqttSubscriptionRegistry", registry);
+
+        useCase.start();
+
+        InOrder order = inOrder(dispatcher, registry);
+        order.verify(dispatcher).refreshConfig();
+        order.verify(dispatcher).findRuntimeAs("ZRM1", TrackingType.STATUS, StatusTrackingRuntime.class);
+        order.verify(registry).register(process);
+        order.verify(registry).register(status);
+    }
 
     @Test
     @SuppressWarnings("unchecked")
