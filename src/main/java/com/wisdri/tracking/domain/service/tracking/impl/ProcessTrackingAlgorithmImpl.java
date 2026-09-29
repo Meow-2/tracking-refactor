@@ -33,6 +33,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -154,12 +155,14 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
             BigDecimal speed = PointReader.decimalValue(latest,
                     trackingPointPath(tracking, tracking.getSpeedPoint()));
             Integer passNo = passNo(latest, tracking);
+            String cellCode = cellCode(config.getUnitCode(), latest, segment);
             Map<String, Object> parameters = parameters(latest, segment);
             ProcessResult result = ProcessResult.builder()
                     .unitCode(config.getUnitCode())
                     .trackingType(config.getTrackingType())
                     .segmentCode(segment.getCode())
                     .segmentName(segment.getName())
+                    .cellCode(cellCode)
                     .coilNo(selected.coilNo)
                     .inMatNoProdNo(selected.productNo)
                     .headLength(selected.headLength)
@@ -177,6 +180,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                             "headLength", selected.headLength,
                             "speed", speed,
                             "passNo", passNo,
+                            "cellCode", cellCode,
                             "parameters", parameters
                     ));
         }
@@ -472,12 +476,44 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
             return parameters;
         }
         for (PointConfig point : segment.getPoints()) {
+            // cell_code 是固定结果列；同名原始点位不能覆盖格式化后的加工单元代码。
+            if ("cell_code".equalsIgnoreCase(pointName(point))) {
+                continue;
+            }
             Object value = PointReader.rawValue(latest, segmentPointPath(segment, point));
             if (value != null) {
                 parameters.put(pointName(point), value);
             }
         }
         return parameters;
+    }
+
+    /**
+     * 按本段配置读取加工单元序号，并生成大写机组代码加三位序号的代码。
+     * 点位已配置但值缺失、非整数或超出 0～999 时返回 null，不回退到默认序号。
+     */
+    private String cellCode(String unitCode, PointSnapshot latest, SegmentConfig segment) {
+        Object raw = segment.getCellCodePoint() == null
+                ? (segment.getCellCodeValue() == null ? 1 : segment.getCellCodeValue())
+                : PointReader.rawValue(latest, segmentPointPath(segment, segment.getCellCodePoint()));
+        Integer number = cellCodeNumber(raw);
+        if (number == null || unitCode == null || unitCode.trim().isEmpty()) {
+            return null;
+        }
+        return unitCode.toUpperCase(Locale.ROOT) + String.format(Locale.ROOT, "%03d", number);
+    }
+
+    /** 将数字或数字文本严格解析为三位加工单元序号。 */
+    private Integer cellCodeNumber(Object raw) {
+        if (raw == null || raw instanceof Boolean) {
+            return null;
+        }
+        try {
+            int number = new BigDecimal(String.valueOf(raw).trim()).intValueExact();
+            return number >= 0 && number <= 999 ? number : null;
+        } catch (NumberFormatException | ArithmeticException e) {
+            return null;
+        }
     }
 
     /**

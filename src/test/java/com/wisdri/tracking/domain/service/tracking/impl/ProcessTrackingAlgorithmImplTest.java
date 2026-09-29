@@ -232,6 +232,49 @@ class ProcessTrackingAlgorithmImplTest {
     }
 
     @Test
+    void formatsFixedAndDefaultCellCodeForEachSegment() {
+        ProcessTrackingConfig config = config();
+        config.setUnitCode("cp1");
+        config.setSegments(java.util.Arrays.asList(
+                SegmentConfig.builder().code("S1").cellCodeValue(7).build(),
+                SegmentConfig.builder().code("S2").build()));
+        when(runtimeRepositoryDispatcher.findConfigAs(
+                "CP1", TrackingType.PROCESS, ProcessTrackingConfig.class
+        )).thenReturn(Optional.of(config));
+
+        List<ProcessResult> results = algorithm.calculate(input(values("C001", BigDecimal.ONE)));
+
+        assertEquals(2, results.size());
+        assertEquals("CP1007", results.get(0).getCellCode());
+        assertEquals("CP1001", results.get(1).getCellCode());
+    }
+
+    @Test
+    void readsCellCodePointAndKeepsResultWhenPointValueIsInvalid() {
+        ProcessTrackingConfig config = config();
+        config.getSegments().get(0).setPointPrefix("/tech/");
+        config.getSegments().get(0).setCellCodePoint(PointConfig.builder().name("cell").build());
+        when(runtimeRepositoryDispatcher.findConfigAs(
+                "CP1", TrackingType.PROCESS, ProcessTrackingConfig.class
+        )).thenReturn(Optional.of(config));
+        Map<String, Object> values = values("C001", BigDecimal.ONE);
+
+        values.put("/tech/cell", 23);
+        assertEquals("CP1023", algorithm.calculate(input(values)).get(0).getCellCode());
+        values.put("/tech/cell", 0);
+        assertEquals("CP1000", algorithm.calculate(input(values)).get(0).getCellCode());
+        values.put("/tech/cell", 999);
+        assertEquals("CP1999", algorithm.calculate(input(values)).get(0).getCellCode());
+        for (Object invalid : new Object[]{null, "1.5", -1, 1000, "unknown"}) {
+            values.put("/tech/cell", invalid);
+            List<ProcessResult> results = algorithm.calculate(input(values));
+            assertEquals(1, results.size());
+            assertEquals(null, results.get(0).getCellCode());
+            assertEquals("C001", results.get(0).getCoilNo());
+        }
+    }
+
+    @Test
     void skipsStatusModesWhenCoilerNotStartedOrUncoilerDataIsIncomplete() {
         assertTrue(algorithm.calculate(input(values("C001", BigDecimal.ONE),
                 status("C001", 2, "100", "90", null))).isEmpty());

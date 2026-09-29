@@ -30,6 +30,11 @@ public class ProcessResult extends TrackingResult {
     private String segmentName;
 
     /**
+     * 加工单元代码，由大写机组代码和三位加工单元序号组成；点位无效时为空。
+     */
+    private String cellCode;
+
+    /**
      * 当前跟踪结果对应的钢卷号。
      */
     private String coilNo;

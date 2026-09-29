@@ -26,6 +26,7 @@ import java.util.Map;
 public class ProcessTrackingResultRepositoryImpl implements TrackingResultRepository<ProcessTrackingConfig, ProcessResult> {
     private static final List<TimeSeriesTableRule> FIXED_COLUMNS = Arrays.asList(
             tableRule("coil_no", TimeSeriesDataType.STRING.getCode(), true),
+            tableRule("cell_code", TimeSeriesDataType.STRING.getCode(), true),
             tableRule("in_mat_prod_no", TimeSeriesDataType.INT.getCode(), true),
             tableRule("head_length", TimeSeriesDataType.FLOAT.getCode(), false),
             tableRule("speed", TimeSeriesDataType.FLOAT.getCode(), false),
@@ -72,6 +73,9 @@ public class ProcessTrackingResultRepositoryImpl implements TrackingResultReposi
             List<TimeSeriesTableRule> rules = new ArrayList<>(FIXED_COLUMNS);
             if (segment.getPoints() != null) {
                 for (PointConfig point : segment.getPoints()) {
+                    if ("cell_code".equalsIgnoreCase(point.getName())) {
+                        continue;
+                    }
                     rules.add(tableRule(point.getName(),
                             TimeSeriesDataType.fromPointDataType(point.getType()).getCode(), false));
                 }
@@ -113,12 +117,16 @@ public class ProcessTrackingResultRepositoryImpl implements TrackingResultReposi
     private List<TimeSeriesDataValue> processValues(ProcessResult result, Long timestamp) {
         List<TimeSeriesDataValue> values = new ArrayList<>();
         add(values, "coil_no", result.getCoilNo(), true, timestamp);
+        add(values, "cell_code", result.getCellCode(), true, timestamp);
         add(values, "in_mat_prod_no", result.getInMatNoProdNo(), true, timestamp);
         add(values, "head_length", result.getHeadLength(), false, timestamp);
         add(values, "speed", result.getSpeed(), false, timestamp);
         add(values, "pass_no", result.getPassNo(), true, timestamp);
         if (result.getParameters() != null) {
             for (Map.Entry<String, Object> entry : result.getParameters().entrySet()) {
+                if ("cell_code".equalsIgnoreCase(entry.getKey())) {
+                    continue;
+                }
                 add(values, entry.getKey(), entry.getValue(), false, timestamp);
             }
         }

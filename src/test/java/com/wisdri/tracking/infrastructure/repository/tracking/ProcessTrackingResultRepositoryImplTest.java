@@ -20,6 +20,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -49,7 +51,8 @@ class ProcessTrackingResultRepositoryImplTest {
                         .code("S1")
                         .points(Arrays.asList(
                                 PointConfig.builder().name("count").type(PointDataType.SHORT).build(),
-                                PointConfig.builder().name("ready").type(PointDataType.BOOLEAN).build()))
+                                PointConfig.builder().name("ready").type(PointDataType.BOOLEAN).build(),
+                                PointConfig.builder().name("cell_code").type(PointDataType.SHORT).build()))
                         .build()))
                 .build();
 
@@ -80,6 +83,13 @@ class ProcessTrackingResultRepositoryImplTest {
         assertFalse(captor.getValue().getRule().stream()
                 .filter(rule -> "speed".equals(rule.getId()))
                 .findFirst().orElseThrow(AssertionError::new).getIsTag());
+        assertEquals(1, captor.getValue().getRule().stream()
+                .filter(rule -> "cell_code".equals(rule.getId())).count());
+        TimeSeriesTableRule cellCode = captor.getValue().getRule().stream()
+                .filter(rule -> "cell_code".equals(rule.getId()))
+                .findFirst().orElseThrow(AssertionError::new);
+        assertEquals("string", cellCode.getDatatype());
+        assertTrue(cellCode.getIsTag());
     }
 
     @Test
@@ -90,15 +100,19 @@ class ProcessTrackingResultRepositoryImplTest {
         ReflectionTestUtils.setField(repository, "timeSeriesStorageProperties", new TimeSeriesStorageProperties());
         ReflectionTestUtils.setField(repository, "trackingProperties", new TrackingProperties());
         Instant receivedAt = Instant.parse("2026-09-03T01:00:00Z");
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("temperature", 850);
+        parameters.put("cell_code", 999);
 
         repository.save(Collections.singletonList(ProcessResult.builder()
                 .unitCode("CP1")
                 .trackingType(TrackingType.PROCESS)
                 .segmentCode("S1")
+                .cellCode("CP1001")
                 .inMatNoProdNo(3)
                 .headLength(new java.math.BigDecimal("12.5"))
                 .speed(new java.math.BigDecimal("2.5"))
-                .parameters(Collections.singletonMap("temperature", 850))
+                .parameters(parameters)
                 .receivedAt(receivedAt)
                 .build()));
 
@@ -120,6 +134,35 @@ class ProcessTrackingResultRepositoryImplTest {
                 .filter(value -> "temperature".equals(value.getId()))
                 .findFirst().orElseThrow(AssertionError::new);
         assertFalse(temperature.getIsTag());
+        assertEquals(1, captor.getValue().getValues().stream()
+                .filter(value -> "cell_code".equals(value.getId())).count());
+        TimeSeriesDataValue cellCode = captor.getValue().getValues().stream()
+                .filter(value -> "cell_code".equals(value.getId()))
+                .findFirst().orElseThrow(AssertionError::new);
+        assertEquals("CP1001", cellCode.getV());
+        assertTrue(cellCode.getIsTag());
+    }
+
+    @Test
+    void savesNullCellCodeWhenConfiguredPointHasNoValidValue() {
+        ProcessTrackingResultRepositoryImpl repository = new ProcessTrackingResultRepositoryImpl();
+        TimeSeriesStorageGateway gateway = mock(TimeSeriesStorageGateway.class);
+        ReflectionTestUtils.setField(repository, "timeSeriesStorageGateway", gateway);
+        ReflectionTestUtils.setField(repository, "trackingProperties", new TrackingProperties());
+
+        repository.save(Collections.singletonList(ProcessResult.builder()
+                .unitCode("CP1")
+                .trackingType(TrackingType.PROCESS)
+                .segmentCode("S1")
+                .receivedAt(Instant.parse("2026-09-03T01:00:00Z"))
+                .build()));
+
+        ArgumentCaptor<TimeSeriesDataRequest> captor = ArgumentCaptor.forClass(TimeSeriesDataRequest.class);
+        verify(gateway).saveColumn(anyString(), captor.capture());
+        TimeSeriesDataValue cellCode = captor.getValue().getValues().stream()
+                .filter(value -> "cell_code".equals(value.getId()))
+                .findFirst().orElseThrow(AssertionError::new);
+        assertEquals(null, cellCode.getV());
     }
 
     @Test

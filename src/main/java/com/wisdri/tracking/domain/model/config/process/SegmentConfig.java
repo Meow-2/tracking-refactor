@@ -46,6 +46,16 @@ public class SegmentConfig {
     private Integer lengthArrayIndex;
 
     /**
+     * 加工单元固定序号，范围 0～999；未配置固定值和点位时使用 1。
+     */
+    private Integer cellCodeValue;
+
+    /**
+     * 加工单元序号点位；配置后按本段点位前缀读取，缺值时不使用默认序号。
+     */
+    private PointConfig cellCodePoint;
+
+    /**
      * 该工艺段需要采集的参数点位列表。
      */
     private List<PointConfig> points;
