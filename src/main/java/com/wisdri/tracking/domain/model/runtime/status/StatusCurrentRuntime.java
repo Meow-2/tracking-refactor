@@ -32,7 +32,7 @@ public class StatusCurrentRuntime {
     private String coilerMethodName;
     /** 当前设备上的钢卷号。 */
     private String coilNo;
-    /** 钢卷重复生产次数；质量系统不可用时允许为空。 */
+    /** 钢卷重复生产次数；PostgreSQL 取号失败或未查到记录时允许为空。 */
     private Integer productNo;
     /** 当前钢卷颜色号。 */
     private String colorNo;

@@ -71,7 +71,3 @@ time-series-storage:
   database: digital_coil
   connectTimeout: 3000
   readTimeout: 5000
-
-quality:
-  connectTimeout: 3000
-  readTimeout: 5000

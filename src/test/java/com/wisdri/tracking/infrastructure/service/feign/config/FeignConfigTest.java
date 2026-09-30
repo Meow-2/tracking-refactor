@@ -1,7 +1,6 @@
 package com.wisdri.tracking.infrastructure.service.feign.config;
 
 import com.wisdri.tracking.infrastructure.properties.feign.CubeApiProperties;
-import com.wisdri.tracking.infrastructure.properties.feign.QualityProperties;
 import com.wisdri.tracking.infrastructure.properties.feign.TimeSeriesStorageProperties;
 import feign.Request;
 import org.junit.jupiter.api.Test;
@@ -19,18 +18,6 @@ class FeignConfigTest {
 
         assertThat(options.connectTimeoutMillis()).isEqualTo(1100);
         assertThat(options.readTimeoutMillis()).isEqualTo(2200);
-    }
-
-    @Test
-    void createsQualityOptionsFromTypedProperties() {
-        QualityProperties properties = new QualityProperties();
-        properties.setConnectTimeout(1200);
-        properties.setReadTimeout(2300);
-
-        Request.Options options = new QualityFeignConfig().qualityRequestOptions(properties);
-
-        assertThat(options.connectTimeoutMillis()).isEqualTo(1200);
-        assertThat(options.readTimeoutMillis()).isEqualTo(2300);
     }
 
     @Test

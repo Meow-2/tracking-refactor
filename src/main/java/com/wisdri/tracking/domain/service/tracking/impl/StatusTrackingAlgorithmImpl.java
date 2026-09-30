@@ -16,7 +16,7 @@ import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.status.StatusResult;
-import com.wisdri.tracking.domain.repository.quality.QualityRepository;
+import com.wisdri.tracking.domain.repository.product.ProductNoRepository;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
@@ -58,7 +58,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
     private TrackingStepLogger trackingStepLogger;
 
     @Resource
-    private QualityRepository qualityRepository;
+    private ProductNoRepository productNoRepository;
 
     @Override
     public boolean support(TrackingType trackingType) {
@@ -163,6 +163,8 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             List<StatusResult> results) {
         Map<String, StatusCandidateRuntime> previous = previousRuntime == null
                 ? null : previousRuntime.getCandidates();
+        // 同一帧先为开卷设备分配次数，避免配置中的卷取设备先读到上一生产次数。
+        Map<String, Integer> porProductNos = allocatePorProductNos(input, tracking, previous);
         Map<String, StatusCandidateRuntime> updated = new LinkedHashMap<>();
         for (StatusPointGroup group : tracking.getPoints()) {
             DeviceSide side = actualSide(group, tracking, rollingState);
@@ -178,7 +180,9 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             boolean sameCoil = coilNoValid && old != null && coilNo.equals(old.getCoilNo());
             Integer productNo = !coilNoValid
                     ? null
-                    : sameCoil ? old.getProductNo() : queryProductNo(input, group, coilNo);
+                    : sameCoil ? old.getProductNo()
+                    : porDevice(group) ? porProductNos.get(group.getCode())
+                    : queryProductNo(input, group, coilNo, false);
             // 本道次不参与的设备不生成方式及开卷卷取结果；换道或换向后按新侧别重新取方式。
             CoilerMethodValue coilerMethod = side == null ? null : sameCoil && !rollingState.isWindowReset()
                     && coilerMethodPresent(old)
@@ -301,20 +305,51 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         return null;
     }
 
-    private Integer queryProductNo(TrackingInput input, StatusPointGroup group, String coilNo) {
+    /**
+     * 按配置顺序分配本帧所有开卷设备的新卷次数，不改变最终候选与结果的配置顺序。
+     */
+    private Map<String, Integer> allocatePorProductNos(TrackingInput input,
+                                                        StatusTrackingSection tracking,
+                                                        Map<String, StatusCandidateRuntime> previous) {
+        Map<String, Integer> allocated = new LinkedHashMap<>();
+        for (StatusPointGroup group : tracking.getPoints()) {
+            if (!porDevice(group)) {
+                continue;
+            }
+            String coilNo = normalizeCoilNo(PointReader.stringValue(input.getLatestSnapshot(),
+                    pointPath(tracking, group.getCoilNo())));
+            StatusCandidateRuntime old = previous == null ? null : previous.get(group.getCode());
+            if (coilNo != null && (old == null || !coilNo.equals(old.getCoilNo()))) {
+                allocated.put(group.getCode(), queryProductNo(input, group, coilNo, true));
+            }
+        }
+        return allocated;
+    }
+
+    /** 设备编码以 por 开头时才分配下一次生产次数；其余设备只读取当前次数。 */
+    private boolean porDevice(StatusPointGroup group) {
+        return group.getCode() != null && group.getCode().toLowerCase(Locale.ROOT).startsWith("por");
+    }
+
+    /** PG 异常不阻断状态计算，本次卷号对应的次数留空。 */
+    private Integer queryProductNo(TrackingInput input, StatusPointGroup group,
+                                   String coilNo, boolean increment) {
+        String action = increment ? "分配" : "查询";
         try {
-            Integer productNo = qualityRepository.queryProductNo(input.getUnitCode(), coilNo);
-            trackingStepLogger.log(input, "重复生产次数查询", group.getCode(), TrackingStepLogger.details(
+            Integer productNo = increment
+                    ? productNoRepository.incrementAndGet(input.getUnitCode(), coilNo)
+                    : productNoRepository.findCurrent(input.getUnitCode(), coilNo);
+            trackingStepLogger.log(input, "重复生产次数" + action, group.getCode(), TrackingStepLogger.details(
                     "coilNo", coilNo,
                     "productNo", productNo));
             return productNo;
         } catch (RuntimeException e) {
-            log.warn("查询钢卷重复生产次数失败，机组编码={}，设备编码={}，钢卷号={}",
-                    input.getUnitCode(), group.getCode(), coilNo, e);
-            trackingStepLogger.log(input, "重复生产次数查询", group.getCode(), TrackingStepLogger.details(
+            log.warn("{}钢卷重复生产次数失败，机组编码={}，设备编码={}，钢卷号={}",
+                    action, input.getUnitCode(), group.getCode(), coilNo, e);
+            trackingStepLogger.log(input, "重复生产次数" + action, group.getCode(), TrackingStepLogger.details(
                     "coilNo", coilNo,
                     "productNo", null,
-                    "reason", "查询失败"));
+                    "reason", action + "失败"));
             return null;
         }
     }
