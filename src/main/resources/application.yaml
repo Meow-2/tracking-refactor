@@ -4,7 +4,7 @@ tracking:
     abnormal:
       enabled: false
     process:
-      enabled: false
+      enabled: true
     batch:
       enabled: false
     shear:
