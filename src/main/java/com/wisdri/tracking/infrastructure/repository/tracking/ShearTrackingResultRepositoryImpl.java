@@ -22,6 +22,9 @@ import java.util.List;
 public class ShearTrackingResultRepositoryImpl
         extends ServiceImpl<QmShearLogMapper, QmShearLogEntity>
         implements TrackingResultRepository<ShearTrackingConfig, ShearResult> {
+    /** CSL1 的剪切入料卷号在 PostgreSQL 中仅保留前 11 位。 */
+    private static final int CSL1_IN_MAT_NO_LENGTH = 11;
+
     /** 控制剪切结果是否写入 PostgreSQL，关闭时 save 直接返回。 */
     @Resource
     private TrackingProperties trackingProperties;
@@ -64,7 +67,13 @@ public class ShearTrackingResultRepositoryImpl
     private QmShearLogEntity toEntity(ShearResult result) {
         QmShearLogEntity entity = new QmShearLogEntity();
         entity.setUnitCode(result.getUnitCode());
-        entity.setInMatNo(result.getInMatNo());
+        String inMatNo = result.getInMatNo();
+        // 只调整 CSL1 的入库字段，领域结果仍保留设备上报的完整卷号供算法使用。
+        if ("CSL1".equalsIgnoreCase(result.getUnitCode())
+                && inMatNo != null && inMatNo.length() > CSL1_IN_MAT_NO_LENGTH) {
+            inMatNo = inMatNo.substring(0, CSL1_IN_MAT_NO_LENGTH);
+        }
+        entity.setInMatNo(inMatNo);
         entity.setInMatNoProdNo(result.getInMatNoProdNo());
         entity.setShearType(result.getShearType());
         entity.setShearTypeName(result.getShearTypeName());

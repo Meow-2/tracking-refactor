@@ -61,6 +61,28 @@ class ShearTrackingResultRepositoryImplTest {
     }
 
     @Test
+    void truncatesOnlyCsl1InMatNoLongerThanElevenCharacters() {
+        ShearTrackingResultRepositoryImpl repository = new ShearTrackingResultRepositoryImpl();
+        String longCoilNo = "12345678901EXTRA";
+        ShearResult csl1Result = ShearResult.builder()
+                .unitCode("csl1").inMatNo(longCoilNo).build();
+
+        QmShearLogEntity csl1Entity = ReflectionTestUtils.invokeMethod(repository, "toEntity", csl1Result);
+        QmShearLogEntity otherUnitEntity = ReflectionTestUtils.invokeMethod(repository, "toEntity",
+                ShearResult.builder().unitCode("CBL1").inMatNo(longCoilNo).build());
+        QmShearLogEntity elevenCharacterEntity = ReflectionTestUtils.invokeMethod(repository, "toEntity",
+                ShearResult.builder().unitCode("CSL1").inMatNo("12345678901").build());
+        QmShearLogEntity nullCoilEntity = ReflectionTestUtils.invokeMethod(repository, "toEntity",
+                ShearResult.builder().unitCode("CSL1").build());
+
+        assertThat(csl1Entity.getInMatNo()).isEqualTo("12345678901");
+        assertThat(csl1Result.getInMatNo()).isEqualTo(longCoilNo);
+        assertThat(otherUnitEntity.getInMatNo()).isEqualTo(longCoilNo);
+        assertThat(elevenCharacterEntity.getInMatNo()).isEqualTo("12345678901");
+        assertThat(nullCoilEntity.getInMatNo()).isNull();
+    }
+
+    @Test
     void disabledShearStorageDoesNotOpenTransaction() {
         ShearTrackingResultRepositoryImpl repository = new ShearTrackingResultRepositoryImpl();
         TrackingProperties properties = new TrackingProperties();
