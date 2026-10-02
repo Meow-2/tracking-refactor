@@ -13,6 +13,8 @@ tracking:
       enabled: true
     trimming:
       enabled: true
+    ironloss:
+      enabled: true
 
 server:
   port: 9000

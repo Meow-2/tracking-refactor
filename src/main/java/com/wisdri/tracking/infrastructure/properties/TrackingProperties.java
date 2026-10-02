@@ -52,6 +52,9 @@ public class TrackingProperties {
          * 是否启用切边结果存储及运行态提交。
          */
         private StoreSwitch trimming = new StoreSwitch();
+
+        /** 是否启用铁损跟踪结果存储；默认启用。 */
+        private StoreSwitch ironloss = new StoreSwitch();
     }
 
     @Data
@@ -96,5 +99,12 @@ public class TrackingProperties {
         return storage == null
                 || storage.getTrimming() == null
                 || !Boolean.FALSE.equals(storage.getTrimming().getEnabled());
+    }
+
+    /** 铁损存储开关未配置时默认启用。 */
+    public boolean ironlossStorageEnabled() {
+        return storage == null
+                || storage.getIronloss() == null
+                || !Boolean.FALSE.equals(storage.getIronloss().getEnabled());
     }
 }

@@ -14,6 +14,7 @@ import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingSection;
 import com.wisdri.tracking.domain.model.config.shear.ShearTrackingConfig;
 import com.wisdri.tracking.domain.model.config.trimming.TrimmingTrackingConfig;
+import com.wisdri.tracking.domain.model.config.ironloss.IronLossTrackingConfig;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.shear.ShearTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
@@ -391,6 +392,7 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
         types.put(TrackingType.STATUS, StatusTrackingConfig.class);
         types.put(TrackingType.SHEAR, ShearTrackingConfig.class);
         types.put(TrackingType.TRIMMING, TrimmingTrackingConfig.class);
+        types.put(TrackingType.IRONLOSS, IronLossTrackingConfig.class);
         return types;
     }
 

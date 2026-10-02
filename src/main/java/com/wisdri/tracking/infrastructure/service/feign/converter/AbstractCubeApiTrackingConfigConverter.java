@@ -5,12 +5,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.wisdri.tracking.common.exception.TrackingException;
 import com.wisdri.tracking.common.utils.JsonUtils;
 import com.wisdri.tracking.domain.model.config.PointDataType;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeNode;
+
+import java.util.Map;
 
 /**
  * Cube API 类型转换器的公共 JSON 和点位元数据处理能力。
@@ -70,6 +74,40 @@ public abstract class AbstractCubeApiTrackingConfigConverter implements CubeApiT
             return DEFAULT_POINT_TYPE;
         }
         return PointDataType.fromCode(valueType.trim()).getCode();
+    }
+
+    /** 从段直属点位生成列定义，保持 Cube 返回顺序。 */
+    protected ArrayNode directPointNames(CubeApiTreeNode segmentNode) {
+        ArrayNode points = objectMapper.createArrayNode();
+        for (Map.Entry<String, CubeApiTreeNode> pointField : segmentNode.getChildren().entrySet()) {
+            if (isPointNode(pointField.getValue())) {
+                ObjectNode point = objectMapper.createObjectNode();
+                point.put("name", pointField.getKey());
+                point.put("type", pointType(pointField.getValue()));
+                points.add(point);
+            }
+        }
+        return points;
+    }
+
+    /** PROCESS 与 IRONLOSS 共用的加工单元序号配置转换。 */
+    protected void normalizeCellCode(ObjectNode segment, String trackingType) {
+        JsonNode cellCode = segment.remove("cell_code");
+        if (cellCode == null || cellCode.isNull()) {
+            return;
+        }
+        if (cellCode.isIntegralNumber() && cellCode.canConvertToInt()
+                && cellCode.intValue() >= 0 && cellCode.intValue() <= 999) {
+            segment.put("cell_code_value", cellCode.intValue());
+            return;
+        }
+        if (cellCode.isObject() && cellCode.path("name").isTextual()
+                && !cellCode.path("name").asText().trim().isEmpty()) {
+            segment.set("cell_code_point", cellCode);
+            return;
+        }
+        throw new TrackingException(trackingType + " segment.cell_code 必须是 0～999 的整数或带 name 的点位: segment="
+                + segment.path("code").asText());
     }
 
     private String valueType(CubeApiTreeNode pointNode) {

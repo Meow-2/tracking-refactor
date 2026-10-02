@@ -1,0 +1,22 @@
+{
+  "enable": true,
+  "mqtt_topic": "fcl1_ironloss_tracking",
+  "tracking": {
+    "point_prefix": "/aygg_tracking/fcl1/ironloss/tracking/",
+    "coil_no": {
+      "name": "coil_no",
+      "type": "string"
+    },
+    "length": {
+      "name": "length",
+      "type": "float"
+    },
+    "start_condition": {
+      "point": {
+        "name": "length",
+        "type": "float"
+      },
+      "threshold": 0.1
+    }
+  }
+}

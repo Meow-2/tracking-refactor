@@ -11,7 +11,6 @@ import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessSegmentRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
-import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
@@ -22,6 +21,8 @@ import com.wisdri.tracking.domain.service.abnormal.AbnormalDataHandlerDispatcher
 import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
+import com.wisdri.tracking.domain.service.tracking.CellCodeResolver;
+import com.wisdri.tracking.domain.service.tracking.StatusProductNoResolver;
 import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -33,9 +34,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -409,24 +408,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
      * 按钢卷号从当前设备、候选设备中查找重复生产次数。
      */
     private Integer productNo(StatusTrackingContext context, String coilNo) {
-        if (context == null) {
-            return null;
-        }
-        if (context.getCurrent() != null) {
-            for (StatusCurrentRuntime current : context.getCurrent().values()) {
-                if (current != null && Objects.equals(coilNo, current.getCoilNo())) {
-                    return current.getProductNo();
-                }
-            }
-        }
-        if (context.getCandidates() != null) {
-            for (StatusCandidateRuntime candidate : context.getCandidates().values()) {
-                if (candidate != null && Objects.equals(coilNo, candidate.getCoilNo())) {
-                    return candidate.getProductNo();
-                }
-            }
-        }
-        return null;
+        return StatusProductNoResolver.find(context, coilNo);
     }
 
     private boolean blank(String value) {
@@ -493,27 +475,8 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
      * 点位已配置但值缺失、非整数或超出 0～999 时返回 null，不回退到默认序号。
      */
     private String cellCode(String unitCode, PointSnapshot latest, SegmentConfig segment) {
-        Object raw = segment.getCellCodePoint() == null
-                ? (segment.getCellCodeValue() == null ? 1 : segment.getCellCodeValue())
-                : PointReader.rawValue(latest, segmentPointPath(segment, segment.getCellCodePoint()));
-        Integer number = cellCodeNumber(raw);
-        if (number == null || unitCode == null || unitCode.trim().isEmpty()) {
-            return null;
-        }
-        return unitCode.toUpperCase(Locale.ROOT) + String.format(Locale.ROOT, "%03d", number);
-    }
-
-    /** 将数字或数字文本严格解析为三位加工单元序号。 */
-    private Integer cellCodeNumber(Object raw) {
-        if (raw == null || raw instanceof Boolean) {
-            return null;
-        }
-        try {
-            int number = new BigDecimal(String.valueOf(raw).trim()).intValueExact();
-            return number >= 0 && number <= 999 ? number : null;
-        } catch (NumberFormatException | ArithmeticException e) {
-            return null;
-        }
+        return CellCodeResolver.resolve(unitCode, latest, segment.getPointPrefix(),
+                segment.getCellCodeValue(), segment.getCellCodePoint());
     }
 
     /**
