@@ -43,7 +43,7 @@ class CoilerTrackingResultRepositoryImplTest {
         CoilerTrackingResultRepositoryImpl repository = new CoilerTrackingResultRepositoryImpl();
         Instant time = Instant.parse("2026-08-27T01:00:00Z");
         CoilerResult result = CoilerResult.builder()
-                .unitCode("CP1").trackingType(TrackingType.COILER).receivedAt(time)
+                .unitCode("cp1").trackingType(TrackingType.COILER).receivedAt(time)
                 .inMatNo("COIL-1").repeatProdNo(3)
                 .coilerMethod("99").coilerMethodName("下卷取")
                 .coilerDeviceCode("tr1").coilerDeviceName("1#卷取机")

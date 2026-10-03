@@ -26,7 +26,7 @@ class RepeatProdNoRepositoryImplTest {
         when(mapper.findLatest("CP1", "COIL-A")).thenReturn(2);
         when(mapper.insert(anyLong(), eq("CP1"), eq("COIL-A"), eq(3))).thenReturn(3);
 
-        assertThat(repository.allocateNext("CP1", "COIL-A")).isEqualTo(3);
+        assertThat(repository.allocateNext("cp1", "COIL-A")).isEqualTo(3);
         org.mockito.InOrder calls = inOrder(mapper);
         calls.verify(mapper).lockCoil("CP1", "COIL-A");
         calls.verify(mapper).findLatest("CP1", "COIL-A");
@@ -73,7 +73,7 @@ class RepeatProdNoRepositoryImplTest {
         RepeatProdNoRepositoryImpl repository = repository(mapper);
         when(mapper.findLatest("CP1", "COIL-UNKNOWN")).thenReturn(null);
 
-        assertThat(repository.findLatest("CP1", "COIL-UNKNOWN")).isNull();
+        assertThat(repository.findLatest("cp1", "COIL-UNKNOWN")).isNull();
         verify(mapper).findLatest("CP1", "COIL-UNKNOWN");
         verifyNoMoreInteractions(mapper);
     }

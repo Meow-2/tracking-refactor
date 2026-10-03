@@ -18,7 +18,7 @@ create table public.qm_dc_repeat_prod_no_log
 
 comment on table public.qm_dc_repeat_prod_no_log is '钢卷每次重复生产各存一条记录';
 comment on column public.qm_dc_repeat_prod_no_log.id is '主键；在线插入使用 MyBatis-Plus 雪花算法生成';
-comment on column public.qm_dc_repeat_prod_no_log.unit_code is '机组编码；与入口卷号共同确定计数范围，保持输入的原始大小写';
+comment on column public.qm_dc_repeat_prod_no_log.unit_code is '机组编码；与入口卷号共同确定计数范围，入库统一大写';
 comment on column public.qm_dc_repeat_prod_no_log.in_mat_no is '入口钢卷号；同一机组内的计数对象';
 comment on column public.qm_dc_repeat_prod_no_log.in_mat_repeat_prod_no is '该机组该卷的重复生产序号，从1开始，每次新上卷加1';
 comment on column public.qm_dc_repeat_prod_no_log.deleted is '删除标记，0表示有效；逐次记录不得删除或复用序号';

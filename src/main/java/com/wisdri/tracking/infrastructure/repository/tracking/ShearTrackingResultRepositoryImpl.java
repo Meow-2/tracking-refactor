@@ -6,6 +6,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.shear.ShearResult;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepository;
 import com.wisdri.tracking.infrastructure.dto.postgres.shear.QmShearLogEntity;
+import com.wisdri.tracking.infrastructure.repository.PostgresUnitCode;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import com.wisdri.tracking.infrastructure.service.postgres.shear.QmShearLogMapper;
 import org.springframework.stereotype.Repository;
@@ -66,7 +67,7 @@ public class ShearTrackingResultRepositoryImpl
      */
     private QmShearLogEntity toEntity(ShearResult result) {
         QmShearLogEntity entity = new QmShearLogEntity();
-        entity.setUnitCode(result.getUnitCode());
+        entity.setUnitCode(PostgresUnitCode.uppercase(result.getUnitCode()));
         String inMatNo = result.getInMatNo();
         // 只调整 CSL1 的入库字段，领域结果仍保留设备上报的完整卷号供算法使用。
         if ("CSL1".equalsIgnoreCase(result.getUnitCode())

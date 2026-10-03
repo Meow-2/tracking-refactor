@@ -2,7 +2,7 @@
 
 ## 1. 新计数表与历史校验
 
-尚未建表时执行 [`sql/qm_dc_repeat_prod_no_log.sql`](sql/qm_dc_repeat_prod_no_log.sql) 创建 `qm_dc_repeat_prod_no_log`；已创建旧名 `qm_dc_repeat_prod_no` 的环境，在停写后执行[原位改名脚本](sql/rename_qm_dc_repeat_prod_no_to_log.sql)，保留历史行。旧 `qm_dc_product_no` 保留供核对，程序不再读写。上线前按跟踪历史逐次补入新表，确保每个 `(unit_code, in_mat_no)` 的次数从 1 连续到真实最大值。历史卷的识别口径和补全由部署方确认，不可只把旧表当前最大值复制为一行，否则会丢失逐次记录。工作区另有未跟踪的 `docs/qm-dc-repeat-prod-no-backfill/backfill_qm_dc_repeat_prod_no.sql`，其中包含 `unit_code` 大写处理，与本次范围不符，本流程不可直接执行该脚本。
+尚未建表时执行 [`sql/qm_dc_repeat_prod_no_log.sql`](sql/qm_dc_repeat_prod_no_log.sql) 创建 `qm_dc_repeat_prod_no_log`；已创建旧名 `qm_dc_repeat_prod_no` 的环境，在停写后执行[原位改名脚本](sql/rename_qm_dc_repeat_prod_no_to_log.sql)，保留历史行。旧 `qm_dc_product_no` 保留供核对，程序不再读写。上线前按跟踪历史逐次补入新表，确保每个 `(unit_code, in_mat_no)` 的次数从 1 连续到真实最大值。历史卷的识别口径和补全由部署方确认，不可只把旧表当前最大值复制为一行，否则会丢失逐次记录。工作区另有未跟踪的 `docs/qm-dc-repeat-prod-no-backfill/backfill_qm_dc_repeat_prod_no.sql`，会修改其他字段，不作为本次迁移脚本使用。
 
 在 PostgreSQL 校验缺号和重复号：
 
@@ -45,7 +45,7 @@ order by table_name, col_name;
 
 1. 完成新计数表历史补全与最大次数核对，并准备 PG/TDengine 备份与回退数据。
 2. 停止 status、coiler、shear、trimming、process、ironloss 的相关写入；确认消息消费已暂停。
-3. 执行并核对 PG 字段改名和 TDengine 字段迁移。
+3. 执行并核对 PG 字段改名和 TDengine 字段迁移；然后执行[PG 机组代码大写脚本](sql/uppercase_pg_unit_code.sql)，核对历史 `unit_code` 已大写且计数表业务键无冲突。
 4. 一起部署两个计划的程序改动，恢复消息消费与写入；抽查新卷逐次记录、旧 Redis 状态和在途消息读取，以及 PG/TDengine 新字段写入。
 
 旧 `qm_dc_product_no` 在切换后仍保留，但不再参与取号。PG 取号和 Redis 状态保存不在同一事务内；进程在分配成功后、状态保存前退出，重启可能对同一物理上卷再次分配，现场需要按跟踪事件核对该异常。

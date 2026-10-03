@@ -7,6 +7,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.trimming.TrimmingResult;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepository;
 import com.wisdri.tracking.infrastructure.dto.postgres.trimming.QmTrimmingLogEntity;
+import com.wisdri.tracking.infrastructure.repository.PostgresUnitCode;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import com.wisdri.tracking.infrastructure.service.postgres.trimming.QmTrimmingLogMapper;
 import org.springframework.stereotype.Repository;
@@ -63,7 +64,7 @@ public class TrimmingTrackingResultRepositoryImpl
         entity.setCreateTime(null);
         entity.setUpdateTime(eventTime(result));
         int updated = baseMapper.update(entity, Wrappers.<QmTrimmingLogEntity>lambdaUpdate()
-                .eq(QmTrimmingLogEntity::getUnitCode, result.getUnitCode())
+                .eq(QmTrimmingLogEntity::getUnitCode, PostgresUnitCode.uppercase(result.getUnitCode()))
                 .eq(QmTrimmingLogEntity::getInMatNo, result.getInMatNo())
                 .eq(QmTrimmingLogEntity::getInMatRepeatProdNo, String.valueOf(result.getRepeatProdNo())));
         // 数据库被清理但进程 runtime 尚在时，自愈为插入，仍不额外查询数据库。
@@ -74,7 +75,7 @@ public class TrimmingTrackingResultRepositoryImpl
 
     private QmTrimmingLogEntity toEntity(TrimmingResult result) {
         QmTrimmingLogEntity entity = new QmTrimmingLogEntity();
-        entity.setUnitCode(result.getUnitCode());
+        entity.setUnitCode(PostgresUnitCode.uppercase(result.getUnitCode()));
         entity.setInMatNo(result.getInMatNo());
         entity.setInMatRepeatProdNo(result.getRepeatProdNo() == null
                 ? null : String.valueOf(result.getRepeatProdNo()));

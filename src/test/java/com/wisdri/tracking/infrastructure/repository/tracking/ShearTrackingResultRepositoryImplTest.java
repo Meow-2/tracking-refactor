@@ -29,7 +29,7 @@ class ShearTrackingResultRepositoryImplTest {
         ShearTrackingResultRepositoryImpl repository = new ShearTrackingResultRepositoryImpl();
         Instant time = Instant.parse("2026-01-01T00:00:00Z");
         ShearResult result = ShearResult.builder()
-                .unitCode("LINE-X").trackingType(TrackingType.SHEAR)
+                .unitCode("line-x").trackingType(TrackingType.SHEAR)
                 .inMatNo("MAT-1").repeatProdNo("3")
                 .shearType("711").shearTypeName("feed-device-x_head")
                 .shearLength(new BigDecimal("2.5")).setNumber(4).shearTime(time)
@@ -76,6 +76,7 @@ class ShearTrackingResultRepositoryImplTest {
                 ShearResult.builder().unitCode("CSL1").build());
 
         assertThat(csl1Entity.getInMatNo()).isEqualTo("12345678901");
+        assertThat(csl1Entity.getUnitCode()).isEqualTo("CSL1");
         assertThat(csl1Result.getInMatNo()).isEqualTo(longCoilNo);
         assertThat(otherUnitEntity.getInMatNo()).isEqualTo(longCoilNo);
         assertThat(elevenCharacterEntity.getInMatNo()).isEqualTo("12345678901");

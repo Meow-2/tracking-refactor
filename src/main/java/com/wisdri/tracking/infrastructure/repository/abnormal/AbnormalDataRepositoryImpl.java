@@ -7,6 +7,7 @@ import com.wisdri.tracking.domain.model.abnormal.AbnormalType;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.abnormal.AbnormalDataRepository;
 import com.wisdri.tracking.infrastructure.dto.postgres.abnormal.AbnormalDataEntity;
+import com.wisdri.tracking.infrastructure.repository.PostgresUnitCode;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import com.wisdri.tracking.infrastructure.service.postgres.abnormal.AbnormalDataMapper;
 import org.springframework.stereotype.Repository;
@@ -46,7 +47,7 @@ public class AbnormalDataRepositoryImpl extends ServiceImpl<AbnormalDataMapper, 
     @Override
     public List<AbnormalData> find(String unitCode, TrackingType trackingType) {
         LambdaQueryWrapper<AbnormalDataEntity> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(AbnormalDataEntity::getUnitCode, unitCode)
+        queryWrapper.eq(AbnormalDataEntity::getUnitCode, PostgresUnitCode.uppercase(unitCode))
                 .eq(AbnormalDataEntity::getTrackingType,
                         trackingType == null ? null : trackingType.getCode());
         List<AbnormalDataEntity> entities = abnormalDataMapper.selectList(queryWrapper);
@@ -83,7 +84,7 @@ public class AbnormalDataRepositoryImpl extends ServiceImpl<AbnormalDataMapper, 
 
     private AbnormalDataEntity toEntity(AbnormalData data) {
         AbnormalDataEntity entity = new AbnormalDataEntity();
-        entity.setUnitCode(data.getUnitCode());
+        entity.setUnitCode(PostgresUnitCode.uppercase(data.getUnitCode()));
         entity.setTrackingType(data.getTrackingType() == null ? null : data.getTrackingType().getCode());
         entity.setPointCode(data.getPointCode());
         entity.setAbnormalType(data.getAbnormalType() == null ? null : data.getAbnormalType().getCode());

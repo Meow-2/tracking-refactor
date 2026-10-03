@@ -8,6 +8,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.coiler.CoilerResult;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepository;
 import com.wisdri.tracking.infrastructure.dto.postgres.coiler.QmCoilerLogEntity;
+import com.wisdri.tracking.infrastructure.repository.PostgresUnitCode;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import com.wisdri.tracking.infrastructure.service.postgres.coiler.QmCoilerLogMapper;
 import org.springframework.stereotype.Repository;
@@ -93,7 +94,7 @@ public class CoilerTrackingResultRepositoryImpl
     }
 
     private void merge(QmCoilerLogEntity entity, CoilerResult result) {
-        entity.setUnitCode(result.getUnitCode());
+        entity.setUnitCode(PostgresUnitCode.uppercase(result.getUnitCode()));
         entity.setInMatNo(result.getInMatNo());
         entity.setInMatRepeatProdNo(result.getRepeatProdNo() == null
                 ? null : String.valueOf(result.getRepeatProdNo()));

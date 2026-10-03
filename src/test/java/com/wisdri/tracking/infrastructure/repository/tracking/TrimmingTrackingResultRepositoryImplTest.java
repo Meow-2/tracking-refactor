@@ -80,7 +80,7 @@ class TrimmingTrackingResultRepositoryImplTest {
 
     private TrimmingResult result(boolean update) {
         return TrimmingResult.builder()
-                .unitCode("CP1").trackingType(TrackingType.TRIMMING)
+                .unitCode("cp1").trackingType(TrackingType.TRIMMING)
                 .receivedAt(Instant.parse("2026-08-29T01:00:00Z"))
                 .inMatNo("C001").repeatProdNo(2)
                 .coilWidthPv(new BigDecimal("1005.0"))

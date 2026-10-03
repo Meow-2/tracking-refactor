@@ -2,6 +2,7 @@ package com.wisdri.tracking.infrastructure.repository.product;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.wisdri.tracking.domain.repository.product.RepeatProdNoRepository;
+import com.wisdri.tracking.infrastructure.repository.PostgresUnitCode;
 import com.wisdri.tracking.infrastructure.service.postgres.product.RepeatProdNoMapper;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,19 +21,20 @@ public class RepeatProdNoRepositoryImpl implements RepeatProdNoRepository {
     @Transactional
     public Integer allocateNext(String unitCode, String coilNo) {
         validateKey(unitCode, coilNo);
-        repeatProdNoMapper.lockCoil(unitCode, coilNo);
-        Integer latest = repeatProdNoMapper.findLatest(unitCode, coilNo);
+        String storedUnitCode = PostgresUnitCode.uppercase(unitCode);
+        repeatProdNoMapper.lockCoil(storedUnitCode, coilNo);
+        Integer latest = repeatProdNoMapper.findLatest(storedUnitCode, coilNo);
         if (latest != null && latest == Integer.MAX_VALUE) {
             throw new IllegalStateException("钢卷重复生产次数已达到整数上限: 机组=" + unitCode + "，钢卷=" + coilNo);
         }
         int next = latest == null ? 1 : latest + 1;
-        return repeatProdNoMapper.insert(IdWorker.getId(), unitCode, coilNo, next);
+        return repeatProdNoMapper.insert(IdWorker.getId(), storedUnitCode, coilNo, next);
     }
 
     @Override
     public Integer findLatest(String unitCode, String coilNo) {
         validateKey(unitCode, coilNo);
-        return repeatProdNoMapper.findLatest(unitCode, coilNo);
+        return repeatProdNoMapper.findLatest(PostgresUnitCode.uppercase(unitCode), coilNo);
     }
 
     /** 表中的业务键不可为空，取号前先校验。 */
