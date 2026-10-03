@@ -42,7 +42,8 @@ public class RepeatProdNoRepositoryImpl
     @Override
     public Integer findLatest(String unitCode, String coilNo) {
         validateKey(unitCode, coilNo);
-        return findLatestStored(PostgresUnitCode.uppercase(unitCode), coilNo);
+        Integer latest = findLatestStored(PostgresUnitCode.uppercase(unitCode), coilNo);
+        return latest == null ? 1 : latest;
     }
 
     /** 只取同机组同卷序号最大的一行，不修改任何历史记录。 */

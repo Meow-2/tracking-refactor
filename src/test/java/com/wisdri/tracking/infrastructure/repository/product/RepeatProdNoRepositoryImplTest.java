@@ -91,6 +91,16 @@ class RepeatProdNoRepositoryImplTest {
     }
 
     @Test
+    void findLatestReturnsOneWithoutInsertingWhenRecordIsMissing() {
+        RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
+        RepeatProdNoRepositoryImpl repository = repository(mapper);
+
+        assertThat(repository.findLatest("cp1", "COIL-UNKNOWN")).isEqualTo(1);
+        verify(mapper).selectOne(any());
+        org.mockito.Mockito.verifyNoMoreInteractions(mapper);
+    }
+
+    @Test
     void rejectsBlankBusinessKeyBeforeQuerying() {
         RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
         RepeatProdNoRepositoryImpl repository = repository(mapper);

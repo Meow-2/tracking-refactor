@@ -7,6 +7,6 @@ public interface RepeatProdNoRepository {
     /** 首次分配返回 1，此后逐次插入并返回新次数；存储失败时抛出异常。 */
     Integer allocateNext(String unitCode, String coilNo);
 
-    /** 仅读取已分配的最大次数；记录不存在时返回 null。 */
+    /** 仅读取已分配的最大次数；记录不存在时按首次生产返回 1，不写入记录。 */
     Integer findLatest(String unitCode, String coilNo);
 }
