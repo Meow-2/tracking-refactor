@@ -74,7 +74,7 @@ class ProcessTrackingAlgorithmImplTest {
         List<ProcessResult> results = algorithm.calculate(input(values("C001", new BigDecimal("15.5"))));
         assertEquals(1, results.size());
         assertEquals("C001", results.get(0).getCoilNo());
-        assertEquals(Integer.valueOf(2), results.get(0).getInMatNoProdNo());
+        assertEquals(Integer.valueOf(2), results.get(0).getRepeatProdNo());
         assertEquals(new BigDecimal("15.5"), results.get(0).getHeadLength());
 
         List<ProcessResult> emptyResults = algorithm.calculate(input(Collections.emptyMap()));
@@ -150,7 +150,7 @@ class ProcessTrackingAlgorithmImplTest {
 
         assertEquals(1, results.size());
         assertEquals("STATUS-COIL", results.get(0).getCoilNo());
-        assertEquals(Integer.valueOf(7), results.get(0).getInMatNoProdNo());
+        assertEquals(Integer.valueOf(7), results.get(0).getRepeatProdNo());
         assertEquals(new BigDecimal("100"), results.get(0).getHeadLength());
         assertEquals(Integer.valueOf(3), results.get(0).getPassNo());
     }
@@ -228,7 +228,7 @@ class ProcessTrackingAlgorithmImplTest {
         assertEquals(2, results.size());
         assertEquals(new BigDecimal("26.5"), results.get(0).getHeadLength());
         assertEquals(new BigDecimal("23"), results.get(1).getHeadLength());
-        assertEquals(null, results.get(0).getInMatNoProdNo());
+        assertEquals(null, results.get(0).getRepeatProdNo());
     }
 
     @Test
@@ -299,22 +299,22 @@ class ProcessTrackingAlgorithmImplTest {
         )).thenReturn(Optional.of(config));
         StatusTrackingContext context = status("OTHER", 8, "100", "90", "1");
         context.getCurrent().get(DeviceSide.COILER).setCoilNo("C001");
-        context.getCurrent().get(DeviceSide.COILER).setProductNo(null);
+        context.getCurrent().get(DeviceSide.COILER).setRepeatProdNo(null);
         context.getCandidates().put("candidate", StatusCandidateRuntime.builder()
-                .coilNo("C001").productNo(9).build());
+                .coilNo("C001").repeatProdNo(9).build());
 
         List<ProcessResult> currentMatched = algorithm.calculate(input(values("C001", new BigDecimal("12")), context));
 
         assertEquals(1, currentMatched.size());
-        assertEquals(null, currentMatched.get(0).getInMatNoProdNo());
+        assertEquals(null, currentMatched.get(0).getRepeatProdNo());
 
         context.getCurrent().get(DeviceSide.COILER).setCoilNo("OTHER-2");
         List<ProcessResult> candidateMatched = algorithm.calculate(input(values("C001", new BigDecimal("12")), context));
-        assertEquals(Integer.valueOf(9), candidateMatched.get(0).getInMatNoProdNo());
+        assertEquals(Integer.valueOf(9), candidateMatched.get(0).getRepeatProdNo());
 
         context.getCandidates().clear();
         List<ProcessResult> notMatched = algorithm.calculate(input(values("C001", new BigDecimal("12")), context));
-        assertEquals(null, notMatched.get(0).getInMatNoProdNo());
+        assertEquals(null, notMatched.get(0).getRepeatProdNo());
     }
 
     private ProcessTrackingConfig config() {
@@ -363,7 +363,7 @@ class ProcessTrackingAlgorithmImplTest {
     }
 
     private StatusTrackingContext status(String coilNo,
-                                         Integer productNo,
+                                         Integer repeatProdNo,
                                          String maxLength,
                                          String uncoilerRemainingLength,
                                          String coilerRemainingLength) {
@@ -371,7 +371,7 @@ class ProcessTrackingAlgorithmImplTest {
         current.put(DeviceSide.UNCOILER, StatusCurrentRuntime.builder()
                 .side(DeviceSide.UNCOILER)
                 .coilNo(coilNo)
-                .productNo(productNo)
+                .repeatProdNo(repeatProdNo)
                 .maxLength(decimal(maxLength))
                 .remainingLength(decimal(uncoilerRemainingLength))
                 .build());

@@ -65,7 +65,7 @@ class TrimmingTrackingAlgorithmImplTest {
         TrimmingResult result = algorithm.calculate(input).get(0);
 
         assertThat(result.getInMatNo()).isEqualTo("C001");
-        assertThat(result.getInMatNoProdNo()).isEqualTo(2);
+        assertThat(result.getRepeatProdNo()).isEqualTo(2);
         assertThat(result.getTrimmingLength()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(result.getUpdateExisting()).isFalse();
         algorithm.afterPersist(input, Collections.singletonList(result));
@@ -75,7 +75,7 @@ class TrimmingTrackingAlgorithmImplTest {
         TrimmingSegmentRuntime disc = ((TrimmingTrackingRuntime) runtime.getValue())
                 .getSegments().get("disc");
         assertThat(disc.getCoilNo()).isEqualTo("C001");
-        assertThat(disc.getProductNo()).isEqualTo(2);
+        assertThat(disc.getRepeatProdNo()).isEqualTo(2);
         assertThat(disc.getCoilWidthPv()).isEqualByComparingTo("1000.5");
         assertThat(disc.getCoilWidthSv()).isEqualByComparingTo("1000");
         assertThat(disc.getTrimmingLength()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -116,12 +116,12 @@ class TrimmingTrackingAlgorithmImplTest {
         values.put("length2", new BigDecimal("5"));
         StatusTrackingContext context = status("OTHER", 1, true);
         context.setCandidates(Collections.singletonMap("por2", StatusCandidateRuntime.builder()
-                .coilNo("C002").productNo(7).build()));
+                .coilNo("C002").repeatProdNo(7).build()));
 
         TrimmingResult result = algorithm.calculate(input(values, context)).get(0);
 
         assertThat(result.getInMatNo()).isEqualTo("C002");
-        assertThat(result.getInMatNoProdNo()).isEqualTo(7);
+        assertThat(result.getRepeatProdNo()).isEqualTo(7);
         assertThat(result.getHeadLength()).isEqualByComparingTo("3");
         assertThat(result.getTrimmingLength()).isEqualByComparingTo("2");
     }
@@ -160,20 +160,20 @@ class TrimmingTrackingAlgorithmImplTest {
                 .build();
     }
 
-    private TrimmingTrackingRuntime runtime(String coilNo, int productNo, BigDecimal trimmingLength) {
+    private TrimmingTrackingRuntime runtime(String coilNo, int repeatProdNo, BigDecimal trimmingLength) {
         return TrimmingTrackingRuntime.builder()
                 .unitCode("CP1").trackingType(TrackingType.TRIMMING)
                 .segments(Collections.singletonMap("disc", TrimmingSegmentRuntime.builder()
-                        .segmentCode("disc").coilNo(coilNo).productNo(productNo)
+                        .segmentCode("disc").coilNo(coilNo).repeatProdNo(repeatProdNo)
                         .trimmingLength(trimmingLength).build()))
                 .build();
     }
 
-    private StatusTrackingContext status(String coilNo, int productNo, boolean running) {
+    private StatusTrackingContext status(String coilNo, int repeatProdNo, boolean running) {
         Map<DeviceSide, StatusCurrentRuntime> current = new EnumMap<>(DeviceSide.class);
         current.put(DeviceSide.UNCOILER, StatusCurrentRuntime.builder()
                 .side(DeviceSide.UNCOILER).running(running)
-                .coilNo(coilNo).productNo(productNo).build());
+                .coilNo(coilNo).repeatProdNo(repeatProdNo).build());
         return StatusTrackingContext.builder().current(current).build();
     }
 

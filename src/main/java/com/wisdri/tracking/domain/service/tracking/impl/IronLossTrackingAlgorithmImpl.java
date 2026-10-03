@@ -12,7 +12,7 @@ import com.wisdri.tracking.domain.model.tracking.ironloss.IronLossResult;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.tracking.CellCodeResolver;
-import com.wisdri.tracking.domain.service.tracking.StatusProductNoResolver;
+import com.wisdri.tracking.domain.service.tracking.StatusRepeatProdNoResolver;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
 import org.springframework.stereotype.Component;
 
@@ -60,7 +60,7 @@ public class IronLossTrackingAlgorithmImpl implements TrackingAlgorithm<IronLoss
         if (coilNo == null || coilNo.trim().isEmpty() || length == null) {
             return Collections.emptyList();
         }
-        Integer productNo = StatusProductNoResolver.find(input.getStatusContext(), coilNo);
+        Integer repeatProdNo = StatusRepeatProdNoResolver.find(input.getStatusContext(), coilNo);
         List<IronLossResult> results = new ArrayList<>();
         for (IronLossSegmentConfig segment : config.getSegments()) {
             results.add(IronLossResult.builder()
@@ -71,7 +71,7 @@ public class IronLossTrackingAlgorithmImpl implements TrackingAlgorithm<IronLoss
                     .segmentCode(segment.getCode())
                     .coilNo(coilNo)
                     .headLength(length)
-                    .inMatNoProdNo(productNo)
+                    .repeatProdNo(repeatProdNo)
                     .cellCode(CellCodeResolver.resolve(input.getUnitCode(), snapshot,
                             segment.getPointPrefix(), segment.getCellCodeValue(), segment.getCellCodePoint()))
                     .parameters(parameters(snapshot, segment))

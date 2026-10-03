@@ -271,14 +271,14 @@ public class ShearDeviceResolver {
         String coilNo = zeroLengthAsEmptyCoil && remainingLength != null
                 && remainingLength.compareTo(BigDecimal.ZERO) == 0 ? null : candidate.getCoilNo();
         boolean complete = !Boolean.FALSE.equals(candidate.getDataComplete())
-                && hasText(coilNo) && candidate.getProductNo() != null
+                && hasText(coilNo) && candidate.getRepeatProdNo() != null
                 && remainingLength != null;
         return ShearDeviceSnapshot.builder()
                 .side(group.getSide())
                 .deviceCode(candidate.getDeviceCode())
                 .deviceName(candidate.getDeviceName() == null ? group.getName() : candidate.getDeviceName())
                 .coilNo(coilNo)
-                .productNo(candidate.getProductNo())
+                .repeatProdNo(candidate.getRepeatProdNo())
                 .colorNo(normalizedColor(candidate.getColorNo()))
                 .remainingLength(remainingLength)
                 .maxLength(candidate.getMaxLength())

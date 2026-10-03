@@ -65,7 +65,7 @@ public class TrimmingTrackingResultRepositoryImpl
         int updated = baseMapper.update(entity, Wrappers.<QmTrimmingLogEntity>lambdaUpdate()
                 .eq(QmTrimmingLogEntity::getUnitCode, result.getUnitCode())
                 .eq(QmTrimmingLogEntity::getInMatNo, result.getInMatNo())
-                .eq(QmTrimmingLogEntity::getInMatNoProdNo, String.valueOf(result.getInMatNoProdNo())));
+                .eq(QmTrimmingLogEntity::getInMatRepeatProdNo, String.valueOf(result.getRepeatProdNo())));
         // 数据库被清理但进程 runtime 尚在时，自愈为插入，仍不额外查询数据库。
         if (updated == 0) {
             baseMapper.insert(toEntity(result));
@@ -76,8 +76,8 @@ public class TrimmingTrackingResultRepositoryImpl
         QmTrimmingLogEntity entity = new QmTrimmingLogEntity();
         entity.setUnitCode(result.getUnitCode());
         entity.setInMatNo(result.getInMatNo());
-        entity.setInMatNoProdNo(result.getInMatNoProdNo() == null
-                ? null : String.valueOf(result.getInMatNoProdNo()));
+        entity.setInMatRepeatProdNo(result.getRepeatProdNo() == null
+                ? null : String.valueOf(result.getRepeatProdNo()));
         entity.setCoilWidthPv(decimalText(result.getCoilWidthPv()));
         entity.setCoilWidthSv(decimalText(result.getCoilWidthSv()));
         entity.setTrimmingLength(decimalText(result.getTrimmingLength()));

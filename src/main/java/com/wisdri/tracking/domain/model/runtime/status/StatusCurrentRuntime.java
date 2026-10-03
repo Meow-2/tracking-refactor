@@ -1,5 +1,6 @@
 package com.wisdri.tracking.domain.model.runtime.status;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -33,7 +34,8 @@ public class StatusCurrentRuntime {
     /** 当前设备上的钢卷号。 */
     private String coilNo;
     /** 钢卷重复生产次数；PostgreSQL 取号失败或未查到记录时允许为空。 */
-    private Integer productNo;
+    @JsonAlias({"productNo", "product_no"})
+    private Integer repeatProdNo;
     /** 当前钢卷颜色号。 */
     private String colorNo;
     /** 当前帧识别到的剩余长度。 */

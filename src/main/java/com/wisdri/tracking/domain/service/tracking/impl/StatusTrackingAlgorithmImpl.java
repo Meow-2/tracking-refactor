@@ -16,7 +16,7 @@ import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.status.StatusResult;
-import com.wisdri.tracking.domain.repository.product.ProductNoRepository;
+import com.wisdri.tracking.domain.repository.product.RepeatProdNoRepository;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
@@ -58,7 +58,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
     private TrackingStepLogger trackingStepLogger;
 
     @Resource
-    private ProductNoRepository productNoRepository;
+    private RepeatProdNoRepository repeatProdNoRepository;
 
     @Override
     public boolean support(TrackingType trackingType) {
@@ -164,7 +164,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         Map<String, StatusCandidateRuntime> previous = previousRuntime == null
                 ? null : previousRuntime.getCandidates();
         // 同一帧先为开卷设备分配次数，避免配置中的卷取设备先读到上一生产次数。
-        Map<String, Integer> porProductNos = allocatePorProductNos(input, tracking, previous);
+        Map<String, Integer> porRepeatProdNos = allocatePorRepeatProdNos(input, tracking, previous);
         Map<String, StatusCandidateRuntime> updated = new LinkedHashMap<>();
         for (StatusPointGroup group : tracking.getPoints()) {
             DeviceSide side = actualSide(group, tracking, rollingState);
@@ -178,11 +178,11 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             boolean coilNoValid = coilNo != null && !coilNo.isEmpty();
             boolean dataComplete = coilNoValid && length != null;
             boolean sameCoil = coilNoValid && old != null && coilNo.equals(old.getCoilNo());
-            Integer productNo = !coilNoValid
+            Integer repeatProdNo = !coilNoValid
                     ? null
-                    : sameCoil ? old.getProductNo()
-                    : porDevice(group) ? porProductNos.get(group.getCode())
-                    : queryProductNo(input, group, coilNo, false);
+                    : sameCoil ? old.getRepeatProdNo()
+                    : porDevice(group) ? porRepeatProdNos.get(group.getCode())
+                    : queryRepeatProdNo(input, group, coilNo, false);
             // 本道次不参与的设备不生成方式及开卷卷取结果；换道或换向后按新侧别重新取方式。
             CoilerMethodValue coilerMethod = side == null ? null : sameCoil && !rollingState.isWindowReset()
                     && coilerMethodPresent(old)
@@ -209,7 +209,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     .deviceName(group.getName())
                     .dataComplete(dataComplete)
                     .coilNo(coilNo)
-                    .productNo(productNo)
+                    .repeatProdNo(repeatProdNo)
                     .colorNo(colorNo)
                     .coilerMethod(coilerMethod == null ? null : coilerMethod.getCode())
                     .coilerMethodName(coilerMethod == null ? null : coilerMethod.getName())
@@ -230,7 +230,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     "actualSide", side,
                     "passNo", rollingState.getPassNo(),
                     "coilNo", coilNo,
-                    "productNo", productNo,
+                    "repeatProdNo", repeatProdNo,
                     "colorNo", colorNo,
                     "coilerMethod", candidate.getCoilerMethod(),
                     "coilerMethodName", candidate.getCoilerMethodName(),
@@ -308,7 +308,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
     /**
      * 按配置顺序分配本帧所有开卷设备的新卷次数，不改变最终候选与结果的配置顺序。
      */
-    private Map<String, Integer> allocatePorProductNos(TrackingInput input,
+    private Map<String, Integer> allocatePorRepeatProdNos(TrackingInput input,
                                                         StatusTrackingSection tracking,
                                                         Map<String, StatusCandidateRuntime> previous) {
         Map<String, Integer> allocated = new LinkedHashMap<>();
@@ -320,7 +320,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     pointPath(tracking, group.getCoilNo())));
             StatusCandidateRuntime old = previous == null ? null : previous.get(group.getCode());
             if (coilNo != null && (old == null || !coilNo.equals(old.getCoilNo()))) {
-                allocated.put(group.getCode(), queryProductNo(input, group, coilNo, true));
+                allocated.put(group.getCode(), queryRepeatProdNo(input, group, coilNo, true));
             }
         }
         return allocated;
@@ -332,23 +332,23 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
     }
 
     /** PG 异常不阻断状态计算，本次卷号对应的次数留空。 */
-    private Integer queryProductNo(TrackingInput input, StatusPointGroup group,
+    private Integer queryRepeatProdNo(TrackingInput input, StatusPointGroup group,
                                    String coilNo, boolean increment) {
         String action = increment ? "分配" : "查询";
         try {
-            Integer productNo = increment
-                    ? productNoRepository.incrementAndGet(input.getUnitCode(), coilNo)
-                    : productNoRepository.findCurrent(input.getUnitCode(), coilNo);
+            Integer repeatProdNo = increment
+                    ? repeatProdNoRepository.allocateNext(input.getUnitCode(), coilNo)
+                    : repeatProdNoRepository.findLatest(input.getUnitCode(), coilNo);
             trackingStepLogger.log(input, "重复生产次数" + action, group.getCode(), TrackingStepLogger.details(
                     "coilNo", coilNo,
-                    "productNo", productNo));
-            return productNo;
+                    "repeatProdNo", repeatProdNo));
+            return repeatProdNo;
         } catch (RuntimeException e) {
             log.warn("{}钢卷重复生产次数失败，机组编码={}，设备编码={}，钢卷号={}",
                     action, input.getUnitCode(), group.getCode(), coilNo, e);
             trackingStepLogger.log(input, "重复生产次数" + action, group.getCode(), TrackingStepLogger.details(
                     "coilNo", coilNo,
-                    "productNo", null,
+                    "repeatProdNo", null,
                     "reason", action + "失败"));
             return null;
         }
@@ -411,7 +411,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             SelectedCandidate existing = selected.get(side);
             if (existing == null || absoluteChange.compareTo(existing.getAbsoluteChange()) > 0) {
                 selected.put(side, new SelectedCandidate(
-                        group, runtime.getCoilNo(), runtime.getProductNo(), runtime.getColorNo(),
+                        group, runtime.getCoilNo(), runtime.getRepeatProdNo(), runtime.getColorNo(),
                         runtime.getCoilerMethod(), runtime.getCoilerMethodName(), latest,
                         runtime.getMaxLength(), absoluteChange));
             }
@@ -561,7 +561,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     "coilerMethod", runtime.getCoilerMethod(),
                     "coilerMethodName", runtime.getCoilerMethodName(),
                     "coilNo", runtime.getCoilNo(),
-                    "productNo", runtime.getProductNo(),
+                    "repeatProdNo", runtime.getRepeatProdNo(),
                     "colorNo", runtime.getColorNo(),
                     "remainingLength", runtime.getRemainingLength(),
                     "maxLength", runtime.getMaxLength()));
@@ -579,7 +579,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 .coilerMethod(candidate.getCoilerMethod())
                 .coilerMethodName(candidate.getCoilerMethodName())
                 .coilNo(candidate.getCoilNo())
-                .productNo(candidate.getProductNo())
+                .repeatProdNo(candidate.getRepeatProdNo())
                 .colorNo(candidate.getColorNo())
                 .remainingLength(candidate.getRemainingLength())
                 .maxLength(candidate.getMaxLength())
@@ -605,7 +605,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 .coilerMethod(previous.getCoilerMethod())
                 .coilerMethodName(previous.getCoilerMethodName())
                 .coilNo(previous.getCoilNo())
-                .productNo(previous.getProductNo())
+                .repeatProdNo(previous.getRepeatProdNo())
                 .colorNo(previous.getColorNo())
                 .remainingLength(previous.getRemainingLength())
                 .maxLength(previous.getMaxLength())
@@ -750,7 +750,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
     private static class SelectedCandidate {
         private final StatusPointGroup group;
         private final String coilNo;
-        private final Integer productNo;
+        private final Integer repeatProdNo;
         private final String colorNo;
         private final String coilerMethod;
         private final String coilerMethodName;

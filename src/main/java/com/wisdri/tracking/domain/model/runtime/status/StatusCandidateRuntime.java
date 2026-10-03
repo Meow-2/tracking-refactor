@@ -1,5 +1,6 @@
 package com.wisdri.tracking.domain.model.runtime.status;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -38,7 +39,8 @@ public class StatusCandidateRuntime {
     /**
      * 当前钢卷重复生产次数。
      */
-    private Integer productNo;
+    @JsonAlias({"productNo", "product_no"})
+    private Integer repeatProdNo;
     private String colorNo;
     /**
      * 当前钢卷固化的开卷卷取方式代码。

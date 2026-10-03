@@ -20,8 +20,9 @@ public class QmShearLogEntity {
     /** 剪切归属物料设备上的钢卷号。 */
     private String inMatNo;
     /** 剪切归属物料钢卷的生产次数。 */
-    @TableField("in_mat_prod_no")
-    private String inMatNoProdNo;
+    /** 剪切归属钢卷的重复生产序号；沿用记录表的字符串列类型，允许为空。 */
+    @TableField("in_mat_repeat_prod_no")
+    private String inMatRepeatProdNo;
     /** 配置提供的剪切类型编码。 */
     private String shearType;
     /** 触发设备代码与 head/slice/tail 的组合名称。 */

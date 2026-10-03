@@ -154,7 +154,7 @@ class TrackingRuntimeRepositoryImplTest {
                 .side(DeviceSide.COILER)
                 .deviceName("1#卷取机")
                 .coilNo("COIL-1")
-                .productNo(1)
+                .repeatProdNo(1)
                 .head(ShearCounterRuntime.builder().shearNo(0).cutNo(0).build())
                 .slice(ShearCounterRuntime.builder().shearNo(0).cutNo(0).build())
                 .tail(ShearCounterRuntime.builder().shearNo(0).cutNo(0).build())
@@ -216,7 +216,7 @@ class TrackingRuntimeRepositoryImplTest {
                 .deviceCode("U1")
                 .deviceName("1#开卷机")
                 .coilNo("C001")
-                .productNo(2)
+                .repeatProdNo(2)
                 .coilerMethod("11")
                 .coilerMethodName("上开卷")
                 .maxLength(new BigDecimal("100"))
@@ -230,7 +230,7 @@ class TrackingRuntimeRepositoryImplTest {
                 .coilerMethod("11")
                 .coilerMethodName("上开卷")
                 .coilNo("C001")
-                .productNo(2)
+                .repeatProdNo(2)
                 .remainingLength(new BigDecimal("95"))
                 .maxLength(new BigDecimal("100"))
                 .build();
@@ -248,7 +248,7 @@ class TrackingRuntimeRepositoryImplTest {
         assertFalse(redis.get("tracking:cp1:status:runtime").contains("updated_at"));
         assertTrue(redis.get("tracking:cp1:status:runtime").contains(
                 "\"lengths\" : [ 100, 95 ]"));
-        assertTrue(redis.get("tracking:cp1:status:runtime").contains("\"product_no\" : 2"));
+        assertTrue(redis.get("tracking:cp1:status:runtime").contains("\"repeat_prod_no\" : 2"));
         assertTrue(redis.get("tracking:cp1:status:runtime").contains("\"device_code\" : \"U1\""));
         assertTrue(redis.get("tracking:cp1:status:runtime").contains("\"device_name\" : \"1#开卷机\""));
         assertTrue(redis.get("tracking:cp1:status:runtime").contains("\"null_count\" : 3"));
@@ -258,7 +258,7 @@ class TrackingRuntimeRepositoryImplTest {
         assertEquals("U1", cached.getCandidates().get("U1").getDeviceCode());
         assertEquals("1#开卷机", cached.getCandidates().get("U1").getDeviceName());
         assertEquals("C001", cached.getCandidates().get("U1").getCoilNo());
-        assertEquals(2, cached.getCandidates().get("U1").getProductNo());
+        assertEquals(2, cached.getCandidates().get("U1").getRepeatProdNo());
         assertEquals("11", cached.getCandidates().get("U1").getCoilerMethod());
         assertEquals("上开卷", cached.getCandidates().get("U1").getCoilerMethodName());
         assertEquals(new BigDecimal("100"), cached.getCandidates().get("U1").getMaxLength());
@@ -266,7 +266,7 @@ class TrackingRuntimeRepositoryImplTest {
                 cached.getCandidates().get("U1").getLengths());
         assertTrue(cached.getCurrent().get(DeviceSide.UNCOILER).getRunning());
         assertEquals(3, cached.getCurrent().get(DeviceSide.UNCOILER).getNullCount());
-        assertEquals(2, cached.getCurrent().get(DeviceSide.UNCOILER).getProductNo());
+        assertEquals(2, cached.getCurrent().get(DeviceSide.UNCOILER).getRepeatProdNo());
         assertEquals("11", cached.getCurrent().get(DeviceSide.UNCOILER).getCoilerMethod());
         assertEquals("上开卷", cached.getCurrent().get(DeviceSide.UNCOILER).getCoilerMethodName());
         assertEquals(new BigDecimal("95"),
@@ -275,6 +275,33 @@ class TrackingRuntimeRepositoryImplTest {
                 cached.getCurrent().get(DeviceSide.UNCOILER).getMaxLength());
         assertFalse(repository().findRuntimeAs(
                 "CP1", TrackingType.STATUS, StatusTrackingRuntime.class).isPresent());
+    }
+
+    @Test
+    void restoresLegacyProductNoFromRedisAndWritesOnlyRepeatProdNo() {
+        Instant now = Instant.parse("2026-09-24T06:00:00Z");
+        String key = "tracking:cp1:status:runtime";
+        repository().saveRuntime(StatusTrackingRuntime.builder()
+                .unitCode("CP1")
+                .trackingType(TrackingType.STATUS)
+                .receivedAt(now)
+                .candidates(Collections.singletonMap("TR1", StatusCandidateRuntime.builder()
+                        .deviceCode("TR1").coilNo("C001").repeatProdNo(2).build()))
+                .current(Collections.singletonMap(DeviceSide.UNCOILER, StatusCurrentRuntime.builder()
+                        .side(DeviceSide.UNCOILER).deviceCode("TR1").coilNo("C001")
+                        .repeatProdNo(2).build()))
+                .build());
+        redis.put(key, redis.get(key).replace("repeat_prod_no", "product_no"));
+
+        TrackingRuntimeRepositoryImpl restarted = restartedAt(now);
+        StatusTrackingRuntime restored = restarted.findRuntimeAs(
+                "CP1", TrackingType.STATUS, StatusTrackingRuntime.class).orElseThrow(AssertionError::new);
+        assertEquals(2, restored.getCandidates().get("TR1").getRepeatProdNo());
+        assertEquals(2, restored.getCurrent().get(DeviceSide.UNCOILER).getRepeatProdNo());
+
+        restarted.saveRuntime(restored);
+        assertTrue(redis.get(key).contains("\"repeat_prod_no\" : 2"));
+        assertFalse(redis.get(key).contains("\"product_no\""));
     }
 
     @Test

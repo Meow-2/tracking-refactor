@@ -17,8 +17,9 @@ public class QmTrimmingLogEntity {
     private Long id;
     private String unitCode;
     private String inMatNo;
-    @TableField("in_mat_prod_no")
-    private String inMatNoProdNo;
+    /** 切边归属钢卷的重复生产序号；沿用记录表的字符串列类型，允许为空。 */
+    @TableField("in_mat_repeat_prod_no")
+    private String inMatRepeatProdNo;
     private String coilWidthPv;
     private String coilWidthSv;
     private String trimmingLength;

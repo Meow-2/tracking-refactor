@@ -42,7 +42,7 @@ public class ProcessResult extends TrackingResult {
     /**
      * 入口物料重复生产次数。
      */
-    private Integer inMatNoProdNo;
+    private Integer repeatProdNo;
 
     /**
      * 带头长度值。

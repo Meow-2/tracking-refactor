@@ -22,7 +22,7 @@ import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
 import com.wisdri.tracking.domain.service.tracking.CellCodeResolver;
-import com.wisdri.tracking.domain.service.tracking.StatusProductNoResolver;
+import com.wisdri.tracking.domain.service.tracking.StatusRepeatProdNoResolver;
 import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -163,7 +163,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                     .segmentName(segment.getName())
                     .cellCode(cellCode)
                     .coilNo(selected.coilNo)
-                    .inMatNoProdNo(selected.productNo)
+                    .repeatProdNo(selected.repeatProdNo)
                     .headLength(selected.headLength)
                     .speed(speed)
                     .passNo(passNo)
@@ -175,7 +175,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
             trackingStepLogger.log(input, "区段结果生成", segment.getCode(),
                     TrackingStepLogger.details(
                             "coilNo", selected.coilNo,
-                            "productNo", selected.productNo,
+                            "repeatProdNo", selected.repeatProdNo,
                             "headLength", selected.headLength,
                             "speed", speed,
                             "passNo", passNo,
@@ -345,7 +345,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                     true, "候选钢卷"));
             if (selected == null || headLength.compareTo(selected.headLength) < 0) {
                 selected = new SelectedMaterial(coilNo,
-                        productNo(input.getStatusContext(), coilNo), headLength);
+                        repeatProdNo(input.getStatusContext(), coilNo), headLength);
             }
         }
         logCandidateEvaluation(input, segment, LengthMode.WELDER, index, evaluations, selected);
@@ -376,7 +376,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                 "lengthMode", tracking.getLengthMode(),
                 "coilerRemainingLength", coilerRemainingLength,
                 "uncoilerCoilNo", uncoiler == null ? null : uncoiler.getCoilNo(),
-                "uncoilerProductNo", uncoiler == null ? null : uncoiler.getProductNo(),
+                "uncoilerRepeatProdNo", uncoiler == null ? null : uncoiler.getRepeatProdNo(),
                 "uncoilerMaxLength", uncoiler == null ? null : uncoiler.getMaxLength(),
                 "uncoilerRemainingLength", uncoiler == null ? null : uncoiler.getRemainingLength(),
                 "lengthCorrect", lengthCorrect,
@@ -385,7 +385,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
                 "reason", eligible ? "当前卷取端已开始卷取" : statusMaterialReason(coilerStarted, uncoiler)
         ));
         return eligible ? new SelectedMaterial(uncoiler.getCoilNo(),
-                uncoiler.getProductNo(), headLength) : null;
+                uncoiler.getRepeatProdNo(), headLength) : null;
     }
 
     private String statusMaterialReason(boolean coilerStarted, StatusCurrentRuntime uncoiler) {
@@ -407,8 +407,8 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
     /**
      * 按钢卷号从当前设备、候选设备中查找重复生产次数。
      */
-    private Integer productNo(StatusTrackingContext context, String coilNo) {
-        return StatusProductNoResolver.find(context, coilNo);
+    private Integer repeatProdNo(StatusTrackingContext context, String coilNo) {
+        return StatusRepeatProdNoResolver.find(context, coilNo);
     }
 
     private boolean blank(String value) {
@@ -559,7 +559,7 @@ public class ProcessTrackingAlgorithmImpl implements TrackingAlgorithm<ProcessRe
         private final String coilNo;
 
         /** 当前物料重复生产次数。 */
-        private final Integer productNo;
+        private final Integer repeatProdNo;
 
         /** 当前物料计算出的带头长度。 */
         private final BigDecimal headLength;

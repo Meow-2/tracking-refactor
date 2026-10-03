@@ -42,14 +42,14 @@ class CoilerTrackingAlgorithmImplTest {
         StatusResult uncoiler = StatusResult.builder()
                 .unitCode("CP1").trackingType(TrackingType.STATUS)
                 .side(DeviceSide.UNCOILER)
-                .coilNo("COIL-1").productNo(2).passNo(3)
+                .coilNo("COIL-1").repeatProdNo(2).passNo(3)
                 .coilerMethod("11").coilerMethodName("上开卷")
                 .deviceCode("por1").deviceName("1#开卷机")
                 .maxLength(new BigDecimal("1200.50")).receivedAt(detectedAt).build();
         StatusResult coiler = StatusResult.builder()
                 .unitCode("CP1").trackingType(TrackingType.STATUS)
                 .side(DeviceSide.COILER)
-                .coilNo("COIL-2").productNo(3)
+                .coilNo("COIL-2").repeatProdNo(3)
                 .coilerMethod("19").coilerMethodName("上卷取")
                 .deviceCode("tr1").deviceName("1#卷取机")
                 .maxLength(new BigDecimal("10")).receivedAt(detectedAt).build();
@@ -64,7 +64,7 @@ class CoilerTrackingAlgorithmImplTest {
         assertThat(results.get(0)).satisfies(result -> {
             assertThat(result.getTrackingType()).isEqualTo(TrackingType.COILER);
             assertThat(result.getInMatNo()).isEqualTo("COIL-1");
-            assertThat(result.getInMatNoProdNo()).isEqualTo(2);
+            assertThat(result.getRepeatProdNo()).isEqualTo(2);
             assertThat(result.getPassNo()).isEqualTo(3);
             assertThat(result.getUncoilerMethod()).isEqualTo("11");
             assertThat(result.getUncoilerMethodName()).isEqualTo("上开卷");

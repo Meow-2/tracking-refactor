@@ -17,7 +17,7 @@ import java.math.BigDecimal;
 @EqualsAndHashCode(callSuper = true)
 public class CoilerResult extends TrackingResult {
     private String inMatNo;
-    private Integer inMatNoProdNo;
+    private Integer repeatProdNo;
     /**
      * 轧机道次号；非轧机 status 结果为空。
      */

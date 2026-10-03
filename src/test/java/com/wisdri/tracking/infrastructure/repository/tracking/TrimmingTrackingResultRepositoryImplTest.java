@@ -49,7 +49,7 @@ class TrimmingTrackingResultRepositoryImplTest {
         verify(mapper, never()).update(any(), any());
         assertThat(entity.getValue().getUnitCode()).isEqualTo("CP1");
         assertThat(entity.getValue().getInMatNo()).isEqualTo("C001");
-        assertThat(entity.getValue().getInMatNoProdNo()).isEqualTo("2");
+        assertThat(entity.getValue().getInMatRepeatProdNo()).isEqualTo("2");
         assertThat(entity.getValue().getCoilWidthPv()).isEqualTo("1005.0");
         assertThat(entity.getValue().getCoilWidthSv()).isEqualTo("1000");
         assertThat(entity.getValue().getTrimmingLength()).isEqualTo("2.50");
@@ -71,7 +71,7 @@ class TrimmingTrackingResultRepositoryImplTest {
         verify(mapper).update(entity.capture(), wrapper.capture());
         verify(mapper, never()).insert(any());
         assertThat(wrapper.getValue().getSqlSegment().toLowerCase())
-                .contains("unit_code =", "in_mat_no =", "in_mat_prod_no =");
+                .contains("unit_code =", "in_mat_no =", "repeat_prod_no =");
         assertThat(wrapper.getValue().getParamNameValuePairs().values())
                 .contains("CP1", "C001", "2");
         assertThat(entity.getValue().getCreateTime()).isNull();
@@ -82,7 +82,7 @@ class TrimmingTrackingResultRepositoryImplTest {
         return TrimmingResult.builder()
                 .unitCode("CP1").trackingType(TrackingType.TRIMMING)
                 .receivedAt(Instant.parse("2026-08-29T01:00:00Z"))
-                .inMatNo("C001").inMatNoProdNo(2)
+                .inMatNo("C001").repeatProdNo(2)
                 .coilWidthPv(new BigDecimal("1005.0"))
                 .coilWidthSv(new BigDecimal("1000"))
                 .trimmingLength(new BigDecimal("2.50"))

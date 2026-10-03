@@ -72,11 +72,11 @@ class ProcessTrackingResultRepositoryImplTest {
         assertFalse(captor.getValue().getRule().stream()
                 .filter(rule -> "ready".equals(rule.getId()))
                 .findFirst().orElseThrow(AssertionError::new).getIsTag());
-        TimeSeriesTableRule productNo = captor.getValue().getRule().stream()
-                .filter(rule -> "in_mat_prod_no".equals(rule.getId()))
+        TimeSeriesTableRule repeatProdNo = captor.getValue().getRule().stream()
+                .filter(rule -> "repeat_prod_no".equals(rule.getId()))
                 .findFirst().orElseThrow(AssertionError::new);
-        assertEquals("int", productNo.getDatatype());
-        assertTrue(productNo.getIsTag());
+        assertEquals("int", repeatProdNo.getDatatype());
+        assertTrue(repeatProdNo.getIsTag());
         assertFalse(captor.getValue().getRule().stream()
                 .filter(rule -> "head_length".equals(rule.getId()))
                 .findFirst().orElseThrow(AssertionError::new).getIsTag());
@@ -109,7 +109,7 @@ class ProcessTrackingResultRepositoryImplTest {
                 .trackingType(TrackingType.PROCESS)
                 .segmentCode("S1")
                 .cellCode("CP1001")
-                .inMatNoProdNo(3)
+                .repeatProdNo(3)
                 .headLength(new java.math.BigDecimal("12.5"))
                 .speed(new java.math.BigDecimal("2.5"))
                 .parameters(parameters)
@@ -118,12 +118,12 @@ class ProcessTrackingResultRepositoryImplTest {
 
         ArgumentCaptor<TimeSeriesDataRequest> captor = ArgumentCaptor.forClass(TimeSeriesDataRequest.class);
         verify(gateway).saveColumn(anyString(), captor.capture());
-        TimeSeriesDataValue productNo = captor.getValue().getValues().stream()
-                .filter(value -> "in_mat_prod_no".equals(value.getId()))
+        TimeSeriesDataValue repeatProdNo = captor.getValue().getValues().stream()
+                .filter(value -> "repeat_prod_no".equals(value.getId()))
                 .findFirst().orElseThrow(AssertionError::new);
-        assertEquals(3, productNo.getV());
-        assertEquals(receivedAt.toEpochMilli(), productNo.getT());
-        assertTrue(productNo.getIsTag());
+        assertEquals(3, repeatProdNo.getV());
+        assertEquals(receivedAt.toEpochMilli(), repeatProdNo.getT());
+        assertTrue(repeatProdNo.getIsTag());
         assertFalse(captor.getValue().getValues().stream()
                 .filter(value -> "head_length".equals(value.getId()))
                 .findFirst().orElseThrow(AssertionError::new).getIsTag());

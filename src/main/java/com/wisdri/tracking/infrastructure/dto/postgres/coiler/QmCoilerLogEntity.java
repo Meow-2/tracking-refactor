@@ -17,8 +17,9 @@ public class QmCoilerLogEntity {
     private Long id;
     private String unitCode;
     private String inMatNo;
-    @TableField("in_mat_prod_no")
-    private String inMatNoProdNo;
+    /** 入口钢卷本次重复生产序号；沿用记录表的字符串列类型，允许为空。 */
+    @TableField("in_mat_repeat_prod_no")
+    private String inMatRepeatProdNo;
     private Integer passNo;
     private String coilerMethod;
     private String coilerMethodName;

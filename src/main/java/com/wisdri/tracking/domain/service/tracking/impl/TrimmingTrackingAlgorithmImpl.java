@@ -79,7 +79,7 @@ public class TrimmingTrackingAlgorithmImpl implements TrackingAlgorithm<Trimming
             return skip(input, "disc 段或宽度点位配置不完整");
         }
         Material material = material(input, tracking, segment);
-        if (material == null || blank(material.coilNo) || material.productNo == null) {
+        if (material == null || blank(material.coilNo) || material.repeatProdNo == null) {
             return skip(input, "当前钢卷号或物料重复生产次数不存在");
         }
         BigDecimal widthPv = segmentValue(snapshot, segment, segment.getPoints().get(0));
@@ -91,7 +91,7 @@ public class TrimmingTrackingAlgorithmImpl implements TrackingAlgorithm<Trimming
         TrimmingSegmentRuntime existing = existing(input.getUnitCode());
         boolean sameMaterial = existing != null
                 && Objects.equals(material.coilNo, existing.getCoilNo())
-                && Objects.equals(material.productNo, existing.getProductNo());
+                && Objects.equals(material.repeatProdNo, existing.getRepeatProdNo());
         if (sameMaterial && existing.getTrimmingLength() != null
                 && existing.getTrimmingLength().compareTo(BigDecimal.ZERO) != 0) {
             return skip(input, "当前物料已记录非零切边量");
@@ -107,7 +107,7 @@ public class TrimmingTrackingAlgorithmImpl implements TrackingAlgorithm<Trimming
                 .receivedAt(snapshot.getReceivedAt())
                 .segmentCode(segment.getCode())
                 .inMatNo(material.coilNo)
-                .inMatNoProdNo(material.productNo)
+                .repeatProdNo(material.repeatProdNo)
                 .headLength(material.headLength)
                 .coilWidthPv(widthPv)
                 .coilWidthSv(widthSv)
@@ -116,7 +116,7 @@ public class TrimmingTrackingAlgorithmImpl implements TrackingAlgorithm<Trimming
                 .build();
         trackingStepLogger.log(input, "切边结果生成", segment.getCode(), TrackingStepLogger.details(
                 "coilNo", material.coilNo,
-                "productNo", material.productNo,
+                "repeatProdNo", material.repeatProdNo,
                 "widthPv", widthPv,
                 "widthSv", widthSv,
                 "trimmingLength", trimmingLength,
@@ -137,7 +137,7 @@ public class TrimmingTrackingAlgorithmImpl implements TrackingAlgorithm<Trimming
         TrimmingSegmentRuntime segment = TrimmingSegmentRuntime.builder()
                 .segmentCode(result.getSegmentCode())
                 .coilNo(result.getInMatNo())
-                .productNo(result.getInMatNoProdNo())
+                .repeatProdNo(result.getRepeatProdNo())
                 .headLength(result.getHeadLength())
                 .coilWidthPv(result.getCoilWidthPv())
                 .coilWidthSv(result.getCoilWidthSv())
@@ -171,7 +171,7 @@ public class TrimmingTrackingAlgorithmImpl implements TrackingAlgorithm<Trimming
         if (current == null || !Boolean.TRUE.equals(current.getRunning())) {
             return null;
         }
-        return new Material(current.getCoilNo(), current.getProductNo(), null);
+        return new Material(current.getCoilNo(), current.getRepeatProdNo(), null);
     }
 
     /** 与 process 的 welder 模式一致，选择修正后最小的非负带头长度。 */
@@ -196,29 +196,29 @@ public class TrimmingTrackingAlgorithmImpl implements TrackingAlgorithm<Trimming
             if (blank(coilNo) || headLength == null || headLength.compareTo(BigDecimal.ZERO) < 0) {
                 continue;
             }
-            Integer productNo = productNo(input.getStatusContext(), coilNo);
+            Integer repeatProdNo = repeatProdNo(input.getStatusContext(), coilNo);
             if (selected == null || headLength.compareTo(selected.headLength) < 0) {
-                selected = new Material(coilNo, productNo, headLength);
+                selected = new Material(coilNo, repeatProdNo, headLength);
             }
         }
         return selected;
     }
 
-    private Integer productNo(StatusTrackingContext context, String coilNo) {
+    private Integer repeatProdNo(StatusTrackingContext context, String coilNo) {
         if (context == null) {
             return null;
         }
         if (context.getCurrent() != null) {
             for (StatusCurrentRuntime current : context.getCurrent().values()) {
                 if (current != null && Objects.equals(coilNo, current.getCoilNo())) {
-                    return current.getProductNo();
+                    return current.getRepeatProdNo();
                 }
             }
         }
         if (context.getCandidates() != null) {
             for (StatusCandidateRuntime candidate : context.getCandidates().values()) {
                 if (candidate != null && Objects.equals(coilNo, candidate.getCoilNo())) {
-                    return candidate.getProductNo();
+                    return candidate.getRepeatProdNo();
                 }
             }
         }
@@ -288,12 +288,12 @@ public class TrimmingTrackingAlgorithmImpl implements TrackingAlgorithm<Trimming
 
     private static class Material {
         private final String coilNo;
-        private final Integer productNo;
+        private final Integer repeatProdNo;
         private final BigDecimal headLength;
 
-        private Material(String coilNo, Integer productNo, BigDecimal headLength) {
+        private Material(String coilNo, Integer repeatProdNo, BigDecimal headLength) {
             this.coilNo = coilNo;
-            this.productNo = productNo;
+            this.repeatProdNo = repeatProdNo;
             this.headLength = headLength;
         }
     }

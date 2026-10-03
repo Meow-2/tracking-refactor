@@ -18,7 +18,7 @@ import java.math.BigDecimal;
 public class TrimmingResult extends TrackingResult {
     private String segmentCode;
     private String inMatNo;
-    private Integer inMatNoProdNo;
+    private Integer repeatProdNo;
     private BigDecimal headLength;
     private BigDecimal coilWidthPv;
     private BigDecimal coilWidthSv;

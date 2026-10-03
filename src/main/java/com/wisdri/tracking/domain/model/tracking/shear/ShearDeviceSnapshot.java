@@ -25,7 +25,7 @@ public class ShearDeviceSnapshot {
     /** 当前设备上的卷号；非连续线出口剪允许触发设备卷号为空。 */
     private String coilNo;
     /** 当前卷生产次数。 */
-    private Integer productNo;
+    private Integer repeatProdNo;
     /** 去不可见字符并数值规范化后的颜色号。 */
     private String colorNo;
     /** 当前候选窗口的最新剩余长度，与 status 长度单位一致。 */
@@ -38,6 +38,6 @@ public class ShearDeviceSnapshot {
     /** 判断该快照是否能作为剪切结果归属物料。 */
     public boolean hasCompleteMaterial() {
         return dataComplete && coilNo != null && !coilNo.trim().isEmpty()
-                && productNo != null && remainingLength != null;
+                && repeatProdNo != null && remainingLength != null;
     }
 }

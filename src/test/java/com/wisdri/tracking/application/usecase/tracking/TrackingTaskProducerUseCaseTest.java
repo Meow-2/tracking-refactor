@@ -81,7 +81,7 @@ class TrackingTaskProducerUseCaseTest {
         assertThat(input.getStatusContext().getCandidates().get("U1").getDeviceCode()).isEqualTo("U1");
         assertThat(input.getStatusContext().getCandidates().get("U1").getDeviceName()).isEqualTo("1#开卷机");
         assertThat(input.getStatusContext().getCandidates().get("U1").getColorNo()).isEqualTo("12");
-        assertThat(input.getStatusContext().getCandidates().get("U1").getProductNo()).isEqualTo(3);
+        assertThat(input.getStatusContext().getCandidates().get("U1").getRepeatProdNo()).isEqualTo(3);
         assertThat(input.getStatusContext().getCandidates().get("U1").getCoilerMethod()).isEqualTo("11");
         assertThat(input.getStatusContext().getCandidates().get("U1").getMaxLength())
                 .isEqualByComparingTo("90");
@@ -92,14 +92,14 @@ class TrackingTaskProducerUseCaseTest {
                     assertThat(current.getDeviceCode()).isEqualTo("U1");
                     assertThat(current.getCoilerMethod()).isEqualTo("11");
                     assertThat(current.getCoilerMethodName()).isEqualTo("上开卷");
-                    assertThat(current.getProductNo()).isEqualTo(3);
+                    assertThat(current.getRepeatProdNo()).isEqualTo(3);
                     assertThat(current.getColorNo()).isEqualTo("12");
                     assertThat(current.getRemainingLength()).isEqualByComparingTo("88.5");
                     assertThat(current.getMaxLength()).isEqualByComparingTo("90");
                 });
         assertThat(input.getStatusContext().getCurrent().get(DeviceSide.COILER).getCoilNo())
                 .isEqualTo("C001");
-        assertThat(input.getStatusContext().getCurrent().get(DeviceSide.COILER).getProductNo())
+        assertThat(input.getStatusContext().getCurrent().get(DeviceSide.COILER).getRepeatProdNo())
                 .isEqualTo(4);
         verify(snapshotRepository).save("BAF1", TrackingType.BATCH, "fb1", input.getLatestSnapshot());
     }
@@ -158,7 +158,7 @@ class TrackingTaskProducerUseCaseTest {
                 .coilerMethod("11")
                 .coilerMethodName("上开卷")
                 .coilNo("COIL-1")
-                .productNo(2)
+                .repeatProdNo(2)
                 .passNo(3)
                 .remainingLength(new BigDecimal("100"))
                 .maxLength(new BigDecimal("100"))
@@ -203,7 +203,7 @@ class TrackingTaskProducerUseCaseTest {
                 .coilerMethod("11")
                 .coilerMethodName("上开卷")
                 .coilNo("U001")
-                .productNo(3)
+                .repeatProdNo(3)
                 .colorNo("12")
                 .remainingLength(new BigDecimal("88.5"))
                 .maxLength(new BigDecimal("90"))
@@ -212,7 +212,7 @@ class TrackingTaskProducerUseCaseTest {
                 .side(DeviceSide.COILER)
                 .running(true)
                 .coilNo("C001")
-                .productNo(4)
+                .repeatProdNo(4)
                 .build());
         return StatusTrackingRuntime.builder()
                 .unitCode("BAF1")
@@ -226,7 +226,7 @@ class TrackingTaskProducerUseCaseTest {
                         .deviceCode("U1")
                         .deviceName("1#开卷机")
                         .coilNo("U001")
-                        .productNo(3)
+                        .repeatProdNo(3)
                         .colorNo("12")
                         .coilerMethod("11")
                         .coilerMethodName("上开卷")

@@ -17,7 +17,7 @@ import java.math.BigDecimal;
 public class TrimmingSegmentRuntime {
     private String segmentCode;
     private String coilNo;
-    private Integer productNo;
+    private Integer repeatProdNo;
     private BigDecimal headLength;
     private BigDecimal coilWidthPv;
     private BigDecimal coilWidthSv;

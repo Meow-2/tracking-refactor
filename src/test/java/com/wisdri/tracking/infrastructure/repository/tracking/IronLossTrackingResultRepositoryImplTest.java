@@ -60,13 +60,13 @@ class IronLossTrackingResultRepositoryImplTest {
         assertThat(request.getRule()).extracting("id", "datatype", "isTag")
                 .containsExactly(tuple("coil_no", "string", true),
                         tuple("cell_code", "string", true),
-                        tuple("in_mat_prod_no", "int", true),
+                        tuple("repeat_prod_no", "int", true),
                         tuple("head_length", "float", false),
                         tuple("iron_loss", "float", false));
     }
 
     @Test
-    void savesUnmatchedProductNoAsNullAndKeepsOriginalParameterValue() {
+    void savesUnmatchedRepeatProdNoAsNullAndKeepsOriginalParameterValue() {
         Instant receivedAt = Instant.parse("2026-10-03T00:00:00Z");
         Map<String, Object> parameters = new LinkedHashMap<>();
         parameters.put("iron_loss", new BigDecimal("1.234567890123456789"));
@@ -81,7 +81,7 @@ class IronLossTrackingResultRepositoryImplTest {
         assertThat(request.getTimestamp()).isEqualTo(receivedAt.toEpochMilli());
         assertThat(request.getValues()).extracting("id", "v")
                 .containsExactly(tuple("coil_no", "C001"), tuple("cell_code", "FCL1001"),
-                        tuple("in_mat_prod_no", null), tuple("head_length", new BigDecimal("0.1")),
+                        tuple("repeat_prod_no", null), tuple("head_length", new BigDecimal("0.1")),
                         tuple("iron_loss", new BigDecimal("1.234567890123456789")));
     }
 

@@ -27,7 +27,7 @@ public class ProcessTrackingResultRepositoryImpl implements TrackingResultReposi
     private static final List<TimeSeriesTableRule> FIXED_COLUMNS = Arrays.asList(
             tableRule("coil_no", TimeSeriesDataType.STRING.getCode(), true),
             tableRule("cell_code", TimeSeriesDataType.STRING.getCode(), true),
-            tableRule("in_mat_prod_no", TimeSeriesDataType.INT.getCode(), true),
+            tableRule("repeat_prod_no", TimeSeriesDataType.INT.getCode(), true),
             tableRule("head_length", TimeSeriesDataType.FLOAT.getCode(), false),
             tableRule("speed", TimeSeriesDataType.FLOAT.getCode(), false),
             tableRule("pass_no", TimeSeriesDataType.INT.getCode(), true)
@@ -118,7 +118,7 @@ public class ProcessTrackingResultRepositoryImpl implements TrackingResultReposi
         List<TimeSeriesDataValue> values = new ArrayList<>();
         add(values, "coil_no", result.getCoilNo(), true, timestamp);
         add(values, "cell_code", result.getCellCode(), true, timestamp);
-        add(values, "in_mat_prod_no", result.getInMatNoProdNo(), true, timestamp);
+        add(values, "repeat_prod_no", result.getRepeatProdNo(), true, timestamp);
         add(values, "head_length", result.getHeadLength(), false, timestamp);
         add(values, "speed", result.getSpeed(), false, timestamp);
         add(values, "pass_no", result.getPassNo(), true, timestamp);

@@ -1,5 +1,6 @@
 package com.wisdri.tracking.domain.model.tracking.status;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
@@ -29,7 +30,8 @@ public class StatusResult extends TrackingResult {
     private String coilerMethod;
     private String coilerMethodName;
     private String coilNo;
-    private Integer productNo;
+    @JsonAlias({"productNo", "product_no"})
+    private Integer repeatProdNo;
     private String colorNo;
     private BigDecimal remainingLength;
     private BigDecimal maxLength;
@@ -77,7 +79,7 @@ public class StatusResult extends TrackingResult {
                 .coilerMethod(candidate.getCoilerMethod())
                 .coilerMethodName(candidate.getCoilerMethodName())
                 .coilNo(candidate.getCoilNo())
-                .productNo(candidate.getProductNo())
+                .repeatProdNo(candidate.getRepeatProdNo())
                 .colorNo(candidate.getColorNo())
                 .remainingLength(remainingLength)
                 .maxLength(candidate.getMaxLength())

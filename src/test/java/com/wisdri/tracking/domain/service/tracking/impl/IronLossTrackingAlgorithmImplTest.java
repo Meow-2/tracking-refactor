@@ -67,14 +67,14 @@ class IronLossTrackingAlgorithmImplTest {
         values.put(TECH_PREFIX + "iron_loss", new BigDecimal("1.234567890123456789"));
         StatusTrackingContext status = StatusTrackingContext.builder()
                 .current(Collections.singletonMap(DeviceSide.UNCOILER,
-                        StatusCurrentRuntime.builder().coilNo("C001").productNo(3).build()))
+                        StatusCurrentRuntime.builder().coilNo("C001").repeatProdNo(3).build()))
                 .build();
 
         IronLossResult result = algorithm.calculate(input(values, status)).get(0);
 
         assertThat(result.getCoilNo()).isEqualTo("C001");
         assertThat(result.getHeadLength()).isEqualByComparingTo("0.1");
-        assertThat(result.getInMatNoProdNo()).isEqualTo(3);
+        assertThat(result.getRepeatProdNo()).isEqualTo(3);
         assertThat(result.getCellCode()).isEqualTo("FCL1001");
         assertThat(result.getParameters()).containsEntry("iron_loss", new BigDecimal("1.234567890123456789"));
         assertThat(result.getReceivedAt()).isEqualTo(RECEIVED_AT);
@@ -91,17 +91,17 @@ class IronLossTrackingAlgorithmImplTest {
     }
 
     @Test
-    void missingConditionStillReadsLengthAndUnmatchedStatusAllowsNullProductNo() {
+    void missingConditionStillReadsLengthAndUnmatchedStatusAllowsNullRepeatProdNo() {
         config.getTracking().setStartCondition(null);
 
         IronLossResult result = algorithm.calculate(input(values(BigDecimal.ZERO), null)).get(0);
 
         assertThat(result.getHeadLength()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(result.getInMatNoProdNo()).isNull();
+        assertThat(result.getRepeatProdNo()).isNull();
     }
 
     @Test
-    void candidateProductNoAndCellCodePointAreUsed() {
+    void candidateRepeatProdNoAndCellCodePointAreUsed() {
         IronLossSegmentConfig segment = config.getSegments().get(0);
         segment.setCellCodeValue(null);
         segment.setCellCodePoint(point("cell_code"));
@@ -109,12 +109,12 @@ class IronLossTrackingAlgorithmImplTest {
         values.put(TECH_PREFIX + "cell_code", "7");
         StatusTrackingContext status = StatusTrackingContext.builder()
                 .candidates(Collections.singletonMap("por1",
-                        StatusCandidateRuntime.builder().coilNo("C001").productNo(5).build()))
+                        StatusCandidateRuntime.builder().coilNo("C001").repeatProdNo(5).build()))
                 .build();
 
         IronLossResult result = algorithm.calculate(input(values, status)).get(0);
 
-        assertThat(result.getInMatNoProdNo()).isEqualTo(5);
+        assertThat(result.getRepeatProdNo()).isEqualTo(5);
         assertThat(result.getCellCode()).isEqualTo("FCL1007");
         values.put(TECH_PREFIX + "cell_code", "1000");
         assertThat(algorithm.calculate(input(values, status)).get(0).getCellCode()).isNull();

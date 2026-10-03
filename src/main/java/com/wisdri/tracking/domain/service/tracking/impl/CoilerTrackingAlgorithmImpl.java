@@ -51,7 +51,7 @@ public class CoilerTrackingAlgorithmImpl implements TrackingAlgorithm<CoilerResu
                     .generatedAt(generatedAt)
                     .receivedAt(status.getReceivedAt())
                     .inMatNo(status.getCoilNo())
-                    .inMatNoProdNo(status.getProductNo())
+                    .repeatProdNo(status.getRepeatProdNo())
                     .passNo(status.getPassNo())
                     .coilerMethod(DeviceSide.COILER == status.getSide()
                             ? status.getCoilerMethod() : null)
@@ -78,7 +78,7 @@ public class CoilerTrackingAlgorithmImpl implements TrackingAlgorithm<CoilerResu
             trackingStepLogger.log(input, "开卷卷取结果生成", status.getDeviceCode(),
                     TrackingStepLogger.details(
                             "coilNo", status.getCoilNo(),
-                            "productNo", status.getProductNo(),
+                            "repeatProdNo", status.getRepeatProdNo(),
                             "passNo", status.getPassNo(),
                             "side", status.getSide(),
                             "coilerMethod", status.getCoilerMethod(),

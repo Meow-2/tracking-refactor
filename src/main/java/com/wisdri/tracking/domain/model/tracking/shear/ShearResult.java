@@ -29,7 +29,7 @@ public class ShearResult extends TrackingResult {
     /** 物料设备对应的钢卷号。 */
     private String inMatNo;
     /** 物料设备对应钢卷的生产次数。 */
-    private String inMatNoProdNo;
+    private String repeatProdNo;
     /** 当前剪刀配置的剪切类型编码。 */
     private String shearType;
     /** 触发设备代码与逻辑类型组成的名称。 */

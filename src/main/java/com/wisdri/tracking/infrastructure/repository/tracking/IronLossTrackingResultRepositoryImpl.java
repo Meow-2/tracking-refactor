@@ -31,7 +31,7 @@ public class IronLossTrackingResultRepositoryImpl
     private static final List<TimeSeriesTableRule> FIXED_COLUMNS = Arrays.asList(
             rule("coil_no", TimeSeriesDataType.STRING.getCode(), true),
             rule("cell_code", TimeSeriesDataType.STRING.getCode(), true),
-            rule("in_mat_prod_no", TimeSeriesDataType.INT.getCode(), true),
+            rule("repeat_prod_no", TimeSeriesDataType.INT.getCode(), true),
             rule("head_length", TimeSeriesDataType.FLOAT.getCode(), false)
     );
 
@@ -85,7 +85,7 @@ public class IronLossTrackingResultRepositoryImpl
             List<TimeSeriesDataValue> values = new ArrayList<>();
             add(values, "coil_no", result.getCoilNo(), true, timestamp);
             add(values, "cell_code", result.getCellCode(), true, timestamp);
-            add(values, "in_mat_prod_no", result.getInMatNoProdNo(), true, timestamp);
+            add(values, "repeat_prod_no", result.getRepeatProdNo(), true, timestamp);
             add(values, "head_length", result.getHeadLength(), false, timestamp);
             if (result.getParameters() != null) {
                 for (Map.Entry<String, Object> entry : result.getParameters().entrySet()) {

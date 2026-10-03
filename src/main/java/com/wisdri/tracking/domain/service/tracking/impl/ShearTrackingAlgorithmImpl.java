@@ -195,7 +195,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 .deviceCode(shear.getDeviceCode())
                 .shearKind(kind)
                 .inMatNo(material.getCoilNo())
-                .inMatNoProdNo(String.valueOf(material.getProductNo()))
+                .repeatProdNo(String.valueOf(material.getRepeatProdNo()))
                 .shearType(typeCode(point, kind))
                 .shearTypeName(shear.getDeviceCode() + "_" + kind.name().toLowerCase(Locale.ROOT))
                 .shearLength(decision.getShearLength())

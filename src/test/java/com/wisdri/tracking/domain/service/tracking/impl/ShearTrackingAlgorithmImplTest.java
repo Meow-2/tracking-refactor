@@ -166,7 +166,7 @@ class ShearTrackingAlgorithmImplTest {
         TrackingInput changed = input("300");
         StatusCandidateRuntime candidate = changed.getStatusContext().getCandidates().get("por1");
         candidate.setCoilNo("NEW-COIL");
-        candidate.setProductNo(2);
+        candidate.setRepeatProdNo(2);
         candidate.setLengths(Arrays.asList(new BigDecimal("300")));
         ShearResult newMaterial = only(algorithm.calculate(changed));
         assertThat(newMaterial.getShearNo()).isEqualTo(1);
@@ -178,7 +178,7 @@ class ShearTrackingAlgorithmImplTest {
     void storesCounterOnMaterialDeviceAndIdempotencyTimeOnTriggerDevice() {
         ShearTrackingRuntime triggerRuntime = ShearTrackingRuntime.builder()
                 .unitCode(UNIT).trackingType(TrackingType.SHEAR).deviceCode("tr1")
-                .side(DeviceSide.COILER).coilNo("COIL-2").productNo(1)
+                .side(DeviceSide.COILER).coilNo("COIL-2").repeatProdNo(1)
                 .tail(ShearCounterRuntime.builder().shearNo(1).cutNo(5)
                         .lastRemainingLength(new BigDecimal("200")).build()).build();
         runtimes.put("tr1", triggerRuntime);
@@ -247,7 +247,7 @@ class ShearTrackingAlgorithmImplTest {
         Map<String, StatusCandidateRuntime> reordered = new LinkedHashMap<>();
         reordered.put("tr2", tr2);
         reordered.put("extra", StatusCandidateRuntime.builder().deviceCode("extra")
-                .deviceName("未配置设备").dataComplete(true).coilNo("COIL-X").productNo(1)
+                .deviceName("未配置设备").dataComplete(true).coilNo("COIL-X").repeatProdNo(1)
                 .lengths(Arrays.asList(new BigDecimal("1"))).build());
         reordered.put("tr1", tr1);
         reordered.put("por1", por1);
@@ -281,10 +281,10 @@ class ShearTrackingAlgorithmImplTest {
         values.put("/line-x/shear/grating-b", true);
         PointSnapshot snapshot = PointSnapshot.builder().values(values).build();
         ShearDeviceSnapshot occupied = ShearDeviceSnapshot.builder().side(DeviceSide.UNCOILER)
-                .deviceCode("por1").coilNo("COIL-1").productNo(1)
+                .deviceCode("por1").coilNo("COIL-1").repeatProdNo(1)
                 .remainingLength(new BigDecimal("500")).dataComplete(true).build();
         ShearDeviceSnapshot shortest = ShearDeviceSnapshot.builder().side(DeviceSide.UNCOILER)
-                .deviceCode("por2").coilNo("COIL-2").productNo(1)
+                .deviceCode("por2").coilNo("COIL-2").repeatProdNo(1)
                 .remainingLength(new BigDecimal("100")).dataComplete(true).build();
 
         ShearDeviceSnapshot selected = new ShearDeviceResolver().selectHeadMaterial(
@@ -300,7 +300,7 @@ class ShearTrackingAlgorithmImplTest {
         TrackingInput emptyCoil = input("500");
         StatusCandidateRuntime emptyTrigger = emptyCoil.getStatusContext().getCandidates().get("tr1");
         emptyTrigger.setCoilNo(null);
-        emptyTrigger.setProductNo(null);
+        emptyTrigger.setRepeatProdNo(null);
         emptyTrigger.setDataComplete(false);
         emptyTrigger.setLengths(java.util.Collections.emptyList());
         triggerExit(emptyCoil, null);
@@ -419,18 +419,18 @@ class ShearTrackingAlgorithmImplTest {
         latest.put("/line-x/shear/exit-tail-length", new BigDecimal("6.5"));
         latest.put("/line-x/shear/exit-tail-number", 6);
         StatusCandidateRuntime feed = StatusCandidateRuntime.builder().deviceCode("por1")
-                .deviceName("1#开卷机").dataComplete(true).coilNo("COIL-1").productNo(1)
+                .deviceName("1#开卷机").dataComplete(true).coilNo("COIL-1").repeatProdNo(1)
                 .colorNo("10").lengths(Arrays.asList(new BigDecimal(remainingLength)))
                 .maxLength(new BigDecimal("1000")).build();
         StatusCandidateRuntime take = StatusCandidateRuntime.builder().deviceCode("tr1")
-                .deviceName("1#卷取机").dataComplete(true).coilNo("COIL-2").productNo(1)
+                .deviceName("1#卷取机").dataComplete(true).coilNo("COIL-2").repeatProdNo(1)
                 .colorNo("20").lengths(Arrays.asList(new BigDecimal("200")))
                 .maxLength(new BigDecimal("800")).build();
         Map<String, StatusCandidateRuntime> candidates = new LinkedHashMap<>();
         candidates.put("por1", feed);
         candidates.put("tr1", take);
         candidates.put("tr2", StatusCandidateRuntime.builder().deviceCode("tr2")
-                .deviceName("2#卷取机").dataComplete(true).coilNo("COIL-3").productNo(1)
+                .deviceName("2#卷取机").dataComplete(true).coilNo("COIL-3").repeatProdNo(1)
                 .colorNo("30").lengths(Arrays.asList(new BigDecimal("100")))
                 .maxLength(new BigDecimal("800")).build());
         return TrackingInput.builder().unitCode(UNIT).trackingType(TrackingType.SHEAR)

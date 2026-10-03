@@ -58,14 +58,14 @@ public class CoilerTrackingResultRepositoryImpl
      * 同一物料号、重复生产号和道次号只保留一条记录，后续事件更新对应侧的方式和设备字段。
      */
     private void upsert(CoilerResult result) {
-        String productNo = result.getInMatNoProdNo() == null
-                ? null : String.valueOf(result.getInMatNoProdNo());
+        String repeatProdNo = result.getRepeatProdNo() == null
+                ? null : String.valueOf(result.getRepeatProdNo());
         LambdaQueryWrapper<QmCoilerLogEntity> query = Wrappers.<QmCoilerLogEntity>lambdaQuery()
                 .eq(QmCoilerLogEntity::getInMatNo, result.getInMatNo());
-        if (productNo == null) {
-            query.isNull(QmCoilerLogEntity::getInMatNoProdNo);
+        if (repeatProdNo == null) {
+            query.isNull(QmCoilerLogEntity::getInMatRepeatProdNo);
         } else {
-            query.eq(QmCoilerLogEntity::getInMatNoProdNo, productNo);
+            query.eq(QmCoilerLogEntity::getInMatRepeatProdNo, repeatProdNo);
         }
         if (result.getPassNo() == null) {
             query.isNull(QmCoilerLogEntity::getPassNo);
@@ -95,8 +95,8 @@ public class CoilerTrackingResultRepositoryImpl
     private void merge(QmCoilerLogEntity entity, CoilerResult result) {
         entity.setUnitCode(result.getUnitCode());
         entity.setInMatNo(result.getInMatNo());
-        entity.setInMatNoProdNo(result.getInMatNoProdNo() == null
-                ? null : String.valueOf(result.getInMatNoProdNo()));
+        entity.setInMatRepeatProdNo(result.getRepeatProdNo() == null
+                ? null : String.valueOf(result.getRepeatProdNo()));
         entity.setPassNo(result.getPassNo());
         if (result.getCoilerMethod() != null || result.getCoilerMethodName() != null) {
             entity.setCoilerMethod(result.getCoilerMethod());

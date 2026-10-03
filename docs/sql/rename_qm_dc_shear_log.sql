@@ -40,7 +40,7 @@ create table public.qm_dc_shear_log
     id                          bigint not null primary key,
     unit_code                   varchar(50),
     in_mat_no                   varchar(50),
-    in_mat_prod_no              varchar(50),
+    in_mat_repeat_prod_no              varchar(50),
     shear_type                  varchar(50),
     shear_type_name             varchar(50),
     shear_length                numeric(12, 5),
@@ -69,7 +69,7 @@ comment on table public.qm_dc_shear_log is '数字钢卷剪切过程记录';
 comment on column public.qm_dc_shear_log.id is '剪切记录主键';
 comment on column public.qm_dc_shear_log.unit_code is '产生剪切事件的机组代码';
 comment on column public.qm_dc_shear_log.in_mat_no is '剪切归属物料钢卷号';
-comment on column public.qm_dc_shear_log.in_mat_prod_no is '剪切归属物料钢卷的生产次数';
+comment on column public.qm_dc_shear_log.in_mat_repeat_prod_no is '剪切归属物料钢卷的生产次数';
 comment on column public.qm_dc_shear_log.shear_type is '当前剪切配置的类型编码';
 comment on column public.qm_dc_shear_log.shear_type_name is '触发设备代码与 head、slice 或 tail 的组合名称';
 comment on column public.qm_dc_shear_log.shear_length is '本刀剪切长度，单位与机组长度点位一致';

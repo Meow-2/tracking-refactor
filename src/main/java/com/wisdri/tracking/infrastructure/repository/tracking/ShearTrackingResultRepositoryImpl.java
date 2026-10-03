@@ -74,7 +74,7 @@ public class ShearTrackingResultRepositoryImpl
             inMatNo = inMatNo.substring(0, CSL1_IN_MAT_NO_LENGTH);
         }
         entity.setInMatNo(inMatNo);
-        entity.setInMatNoProdNo(result.getInMatNoProdNo());
+        entity.setInMatRepeatProdNo(result.getRepeatProdNo());
         entity.setShearType(result.getShearType());
         entity.setShearTypeName(result.getShearTypeName());
         entity.setShearLength(result.getShearLength());

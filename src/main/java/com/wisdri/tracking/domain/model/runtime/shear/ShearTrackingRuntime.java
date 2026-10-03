@@ -30,7 +30,7 @@ public class ShearTrackingRuntime extends TrackingRuntime {
     /** 当前设备卷号；空值表示当前帧未识别到钢卷。 */
     private String coilNo;
     /** 当前卷的生产次数；与卷号共同确定计数归属。 */
-    private Integer productNo;
+    private Integer repeatProdNo;
     /** 当前帧设备颜色号，已规范化便于匹配。 */
     private String colorNo;
     /** 当前设备剩余长度，与 status 点位使用相同单位。 */

@@ -20,7 +20,7 @@ public class IronLossResult extends TrackingResult {
     /** 固定钢卷号，保持消息中的字符串值。 */
     private String coilNo;
     /** STATUS 匹配的重复生产次数；匹配不到时为空。 */
-    private Integer inMatNoProdNo;
+    private Integer repeatProdNo;
     /** 固定点位直接读取的带头长度。 */
     private BigDecimal headLength;
     /** 机组代码加三位加工单元序号；序号无效时为空。 */

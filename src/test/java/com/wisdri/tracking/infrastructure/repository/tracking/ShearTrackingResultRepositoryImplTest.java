@@ -30,7 +30,7 @@ class ShearTrackingResultRepositoryImplTest {
         Instant time = Instant.parse("2026-01-01T00:00:00Z");
         ShearResult result = ShearResult.builder()
                 .unitCode("LINE-X").trackingType(TrackingType.SHEAR)
-                .inMatNo("MAT-1").inMatNoProdNo("3")
+                .inMatNo("MAT-1").repeatProdNo("3")
                 .shearType("711").shearTypeName("feed-device-x_head")
                 .shearLength(new BigDecimal("2.5")).setNumber(4).shearTime(time)
                 .deviceCode("feed-device-x")
@@ -46,7 +46,7 @@ class ShearTrackingResultRepositoryImplTest {
 
         assertThat(entity.getUnitCode()).isEqualTo("LINE-X");
         assertThat(entity.getInMatNo()).isEqualTo("MAT-1");
-        assertThat(entity.getInMatNoProdNo()).isEqualTo("3");
+        assertThat(entity.getInMatRepeatProdNo()).isEqualTo("3");
         assertThat(entity.getShearType()).isEqualTo("711");
         assertThat(entity.getShearTypeName()).isEqualTo("feed-device-x_head");
         assertThat(entity.getShearLength()).isEqualByComparingTo("2.5");

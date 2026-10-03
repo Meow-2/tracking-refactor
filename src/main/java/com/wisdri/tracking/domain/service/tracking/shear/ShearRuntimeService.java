@@ -46,11 +46,11 @@ public class ShearRuntimeService {
             }
             ShearTrackingRuntime runtime = currentRuntime(unitCode, device.getDeviceCode());
             boolean sameMaterial = Objects.equals(runtime.getCoilNo(), device.getCoilNo())
-                    && Objects.equals(runtime.getProductNo(), device.getProductNo());
+                    && Objects.equals(runtime.getRepeatProdNo(), device.getRepeatProdNo());
             runtime.setSide(device.getSide());
             runtime.setDeviceName(device.getDeviceName());
             runtime.setCoilNo(device.getCoilNo());
-            runtime.setProductNo(device.getProductNo());
+            runtime.setRepeatProdNo(device.getRepeatProdNo());
             runtime.setColorNo(device.getColorNo());
             runtime.setRemainingLength(device.getRemainingLength());
             runtime.setMaxLength(device.getMaxLength());
@@ -189,7 +189,7 @@ public class ShearRuntimeService {
                 .unitCode(source.getUnitCode()).trackingType(TrackingType.SHEAR)
                 .deviceCode(source.getDeviceCode()).updatedAt(source.getUpdatedAt())
                 .side(source.getSide()).deviceName(source.getDeviceName())
-                .coilNo(source.getCoilNo()).productNo(source.getProductNo())
+                .coilNo(source.getCoilNo()).repeatProdNo(source.getRepeatProdNo())
                 .colorNo(source.getColorNo()).remainingLength(source.getRemainingLength())
                 .maxLength(source.getMaxLength()).head(copyCounter(source.getHead()))
                 .slice(copyCounter(source.getSlice())).tail(copyCounter(source.getTail()))

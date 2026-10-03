@@ -90,7 +90,7 @@ public class IronLossCubeApiTrackingConfigConverter extends AbstractCubeApiTrack
                     throw new TrackingException("ironloss 工艺段点位名称或类型无效: " + segment.getCode());
                 }
                 if ("coil_no".equalsIgnoreCase(name) || "head_length".equalsIgnoreCase(name)
-                        || "in_mat_prod_no".equalsIgnoreCase(name)) {
+                        || "repeat_prod_no".equalsIgnoreCase(name)) {
                     throw new TrackingException("ironloss 参数与固定列重名: " + name);
                 }
             }

@@ -20,7 +20,7 @@ import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.status.StatusResult;
-import com.wisdri.tracking.domain.repository.product.ProductNoRepository;
+import com.wisdri.tracking.domain.repository.product.RepeatProdNoRepository;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +54,7 @@ class StatusTrackingAlgorithmImplTest {
     private final AtomicReference<StatusTrackingRuntime> runtime = new AtomicReference<>();
     private StatusTrackingAlgorithmImpl algorithm;
     private StatusTrackingConfig statusConfig;
-    private ProductNoRepository productNoRepository;
+    private RepeatProdNoRepository repeatProdNoRepository;
     private TrackingStepLogger trackingStepLogger;
 
     @BeforeEach
@@ -71,13 +71,13 @@ class StatusTrackingAlgorithmImplTest {
         }).when(repository).saveRuntime(any(TrackingRuntime.class));
 
         algorithm = new StatusTrackingAlgorithmImpl();
-        productNoRepository = mock(ProductNoRepository.class);
-        when(productNoRepository.findCurrent(anyString(), anyString())).thenReturn(1);
-        when(productNoRepository.incrementAndGet(anyString(), anyString())).thenReturn(1);
+        repeatProdNoRepository = mock(RepeatProdNoRepository.class);
+        when(repeatProdNoRepository.findLatest(anyString(), anyString())).thenReturn(1);
+        when(repeatProdNoRepository.allocateNext(anyString(), anyString())).thenReturn(1);
         ReflectionTestUtils.setField(algorithm, "runtimeRepositoryDispatcher", repository);
         trackingStepLogger = mock(TrackingStepLogger.class);
         ReflectionTestUtils.setField(algorithm, "trackingStepLogger", trackingStepLogger);
-        ReflectionTestUtils.setField(algorithm, "productNoRepository", productNoRepository);
+        ReflectionTestUtils.setField(algorithm, "repeatProdNoRepository", repeatProdNoRepository);
     }
 
     @Test
@@ -95,7 +95,7 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(current.get(DeviceSide.UNCOILER).getRunning()).isTrue();
         assertThat(current.get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("U2");
         assertThat(current.get(DeviceSide.UNCOILER).getCoilNo()).isEqualTo("COIL-U2");
-        assertThat(current.get(DeviceSide.UNCOILER).getProductNo()).isEqualTo(1);
+        assertThat(current.get(DeviceSide.UNCOILER).getRepeatProdNo()).isEqualTo(1);
         assertThat(current.get(DeviceSide.UNCOILER).getColorNo()).isEqualTo("U2-COLOR");
         assertThat(current.get(DeviceSide.UNCOILER).getCoilerMethod()).isEqualTo("11");
         assertThat(current.get(DeviceSide.UNCOILER).getCoilerMethodName()).isEqualTo("上开卷");
@@ -327,7 +327,7 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(runtime.get().getCandidates()).containsKeys("U1", "U2", "C1");
         assertThat(candidate.getDataComplete()).isFalse();
         assertThat(candidate.getCoilNo()).isNull();
-        assertThat(candidate.getProductNo()).isNull();
+        assertThat(candidate.getRepeatProdNo()).isNull();
         assertThat(candidate.getLengths()).isEmpty();
         assertThat(candidate.getMaxLength()).isNull();
         assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("U2");
@@ -414,17 +414,17 @@ class StatusTrackingAlgorithmImplTest {
     }
 
     @Test
-    void queriesProductNoOnlyWhenCoilChanges() {
+    void queriesRepeatProdNoOnlyWhenCoilChanges() {
         calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
         calculate(true, "U1", "COIL-U1", "95", "U2", "COIL-U2", "195", "C1", "COIL-C1", "15");
 
-        verify(productNoRepository, times(1)).findCurrent("CP1", "COIL-U1");
-        assertThat(runtime.get().getCandidates().get("U1").getProductNo()).isEqualTo(1);
+        verify(repeatProdNoRepository, times(1)).findLatest("CP1", "COIL-U1");
+        assertThat(runtime.get().getCandidates().get("U1").getRepeatProdNo()).isEqualTo(1);
 
         calculate(true, "U1", "COIL-U1-NEW", "90", "U2", "COIL-U2", "190", "C1", "COIL-C1", "20");
 
-        verify(productNoRepository, times(1)).findCurrent("CP1", "COIL-U1-NEW");
-        assertThat(runtime.get().getCandidates().get("U1").getProductNo()).isEqualTo(1);
+        verify(repeatProdNoRepository, times(1)).findLatest("CP1", "COIL-U1-NEW");
+        assertThat(runtime.get().getCandidates().get("U1").getRepeatProdNo()).isEqualTo(1);
     }
 
     @Test
@@ -432,44 +432,44 @@ class StatusTrackingAlgorithmImplTest {
         statusConfig.getTracking().setPoints(Arrays.asList(
                 group("tr1", DeviceSide.COILER), group("por1", DeviceSide.UNCOILER)));
         enableCoilerMethods();
-        when(productNoRepository.incrementAndGet("CP1", "COIL-A")).thenReturn(2);
-        when(productNoRepository.findCurrent("CP1", "COIL-A")).thenReturn(2);
+        when(repeatProdNoRepository.allocateNext("CP1", "COIL-A")).thenReturn(2);
+        when(repeatProdNoRepository.findLatest("CP1", "COIL-A")).thenReturn(2);
 
         List<StatusResult> results = algorithm.calculate(input(values(true,
                 "tr1", "COIL-A", "10", "por1", "COIL-A", "100")));
 
-        InOrder calls = inOrder(productNoRepository);
-        calls.verify(productNoRepository).incrementAndGet("CP1", "COIL-A");
-        calls.verify(productNoRepository).findCurrent("CP1", "COIL-A");
+        InOrder calls = inOrder(repeatProdNoRepository);
+        calls.verify(repeatProdNoRepository).allocateNext("CP1", "COIL-A");
+        calls.verify(repeatProdNoRepository).findLatest("CP1", "COIL-A");
         assertThat(runtime.get().getCandidates().keySet()).containsExactly("tr1", "por1");
         assertThat(results).extracting(StatusResult::getDeviceCode).containsExactly("tr1", "por1");
-        assertThat(results).extracting(StatusResult::getProductNo).containsExactly(2, 2);
+        assertThat(results).extracting(StatusResult::getRepeatProdNo).containsExactly(2, 2);
 
         algorithm.calculate(input(values(true,
                 "tr1", "COIL-A", "15", "por1", "COIL-A", "95")));
-        verify(productNoRepository, times(1)).incrementAndGet("CP1", "COIL-A");
-        verify(productNoRepository, times(1)).findCurrent("CP1", "COIL-A");
+        verify(repeatProdNoRepository, times(1)).allocateNext("CP1", "COIL-A");
+        verify(repeatProdNoRepository, times(1)).findLatest("CP1", "COIL-A");
 
-        when(productNoRepository.incrementAndGet("CP1", "COIL-B")).thenReturn(3);
-        when(productNoRepository.findCurrent("CP1", "COIL-B")).thenReturn(3);
+        when(repeatProdNoRepository.allocateNext("CP1", "COIL-B")).thenReturn(3);
+        when(repeatProdNoRepository.findLatest("CP1", "COIL-B")).thenReturn(3);
         List<StatusResult> next = algorithm.calculate(input(values(true,
                 "tr1", "COIL-B", "20", "por1", "COIL-B", "100")));
 
-        assertThat(next).extracting(StatusResult::getProductNo).containsExactly(3, 3);
-        verify(productNoRepository, times(1)).incrementAndGet("CP1", "COIL-B");
-        verify(productNoRepository, times(1)).findCurrent("CP1", "COIL-B");
+        assertThat(next).extracting(StatusResult::getRepeatProdNo).containsExactly(3, 3);
+        verify(repeatProdNoRepository, times(1)).allocateNext("CP1", "COIL-B");
+        verify(repeatProdNoRepository, times(1)).findLatest("CP1", "COIL-B");
     }
 
     @Test
-    void porAllocationFailureLeavesProductNoEmptyWithoutStoppingStatus() {
+    void porAllocationFailureLeavesRepeatProdNoEmptyWithoutStoppingStatus() {
         statusConfig.getTracking().setPoints(Arrays.asList(group("por1", DeviceSide.UNCOILER)));
-        when(productNoRepository.incrementAndGet("CP1", "COIL-A"))
+        when(repeatProdNoRepository.allocateNext("CP1", "COIL-A"))
                 .thenThrow(new IllegalStateException("pg unavailable"));
 
         algorithm.calculate(input(values(true, "por1", "COIL-A", "100")));
 
-        assertThat(runtime.get().getCandidates().get("por1").getProductNo()).isNull();
-        verify(productNoRepository, times(1)).incrementAndGet("CP1", "COIL-A");
+        assertThat(runtime.get().getCandidates().get("por1").getRepeatProdNo()).isNull();
+        verify(repeatProdNoRepository, times(1)).allocateNext("CP1", "COIL-A");
     }
 
     @Test
@@ -483,13 +483,13 @@ class StatusTrackingAlgorithmImplTest {
 
         StatusCandidateRuntime candidate = runtime.get().getCandidates().get("U1");
         assertThat(candidate.getCoilNo()).isNull();
-        assertThat(candidate.getProductNo()).isNull();
+        assertThat(candidate.getRepeatProdNo()).isNull();
         assertThat(candidate.getDataComplete()).isFalse();
         assertThat(candidate.getLengths()).isEmpty();
         assertThat(candidate.getMaxLength()).isNull();
         assertThat(results).extracting(StatusResult::getDeviceCode)
                 .containsExactly("U2", "C1");
-        verify(productNoRepository, never()).findCurrent("CP1", "..................");
+        verify(repeatProdNoRepository, never()).findLatest("CP1", "..................");
     }
 
     @Test
@@ -504,18 +504,18 @@ class StatusTrackingAlgorithmImplTest {
 
         StatusCandidateRuntime candidate = runtime.get().getCandidates().get("U1");
         assertThat(candidate.getCoilNo()).isNull();
-        assertThat(candidate.getProductNo()).isNull();
+        assertThat(candidate.getRepeatProdNo()).isNull();
         assertThat(candidate.getDataComplete()).isFalse();
         assertThat(candidate.getLengths()).isEmpty();
         assertThat(candidate.getMaxLength()).isNull();
         assertThat(results).extracting(StatusResult::getDeviceCode)
                 .containsExactly("U2", "C1");
-        verify(productNoRepository, never()).findCurrent("CP1", placeholder.trim());
+        verify(repeatProdNoRepository, never()).findLatest("CP1", placeholder.trim());
     }
 
     @Test
-    void keepsCalculatingWhenProductNoQueryFails() {
-        when(productNoRepository.findCurrent("CP1", "COIL-U1"))
+    void keepsCalculatingWhenRepeatProdNoQueryFails() {
+        when(repeatProdNoRepository.findLatest("CP1", "COIL-U1"))
                 .thenThrow(new IllegalStateException("unavailable"));
 
         calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
@@ -523,25 +523,25 @@ class StatusTrackingAlgorithmImplTest {
         Map<DeviceSide, StatusCurrentRuntime> current = calculate(
                 true, "U1", "COIL-U1", "90", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
 
-        assertThat(runtime.get().getCandidates().get("U1").getProductNo()).isNull();
+        assertThat(runtime.get().getCandidates().get("U1").getRepeatProdNo()).isNull();
         assertThat(current.get(DeviceSide.UNCOILER).getRunning()).isTrue();
-        assertThat(current.get(DeviceSide.UNCOILER).getProductNo()).isNull();
-        verify(productNoRepository, times(1)).findCurrent("CP1", "COIL-U1");
+        assertThat(current.get(DeviceSide.UNCOILER).getRepeatProdNo()).isNull();
+        verify(repeatProdNoRepository, times(1)).findLatest("CP1", "COIL-U1");
     }
 
     @Test
-    void keepsCalculatingWhenProductNoQueryReturnsNull() {
-        when(productNoRepository.findCurrent("CP1", "COIL-U1")).thenReturn(null);
+    void keepsCalculatingWhenRepeatProdNoQueryReturnsNull() {
+        when(repeatProdNoRepository.findLatest("CP1", "COIL-U1")).thenReturn(null);
 
         calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
         calculate(true, "U1", "COIL-U1", "95", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
         Map<DeviceSide, StatusCurrentRuntime> current = calculate(
                 true, "U1", "COIL-U1", "90", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
 
-        assertThat(runtime.get().getCandidates().get("U1").getProductNo()).isNull();
+        assertThat(runtime.get().getCandidates().get("U1").getRepeatProdNo()).isNull();
         assertThat(current.get(DeviceSide.UNCOILER).getRunning()).isTrue();
-        assertThat(current.get(DeviceSide.UNCOILER).getProductNo()).isNull();
-        verify(productNoRepository, times(1)).findCurrent("CP1", "COIL-U1");
+        assertThat(current.get(DeviceSide.UNCOILER).getRepeatProdNo()).isNull();
+        verify(repeatProdNoRepository, times(1)).findLatest("CP1", "COIL-U1");
     }
 
     @Test
@@ -559,7 +559,7 @@ class StatusTrackingAlgorithmImplTest {
         StatusResult uncoiler = results.stream()
                 .filter(result -> "U1".equals(result.getDeviceCode())).findFirst().get();
         assertThat(uncoiler.getCoilNo()).isEqualTo("COIL-U1");
-        assertThat(uncoiler.getProductNo()).isEqualTo(1);
+        assertThat(uncoiler.getRepeatProdNo()).isEqualTo(1);
         assertThat(uncoiler.getCoilerMethod()).isEqualTo("91");
         assertThat(uncoiler.getCoilerMethodName()).isEqualTo("下开卷");
         assertThat(uncoiler.getMaxLength()).isEqualByComparingTo("100");
@@ -845,7 +845,7 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(current.keySet()).containsExactly(DeviceSide.UNCOILER, DeviceSide.COILER);
         assertThat(current.values()).allMatch(item -> Boolean.FALSE.equals(item.getRunning())
                 && item.getDeviceCode() == null && item.getDeviceName() == null
-                && item.getCoilNo() == null && item.getProductNo() == null
+                && item.getCoilNo() == null && item.getRepeatProdNo() == null
                 && item.getRemainingLength() == null);
     }
 
