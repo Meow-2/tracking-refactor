@@ -1,0 +1,6 @@
+__pycache__/
+*.sqlite
+candidates.csv
+anomalies.csv
+apply_results.csv
+manifest.json
