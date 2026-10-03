@@ -1,7 +1,14 @@
 package com.wisdri.tracking.infrastructure.repository.product;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.wisdri.tracking.infrastructure.dto.postgres.product.QmDcRepeatProdNoLogEntity;
 import com.wisdri.tracking.infrastructure.service.postgres.product.RepeatProdNoMapper;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
@@ -9,77 +16,82 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+/** 验证逐次取号顺序和 MyBatis-Plus 实体读写。 */
 class RepeatProdNoRepositoryImplTest {
-    @Test
-    void allocateNextInsertsOneAfterLatestWithoutUpdatingPreviousRows() {
-        RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
-        RepeatProdNoRepositoryImpl repository = repository(mapper);
-        when(mapper.findLatest("CP1", "COIL-A")).thenReturn(2);
-        when(mapper.insert(anyLong(), eq("CP1"), eq("COIL-A"), eq(3))).thenReturn(3);
-
-        assertThat(repository.allocateNext("cp1", "COIL-A")).isEqualTo(3);
-        org.mockito.InOrder calls = inOrder(mapper);
-        calls.verify(mapper).lockCoil("CP1", "COIL-A");
-        calls.verify(mapper).findLatest("CP1", "COIL-A");
-        calls.verify(mapper).insert(anyLong(), eq("CP1"), eq("COIL-A"), eq(3));
-        verifyNoMoreInteractions(mapper);
+    @BeforeAll
+    static void initializeTableMetadata() {
+        MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
+        assistant.setCurrentNamespace(RepeatProdNoMapper.class.getName());
+        TableInfoHelper.initTableInfo(assistant, QmDcRepeatProdNoLogEntity.class);
     }
 
     @Test
-    void allocateNextStartsAtOneWhenNoHistoryExists() {
+    @SuppressWarnings("unchecked")
+    void allocatesAfterLatestWithoutUpdatingPreviousRows() {
         RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
         RepeatProdNoRepositoryImpl repository = repository(mapper);
-        when(mapper.insert(anyLong(), eq("CP1"), eq("COIL-A"), eq(1))).thenReturn(1);
+        QmDcRepeatProdNoLogEntity previous = record(2);
+        when(mapper.selectOne(any())).thenReturn(previous);
+        when(mapper.insert(any())).thenReturn(1);
 
-        assertThat(repository.allocateNext("CP1", "COIL-A")).isEqualTo(1);
-        verify(mapper).lockCoil("CP1", "COIL-A");
-        verify(mapper).findLatest("CP1", "COIL-A");
-        verify(mapper).insert(anyLong(), eq("CP1"), eq("COIL-A"), eq(1));
-        verifyNoMoreInteractions(mapper);
+        assertThat(repository.allocateNext("cp1", "COIL-A")).isEqualTo(3);
+
+        ArgumentCaptor<LambdaQueryWrapper<QmDcRepeatProdNoLogEntity>> query =
+                ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        ArgumentCaptor<QmDcRepeatProdNoLogEntity> inserted =
+                ArgumentCaptor.forClass(QmDcRepeatProdNoLogEntity.class);
+        org.mockito.InOrder calls = inOrder(mapper);
+        calls.verify(mapper).selectOne(query.capture());
+        calls.verify(mapper).insert(inserted.capture());
+        calls.verifyNoMoreInteractions();
+        assertThat(query.getValue().getSqlSegment().toLowerCase())
+                .contains("unit_code =", "in_mat_no =", "in_mat_repeat_prod_no desc", "limit 1");
+        assertThat(query.getValue().getParamNameValuePairs().values()).contains("CP1", "COIL-A");
+        assertThat(inserted.getValue().getUnitCode()).isEqualTo("CP1");
+        assertThat(inserted.getValue().getInMatNo()).isEqualTo("COIL-A");
+        assertThat(inserted.getValue().getInMatRepeatProdNo()).isEqualTo(3);
+        assertThat(inserted.getValue().getDeleted()).isZero();
+        assertThat(inserted.getValue().getCreateTime()).isNotNull();
+        assertThat(previous.getInMatRepeatProdNo()).isEqualTo(2);
     }
 
     @Test
     void consecutiveAllocationsAppendOneAndTwo() {
         RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
         RepeatProdNoRepositoryImpl repository = repository(mapper);
-        List<Integer> persisted = new ArrayList<>();
-        when(mapper.findLatest("CP1", "COIL-A"))
-                .thenAnswer(invocation -> persisted.isEmpty() ? null : persisted.get(persisted.size() - 1));
-        when(mapper.insert(anyLong(), eq("CP1"), eq("COIL-A"),
-                org.mockito.ArgumentMatchers.anyInt())).thenAnswer(invocation -> {
-                    Integer allocated = invocation.getArgument(3);
-                    persisted.add(allocated);
-                    return allocated;
-                });
+        List<QmDcRepeatProdNoLogEntity> persisted = new ArrayList<>();
+        when(mapper.selectOne(any())).thenAnswer(invocation ->
+                persisted.isEmpty() ? null : persisted.get(persisted.size() - 1));
+        when(mapper.insert(any())).thenAnswer(invocation -> {
+            persisted.add(invocation.getArgument(0));
+            return 1;
+        });
 
         assertThat(repository.allocateNext("CP1", "COIL-A")).isEqualTo(1);
         assertThat(repository.allocateNext("CP1", "COIL-A")).isEqualTo(2);
-        assertThat(persisted).containsExactly(1, 2);
-        verify(mapper, org.mockito.Mockito.times(2)).lockCoil("CP1", "COIL-A");
+        assertThat(persisted).extracting(QmDcRepeatProdNoLogEntity::getInMatRepeatProdNo)
+                .containsExactly(1, 2);
     }
 
     @Test
-    void findLatestDoesNotAllocateWhenRecordIsMissing() {
+    void findLatestOnlyReadsMaximum() {
         RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
         RepeatProdNoRepositoryImpl repository = repository(mapper);
-        when(mapper.findLatest("CP1", "COIL-UNKNOWN")).thenReturn(null);
+        when(mapper.selectOne(any())).thenReturn(record(4));
 
-        assertThat(repository.findLatest("cp1", "COIL-UNKNOWN")).isNull();
-        verify(mapper).findLatest("CP1", "COIL-UNKNOWN");
-        verifyNoMoreInteractions(mapper);
+        assertThat(repository.findLatest("cp1", "COIL-A")).isEqualTo(4);
+        verify(mapper).selectOne(any());
     }
 
     @Test
-    void rejectsBlankBusinessKeyBeforeAccessingDatabase() {
+    void rejectsBlankBusinessKeyBeforeQuerying() {
         RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
         RepeatProdNoRepositoryImpl repository = repository(mapper);
 
@@ -90,9 +102,25 @@ class RepeatProdNoRepositoryImplTest {
         verifyNoInteractions(mapper);
     }
 
+    @Test
+    void failsAllocationWhenInsertAffectsNoRow() {
+        RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
+        RepeatProdNoRepositoryImpl repository = repository(mapper);
+
+        assertThatThrownBy(() -> repository.allocateNext("CP1", "COIL-A"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("保存钢卷重复生产次数失败");
+    }
+
+    private QmDcRepeatProdNoLogEntity record(int repeatProdNo) {
+        QmDcRepeatProdNoLogEntity entity = new QmDcRepeatProdNoLogEntity();
+        entity.setInMatRepeatProdNo(repeatProdNo);
+        return entity;
+    }
+
     private RepeatProdNoRepositoryImpl repository(RepeatProdNoMapper mapper) {
         RepeatProdNoRepositoryImpl repository = new RepeatProdNoRepositoryImpl();
-        ReflectionTestUtils.setField(repository, "repeatProdNoMapper", mapper);
+        ReflectionTestUtils.setField(repository, "baseMapper", mapper);
         return repository;
     }
 }
