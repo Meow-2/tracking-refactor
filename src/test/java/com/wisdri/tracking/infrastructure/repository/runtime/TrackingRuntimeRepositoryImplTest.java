@@ -17,6 +17,7 @@ import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCoilCacheEntry;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepositoryDispatcher;
 import com.wisdri.tracking.infrastructure.service.feign.gateway.CubeApiGateway;
@@ -314,6 +315,8 @@ class TrackingRuntimeRepositoryImplTest {
                 .rollingDirection(false)
                 .rollingDirectReverse(true)
                 .passNo(2)
+                .coilCache(Collections.singletonMap("LINE-A", StatusCoilCacheEntry.builder()
+                        .repeatProdNo(3).colorNo("BLUE").build()))
                 .candidates(Collections.singletonMap("TR1", StatusCandidateRuntime.builder()
                         .deviceCode("TR1")
                         .coilNo("C001")
@@ -339,6 +342,8 @@ class TrackingRuntimeRepositoryImplTest {
         assertEquals(false, restored.getRollingDirection());
         assertEquals(true, restored.getRollingDirectReverse());
         assertEquals(2, restored.getPassNo());
+        assertEquals(Integer.valueOf(3), restored.getCoilCache().get("LINE-A").getRepeatProdNo());
+        assertEquals("BLUE", restored.getCoilCache().get("LINE-A").getColorNo());
         assertEquals(Arrays.asList(new BigDecimal("100"), new BigDecimal("95")),
                 restored.getCandidates().get("TR1").getLengths());
         assertEquals(new BigDecimal("95"),

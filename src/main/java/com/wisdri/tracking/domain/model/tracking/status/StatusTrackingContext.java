@@ -1,7 +1,9 @@
 package com.wisdri.tracking.domain.model.tracking.status;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCoilCacheEntry;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -53,6 +55,11 @@ public class StatusTrackingContext {
      */
     @Builder.Default
     private Map<DeviceSide, StatusCurrentRuntime> current = new LinkedHashMap<>();
+
+    /** 任务生产时固化的在产钢卷属性缓存；键为钢卷号，旧版消息可为空。 */
+    @Builder.Default
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    private Map<String, StatusCoilCacheEntry> coilCache = new LinkedHashMap<>();
 
     /**
      * 当前状态帧检测到的钢卷号变化结果。

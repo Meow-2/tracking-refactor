@@ -13,6 +13,7 @@ import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCoilCacheEntry;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
@@ -315,6 +316,11 @@ class ProcessTrackingAlgorithmImplTest {
         context.getCandidates().clear();
         List<ProcessResult> notMatched = algorithm.calculate(input(values("C001", new BigDecimal("12")), context));
         assertEquals(null, notMatched.get(0).getRepeatProdNo());
+
+        context.getCoilCache().put("C001", StatusCoilCacheEntry.builder()
+                .repeatProdNo(5).colorNo("BLUE").build());
+        List<ProcessResult> cached = algorithm.calculate(input(values("C001", new BigDecimal("12")), context));
+        assertEquals(Integer.valueOf(5), cached.get(0).getRepeatProdNo());
     }
 
     private ProcessTrackingConfig config() {

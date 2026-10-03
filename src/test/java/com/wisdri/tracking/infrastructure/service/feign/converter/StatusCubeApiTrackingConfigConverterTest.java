@@ -54,6 +54,20 @@ class StatusCubeApiTrackingConfigConverterTest {
     }
 
     @Test
+    void acceptsOptionalCachePointsAndRejectsUnnamedPoints() throws Exception {
+        assertThat(((StatusTrackingConfig) converter.convert("CP1", node(validConfig())))
+                .getTracking().getCachePoints()).isNull();
+        String empty = validConfig().replace("\"points\":[", "\"cache_points\":[],\"points\":[");
+        assertThat(((StatusTrackingConfig) converter.convert("CP1", node(empty)))
+                .getTracking().getCachePoints()).isEmpty();
+        String configured = validConfig().replace("\"points\":[",
+                "\"cache_points\":[{\"name\":\"line_coil\",\"type\":\"string\"}],\"points\":[");
+        assertThat(((StatusTrackingConfig) converter.convert("CP1", node(configured)))
+                .getTracking().getCachePoints()).extracting("name").containsExactly("line_coil");
+        assertInvalid(configured.replace("\"name\":\"line_coil\"", "\"name\":\" \""));
+    }
+
+    @Test
     void convertsConfiguredCurrentClearThresholdAndRejectsInvalidValues() throws Exception {
         String configured = validConfig().replace("\"min_length_change\":0.5",
                 "\"min_length_change\":0.5,\"current_clear_threshold\":3");

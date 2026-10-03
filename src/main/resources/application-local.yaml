@@ -27,9 +27,9 @@ rocketmq:
     endpoints: localhost:8081
 
 cube-api:
-  # zrm1 mock地址
-  # base-url: http://127.0.0.1:4523/m1/8137528-7895686-default
-   base-url: http://172.16.203.12:30800
+  # mock地址, 改 zrm 1 的配置（新的 mqtt 订阅，cell_code），改 cp \fcl\dcl 的 status 跟踪缓存点位配置
+  base-url: http://127.0.0.1:4523/m1/8137528-7895686-default
+  # base-url: http://172.16.203.12:30800
 
 time-series-storage:
   base-url: http://localhost:8886

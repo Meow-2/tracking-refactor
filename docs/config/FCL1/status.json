@@ -36,6 +36,12 @@
         ]
       }
     },
+    "cache_points": [
+      { "name": "group1_coil_no", "type": "string" },
+      { "name": "group2_coil_no", "type": "string" },
+      { "name": "group3_coil_no", "type": "string" },
+      { "name": "group4_coil_no", "type": "string" }
+    ],
     "points": [
       {
         "code": "por1",

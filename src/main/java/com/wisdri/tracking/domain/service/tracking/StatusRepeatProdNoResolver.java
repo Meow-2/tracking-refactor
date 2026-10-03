@@ -1,6 +1,7 @@
 package com.wisdri.tracking.domain.service.tracking;
 
 import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCoilCacheEntry;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.tracking.status.StatusTrackingContext;
 
@@ -30,6 +31,8 @@ public final class StatusRepeatProdNoResolver {
                 }
             }
         }
-        return null;
+        StatusCoilCacheEntry cached = context.getCoilCache() == null || coilNo == null
+                ? null : context.getCoilCache().get(coilNo);
+        return cached == null ? null : cached.getRepeatProdNo();
     }
 }

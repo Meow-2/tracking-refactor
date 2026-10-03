@@ -11,6 +11,7 @@ import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingSection;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCoilCacheEntry;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
@@ -32,10 +33,12 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -110,8 +113,13 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
 
         Instant generatedAt = Instant.now();
         List<StatusResult> results = new ArrayList<>();
+        Map<String, StatusCandidateRuntime> previousCandidates = previousRuntime == null
+                ? null : previousRuntime.getCandidates();
+        Map<String, Integer> allocatedPorRepeatProdNos = started
+                ? allocatePorRepeatProdNos(input, tracking, previousCandidates) : new LinkedHashMap<>();
         Map<String, StatusCandidateRuntime> candidates = started
-                ? updateCandidates(input, tracking, previousRuntime, rollingState, generatedAt, results)
+                ? updateCandidates(input, tracking, previousRuntime, rollingState,
+                        generatedAt, results, allocatedPorRepeatProdNos)
                 : new LinkedHashMap<>();
         Map<DeviceSide, SelectedCandidate> selected = started
                 ? selectCandidates(input, tracking, candidates, rollingState)
@@ -131,6 +139,8 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         Map<DeviceSide, StatusCurrentRuntime> current = current(input, selected, previousRuntime,
                 tracking.getCurrentClearThreshold(), !started || rollingState.isWindowReset()
                         || !validRollingSelection);
+        Map<String, StatusCoilCacheEntry> coilCache = updateCoilCache(input, tracking,
+                previousRuntime, candidates, current, allocatedPorRepeatProdNos);
         runtimeRepositoryDispatcher.saveRuntime(StatusTrackingRuntime.builder()
                 .unitCode(input.getUnitCode())
                 .trackingType(TrackingType.STATUS)
@@ -142,6 +152,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 .passNo(rollingState.getPassNo())
                 .candidates(candidates)
                 .current(current)
+                .coilCache(coilCache)
                 .build());
         trackingStepLogger.log(input, "计算完成", TrackingStepLogger.details(
                 "started", started,
@@ -160,11 +171,11 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             StatusTrackingRuntime previousRuntime,
             RollingState rollingState,
             Instant generatedAt,
-            List<StatusResult> results) {
+            List<StatusResult> results,
+            Map<String, Integer> porRepeatProdNos) {
         Map<String, StatusCandidateRuntime> previous = previousRuntime == null
                 ? null : previousRuntime.getCandidates();
         // 同一帧先为开卷设备分配次数，避免配置中的卷取设备先读到上一生产次数。
-        Map<String, Integer> porRepeatProdNos = allocatePorRepeatProdNos(input, tracking, previous);
         Map<String, StatusCandidateRuntime> updated = new LinkedHashMap<>();
         for (StatusPointGroup group : tracking.getPoints()) {
             DeviceSide side = actualSide(group, tracking, rollingState);
@@ -240,6 +251,123 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     "reason", dataComplete ? null : "当前帧卷号或剩余长度无效"));
         }
         return updated;
+    }
+
+    /**
+     * 仅在配置了产线卷号点位时保留离开设备的钢卷。新开卷取号优先于同帧其他设备值；
+     * 两帧卷号点位均完整且都确认钢卷消失后才清理，避免点位缺失或停线误删。
+     */
+    private Map<String, StatusCoilCacheEntry> updateCoilCache(
+            TrackingInput input,
+            StatusTrackingSection tracking,
+            StatusTrackingRuntime previousRuntime,
+            Map<String, StatusCandidateRuntime> candidates,
+            Map<DeviceSide, StatusCurrentRuntime> current,
+            Map<String, Integer> allocatedPorRepeatProdNos) {
+        Map<String, StatusCoilCacheEntry> cache = new LinkedHashMap<>();
+        if (tracking.getCachePoints() == null || tracking.getCachePoints().isEmpty()) {
+            return cache;
+        }
+        if (previousRuntime != null && previousRuntime.getCoilCache() != null) {
+            previousRuntime.getCoilCache().forEach((coilNo, entry) -> {
+                if (entry != null) {
+                    cache.put(coilNo, StatusCoilCacheEntry.builder()
+                            .repeatProdNo(entry.getRepeatProdNo())
+                            .colorNo(entry.getColorNo())
+                            .build());
+                }
+            });
+        }
+        for (StatusCandidateRuntime candidate : candidates.values()) {
+            if (candidate == null || candidate.getCoilNo() == null) {
+                continue;
+            }
+            StatusCoilCacheEntry cached = cache.get(candidate.getCoilNo());
+            Integer repeatProdNo = candidate.getRepeatProdNo();
+            if (cached == null || repeatProdNo != null && (cached.getRepeatProdNo() == null
+                    || repeatProdNo >= cached.getRepeatProdNo())) {
+                // 同卷号可能同时在多台设备；较旧次数不得覆盖新次数对应的颜色号。
+                cache.put(candidate.getCoilNo(), StatusCoilCacheEntry.builder()
+                        .repeatProdNo(repeatProdNo)
+                        .colorNo(candidate.getColorNo() == null && cached != null
+                                ? cached.getColorNo() : candidate.getColorNo())
+                        .build());
+            } else if (repeatProdNo == null && candidate.getColorNo() != null) {
+                cached.setColorNo(candidate.getColorNo());
+            }
+        }
+        // 开卷设备的新生产次数覆盖同帧其他设备可能持有的旧次数。
+        for (Map.Entry<String, Integer> allocation : allocatedPorRepeatProdNos.entrySet()) {
+            StatusCandidateRuntime candidate = candidates.get(allocation.getKey());
+            if (candidate == null || candidate.getCoilNo() == null) {
+                continue;
+            }
+            if (allocation.getValue() == null) {
+                // 取号失败只清除旧次数；本帧色号仍属于当前钢卷。
+                cache.put(candidate.getCoilNo(), StatusCoilCacheEntry.builder()
+                        .repeatProdNo(null)
+                        .colorNo(candidate.getColorNo())
+                        .build());
+            } else {
+                // 新生产周期以开卷机本帧的颜色号为准；缺色号时不沿用上一周期。
+                cache.put(candidate.getCoilNo(), StatusCoilCacheEntry.builder()
+                        .repeatProdNo(allocation.getValue())
+                        .colorNo(candidate.getColorNo())
+                        .build());
+            }
+        }
+
+        Set<String> latestCoils = snapshotCoils(input.getLatestSnapshot(), tracking);
+        Set<String> previousCoils = snapshotCoils(input.getPreviousSnapshot(), tracking);
+        if (latestCoils == null || previousCoils == null) {
+            return cache;
+        }
+        Set<String> protectedCoils = new LinkedHashSet<>();
+        for (StatusCandidateRuntime candidate : candidates.values()) {
+            if (candidate != null && candidate.getCoilNo() != null) {
+                protectedCoils.add(candidate.getCoilNo());
+            }
+        }
+        for (StatusCurrentRuntime side : current.values()) {
+            if (side != null && side.getCoilNo() != null) {
+                protectedCoils.add(side.getCoilNo());
+            }
+        }
+        cache.keySet().removeIf(coilNo -> !latestCoils.contains(coilNo)
+                && !previousCoils.contains(coilNo) && !protectedCoils.contains(coilNo));
+        return cache;
+    }
+
+    /**
+     * 读取一帧中全部设备及产线卷号；缺少任何配置点位时返回 null，显式空值仍是有效观测。
+     */
+    private Set<String> snapshotCoils(PointSnapshot snapshot, StatusTrackingSection tracking) {
+        if (snapshot == null || snapshot.getValues() == null) {
+            return null;
+        }
+        Set<String> coils = new LinkedHashSet<>();
+        for (StatusPointGroup group : tracking.getPoints()) {
+            if (!addSnapshotCoil(snapshot, pointPath(tracking, group.getCoilNo()), coils)) {
+                return null;
+            }
+        }
+        for (PointConfig point : tracking.getCachePoints()) {
+            if (!addSnapshotCoil(snapshot, pointPath(tracking, point), coils)) {
+                return null;
+            }
+        }
+        return coils;
+    }
+
+    private boolean addSnapshotCoil(PointSnapshot snapshot, String path, Set<String> coils) {
+        if (path == null || !snapshot.getValues().containsKey(path)) {
+            return false;
+        }
+        String coilNo = normalizeCoilNo(PointReader.stringValue(snapshot, path));
+        if (coilNo != null) {
+            coils.add(coilNo);
+        }
+        return true;
     }
 
     private CoilerMethodValue resolveCoilerMethod(PointSnapshot snapshot,
@@ -726,6 +854,8 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 || tracking.getMinLengthChange() == null || tracking.getMinLengthChange().signum() < 0
                 || tracking.getCurrentClearThreshold() == null || tracking.getCurrentClearThreshold() < 1
                 || tracking.getPoints() == null
+                || tracking.getCachePoints() != null && tracking.getCachePoints().stream()
+                .anyMatch(point -> point == null || blank(point.getName()))
                 || tracking.getRolling() != null
                 && (tracking.getRolling().getDirectPoint() == null
                 || blank(tracking.getRolling().getDirectPoint().getName())

@@ -86,6 +86,13 @@ public class StatusCubeApiTrackingConfigConverter extends AbstractCubeApiTrackin
                 throw new TrackingException("status.points 设备编码重复: " + group.getCode());
             }
         }
+        if (tracking.getCachePoints() != null) {
+            for (PointConfig point : tracking.getCachePoints()) {
+                if (invalidPoint(point)) {
+                    throw new TrackingException("status.cache_points 卷号点位配置无效");
+                }
+            }
+        }
         validatePositionSelection(tracking);
     }
 

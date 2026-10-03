@@ -6,6 +6,7 @@ import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCoilCacheEntry;
 import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
@@ -16,6 +17,7 @@ import com.wisdri.tracking.infrastructure.service.mqtt.MqttSubscriptionRegistry;
 import com.wisdri.tracking.infrastructure.dto.mqtt.TrackingSubscription;
 import com.wisdri.tracking.infrastructure.service.rocketmq.TrackingTaskProducer;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithmDispatcher;
+import com.wisdri.tracking.domain.service.tracking.StatusRepeatProdNoResolver;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -25,6 +27,7 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -53,9 +56,14 @@ class TrackingTaskProducerUseCaseTest {
         when(registry.find("baf1_batch_tracking_fb1"))
                 .thenReturn(Optional.of(new TrackingSubscription(config, "fb1")));
         when(runtimeRepository.findConfig("BAF1", TrackingType.BATCH)).thenReturn(Optional.of(config));
+        StatusTrackingRuntime sourceRuntime = statusRuntime();
+        Map<String, StatusCoilCacheEntry> cache = new HashMap<>();
+        cache.put("LINE-A", StatusCoilCacheEntry.builder()
+                .repeatProdNo(5).colorNo("BLUE").build());
+        sourceRuntime.setCoilCache(cache);
         when(runtimeRepository.findRuntimeAs(
                 "BAF1", TrackingType.STATUS, StatusTrackingRuntime.class))
-                .thenReturn(Optional.of(statusRuntime()));
+                .thenReturn(Optional.of(sourceRuntime));
         when(snapshotRepository.find("BAF1", TrackingType.BATCH, "fb1")).thenReturn(Optional.of(previous));
 
         TrackingTaskProducerUseCase useCase = new TrackingTaskProducerUseCase();
@@ -101,6 +109,11 @@ class TrackingTaskProducerUseCaseTest {
                 .isEqualTo("C001");
         assertThat(input.getStatusContext().getCurrent().get(DeviceSide.COILER).getRepeatProdNo())
                 .isEqualTo(4);
+        cache.get("LINE-A").setRepeatProdNo(6);
+        cache.get("LINE-A").setColorNo("RED");
+        assertThat(input.getStatusContext().getCoilCache().get("LINE-A").getRepeatProdNo()).isEqualTo(5);
+        assertThat(input.getStatusContext().getCoilCache().get("LINE-A").getColorNo()).isEqualTo("BLUE");
+        assertThat(StatusRepeatProdNoResolver.find(input.getStatusContext(), "LINE-A")).isEqualTo(5);
         verify(snapshotRepository).save("BAF1", TrackingType.BATCH, "fb1", input.getLatestSnapshot());
     }
 

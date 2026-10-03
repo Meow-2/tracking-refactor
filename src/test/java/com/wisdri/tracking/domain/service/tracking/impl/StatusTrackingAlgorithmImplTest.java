@@ -428,6 +428,85 @@ class StatusTrackingAlgorithmImplTest {
     }
 
     @Test
+    void cacheKeepsCoilOnLineAndClearsAfterTwoCompleteAbsentFrames() {
+        statusConfig.getTracking().setCachePoints(Arrays.asList(point("line_coil")));
+        Map<String, Object> onDevice = cacheFrame("COIL-A", null);
+        calculateWithPrevious(null, onDevice);
+        assertThat(runtime.get().getCoilCache().get("COIL-A").getRepeatProdNo()).isEqualTo(1);
+        assertThat(runtime.get().getCoilCache().get("COIL-A").getColorNo()).isEqualTo("U1-COLOR");
+
+        Map<String, Object> onLine = cacheFrame(null, "COIL-A");
+        calculateWithPrevious(onDevice, onLine);
+        assertThat(runtime.get().getCoilCache().get("COIL-A").getRepeatProdNo()).isEqualTo(1);
+        assertThat(runtime.get().getCoilCache().get("COIL-A").getColorNo()).isEqualTo("U1-COLOR");
+
+        Map<String, Object> firstAbsent = cacheFrame(null, null);
+        calculateWithPrevious(onLine, firstAbsent);
+        assertThat(runtime.get().getCoilCache().get("COIL-A").getRepeatProdNo()).isEqualTo(1);
+
+        Map<String, Object> secondAbsent = cacheFrame(null, null);
+        calculateWithPrevious(firstAbsent, secondAbsent);
+        assertThat(runtime.get().getCoilCache()).doesNotContainKey("COIL-A");
+    }
+
+    @Test
+    void cacheIgnoresMissingPointsAndDoesNotClearForStoppedLine() {
+        statusConfig.getTracking().setCachePoints(Arrays.asList(point("line_coil")));
+        Map<String, Object> onDevice = cacheFrame("COIL-A", null);
+        calculateWithPrevious(null, onDevice);
+
+        Map<String, Object> stoppedOnLine = cacheFrame(null, "COIL-A");
+        stoppedOnLine.put("/status/run", BigDecimal.ZERO);
+        calculateWithPrevious(onDevice, stoppedOnLine);
+        assertThat(runtime.get().getCoilCache().get("COIL-A").getColorNo()).isEqualTo("U1-COLOR");
+
+        Map<String, Object> missingPoint = cacheFrame(null, null);
+        missingPoint.remove("/status/line_coil");
+        calculateWithPrevious(stoppedOnLine, missingPoint);
+        Map<String, Object> absent = cacheFrame(null, null);
+        calculateWithPrevious(missingPoint, absent);
+        assertThat(runtime.get().getCoilCache().get("COIL-A").getRepeatProdNo()).isEqualTo(1);
+        calculateWithPrevious(absent, cacheFrame(null, null));
+        assertThat(runtime.get().getCoilCache()).doesNotContainKey("COIL-A");
+    }
+
+    @Test
+    void cacheUsesLatestPorAllocationAndClearsOnlyOldCountWhenAllocationFails() {
+        statusConfig.getTracking().setPoints(Arrays.asList(group("por1", DeviceSide.UNCOILER)));
+        statusConfig.getTracking().setCachePoints(Arrays.asList(point("line_coil")));
+        when(repeatProdNoRepository.allocateNext("CP1", "COIL-A"))
+                .thenReturn(1, 2)
+                .thenThrow(new IllegalStateException("pg unavailable"));
+
+        Map<String, Object> onDevice = values(true, "por1", "COIL-A", "100");
+        onDevice.put("/status/line_coil", null);
+        calculateWithPrevious(null, onDevice);
+        Map<String, Object> onLine = values(true, "por1", "", "0");
+        onLine.put("/status/line_coil", "COIL-A");
+        calculateWithPrevious(onDevice, onLine);
+        calculateWithPrevious(onLine, onDevice);
+        assertThat(runtime.get().getCoilCache().get("COIL-A").getRepeatProdNo()).isEqualTo(2);
+        assertThat(runtime.get().getCoilCache().get("COIL-A").getColorNo()).isEqualTo("por1-COLOR");
+
+        calculateWithPrevious(onDevice, onLine);
+        Map<String, Object> failedDevice = values(true, "por1", "COIL-A", "100");
+        failedDevice.put("/status/line_coil", null);
+        failedDevice.put("/status/por1_color", "NEW-COLOR");
+        calculateWithPrevious(onLine, failedDevice);
+        assertThat(runtime.get().getCoilCache().get("COIL-A").getRepeatProdNo()).isNull();
+        assertThat(runtime.get().getCoilCache().get("COIL-A").getColorNo()).isEqualTo("NEW-COLOR");
+    }
+
+    @Test
+    void nullAndEmptyCachePointsPreserveLegacyBehavior() {
+        algorithm.calculate(input(cacheFrame("COIL-A", null)));
+        assertThat(runtime.get().getCoilCache()).isEmpty();
+        statusConfig.getTracking().setCachePoints(Arrays.asList());
+        algorithm.calculate(input(cacheFrame("COIL-A", null)));
+        assertThat(runtime.get().getCoilCache()).isEmpty();
+    }
+
+    @Test
     void allocatesPorBeforeReadingOtherDevicesAndKeepsConfiguredResultOrder() {
         statusConfig.getTracking().setPoints(Arrays.asList(
                 group("tr1", DeviceSide.COILER), group("por1", DeviceSide.UNCOILER)));
@@ -804,6 +883,22 @@ class StatusTrackingAlgorithmImplTest {
                 .trackingType(TrackingType.STATUS)
                 .latestSnapshot(PointSnapshot.builder().values(values).receivedAt(Instant.now()).build())
                 .build();
+    }
+
+    private void calculateWithPrevious(Map<String, Object> previous, Map<String, Object> latest) {
+        TrackingInput input = input(latest);
+        if (previous != null) {
+            input.setPreviousSnapshot(PointSnapshot.builder().values(previous)
+                    .receivedAt(Instant.now()).build());
+        }
+        algorithm.calculate(input);
+    }
+
+    private Map<String, Object> cacheFrame(String deviceCoil, String lineCoil) {
+        Map<String, Object> frame = values(true, "U1", deviceCoil == null ? "" : deviceCoil, "100",
+                "U2", "", "0", "C1", "", "0");
+        frame.put("/status/line_coil", lineCoil);
+        return frame;
     }
 
     private StatusTrackingConfig config() {

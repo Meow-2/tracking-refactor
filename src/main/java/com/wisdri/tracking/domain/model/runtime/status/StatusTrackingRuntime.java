@@ -1,6 +1,7 @@
 package com.wisdri.tracking.domain.model.runtime.status;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
 import lombok.Data;
@@ -35,6 +36,12 @@ public class StatusTrackingRuntime extends TrackingRuntime {
     private Integer passNo;
     private Map<String, StatusCandidateRuntime> candidates = new LinkedHashMap<>();
     private Map<DeviceSide, StatusCurrentRuntime> current = new LinkedHashMap<>();
+
+    /**
+     * 本机组仍在设备或产线卷号点位上的钢卷属性；键为钢卷号，旧版运行态可为空。
+     */
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    private Map<String, StatusCoilCacheEntry> coilCache = new LinkedHashMap<>();
 
     /**
      * status 仅以点位帧接收时间标识状态时刻，不记录处理更新时间。

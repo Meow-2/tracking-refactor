@@ -1,6 +1,7 @@
 package com.wisdri.tracking.domain.model.config.status;
 
 import com.wisdri.tracking.domain.model.config.StartCondition;
+import com.wisdri.tracking.domain.model.config.PointConfig;
 import com.wisdri.tracking.domain.model.config.process.RollingConfig;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -37,4 +38,10 @@ public class StatusTrackingSection {
     private RollingConfig rolling;
     private CoilerMethodDefinitions coilerMethodDef;
     private List<StatusPointGroup> points;
+
+    /**
+     * 需延长生产次数缓存生命周期的产线卷号点位；按 pointPrefix 解析。
+     * null 或空列表表示不启用扩展缓存，设备卷号仍由 points 提供。
+     */
+    private List<PointConfig> cachePoints;
 }

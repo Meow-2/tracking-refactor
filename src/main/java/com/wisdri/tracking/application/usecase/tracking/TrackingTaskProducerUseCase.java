@@ -8,6 +8,7 @@ import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCoilCacheEntry;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
@@ -173,7 +174,24 @@ public class TrackingTaskProducerUseCase {
                 .passNo(runtime.getPassNo())
                 .candidates(copyCandidates(runtime.getCandidates()))
                 .current(copyCurrent(runtime.getCurrent()))
+                .coilCache(copyCoilCache(runtime.getCoilCache()))
                 .build();
+    }
+
+    /** 缓存条目也需复制，避免后续 status 更新颜色号影响已发送任务。 */
+    private Map<String, StatusCoilCacheEntry> copyCoilCache(Map<String, StatusCoilCacheEntry> source) {
+        Map<String, StatusCoilCacheEntry> copied = new LinkedHashMap<>();
+        if (source != null) {
+            source.forEach((coilNo, entry) -> {
+                if (entry != null) {
+                    copied.put(coilNo, StatusCoilCacheEntry.builder()
+                            .repeatProdNo(entry.getRepeatProdNo())
+                            .colorNo(entry.getColorNo())
+                            .build());
+                }
+            });
+        }
+        return copied;
     }
 
     private Map<String, StatusCandidateRuntime> copyCandidates(
