@@ -121,8 +121,11 @@ class StatusCubeApiTrackingConfigConverterTest {
     }
 
     @Test
-    void rejectsMissingConditionInvalidWindowAndDuplicateDevices() throws Exception {
-        assertInvalid(validConfig().replace("\"start_condition\"", "\"missing_condition\""));
+    void acceptsMissingObservationPointAndRejectsInvalidWindowAndDuplicateDevices() throws Exception {
+        String withoutObservation = validConfig().replace(
+                "\"start_condition\":{\"point\":{\"name\":\"run\"},\"threshold\":1},", "");
+        assertThat(((StatusTrackingConfig) converter.convert("CP1", node(withoutObservation)))
+                .getTracking().getStartCondition()).isNull();
         assertInvalid(validConfig().replace("\"sample_count\":3", "\"sample_count\":1"));
         assertInvalid(validConfig().replace("\"code\":\"C1\"", "\"code\":\"U1\""));
         assertInvalid(validConfig().replace("\"remaining_length\":{\"name\":\"c1_length\"}",

@@ -51,7 +51,7 @@ public class StatusCubeApiTrackingConfigConverter extends AbstractCubeApiTrackin
             throw new TrackingException("status.tracking 不能为空");
         }
         StartCondition condition = tracking.getStartCondition();
-        if (condition == null || invalidPoint(condition.getPoint()) || condition.getThreshold() == null) {
+        if (condition != null && invalidPoint(condition.getPoint())) {
             throw new TrackingException("status.start_condition 配置无效");
         }
         if (tracking.getSampleCount() == null || tracking.getSampleCount() < 2) {

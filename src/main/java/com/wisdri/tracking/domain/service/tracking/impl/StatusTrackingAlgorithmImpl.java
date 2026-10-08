@@ -1,7 +1,6 @@
 package com.wisdri.tracking.domain.service.tracking.impl;
 
 import com.wisdri.tracking.domain.model.config.PointConfig;
-import com.wisdri.tracking.domain.model.config.StartCondition;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.config.status.DevicePosition;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodConfig;
@@ -105,27 +104,24 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     "reason", !rollingInputsValid ? "道次或方向无效" : "该方向缺少开卷或卷取设备配置"));
         }
         BigDecimal startValue = startConditionValue(input.getLatestSnapshot(), tracking);
-        boolean started = started(startValue, tracking.getStartCondition());
-        trackingStepLogger.log(input, "启动条件检查", TrackingStepLogger.details(
+        // 状态跟踪每帧运行；速度点仅用于观察，零附近的负值不能重置钢卷身份和长度窗口。
+        trackingStepLogger.log(input, "启动点位观察", TrackingStepLogger.details(
                 "actual", startValue,
-                "threshold", tracking.getStartCondition().getThreshold(),
-                "passed", started));
+                "threshold", tracking.getStartCondition() == null
+                        ? null : tracking.getStartCondition().getThreshold()));
 
         Instant generatedAt = Instant.now();
         List<StatusResult> results = new ArrayList<>();
         Map<String, StatusCandidateRuntime> previousCandidates = previousRuntime == null
                 ? null : previousRuntime.getCandidates();
-        Map<String, Integer> allocatedPorRepeatProdNos = started
-                ? allocatePorRepeatProdNos(input, tracking, previousCandidates) : new LinkedHashMap<>();
-        Map<String, StatusCandidateRuntime> candidates = started
-                ? updateCandidates(input, tracking, previousRuntime, rollingState,
-                        generatedAt, results, allocatedPorRepeatProdNos)
-                : new LinkedHashMap<>();
-        Map<DeviceSide, SelectedCandidate> selected = started
-                ? selectCandidates(input, tracking, candidates, rollingState)
-                : new LinkedHashMap<>();
+        Map<String, Integer> allocatedPorRepeatProdNos =
+                allocatePorRepeatProdNos(input, tracking, previousCandidates);
+        Map<String, StatusCandidateRuntime> candidates = updateCandidates(input, tracking,
+                previousRuntime, rollingState, generatedAt, results, allocatedPorRepeatProdNos);
+        Map<DeviceSide, SelectedCandidate> selected =
+                selectCandidates(input, tracking, candidates, rollingState);
         // 配置存在但尚未形成有效长度趋势时，分别记录哪一侧未选中，便于区分配置缺失。
-        if (positionMode && started && validRollingSelection) {
+        if (positionMode && validRollingSelection) {
             for (DeviceSide side : RESULT_ORDER) {
                 if (!selected.containsKey(side)) {
                     trackingStepLogger.log(input, "轧制设备未选中", side.getCode(),
@@ -137,8 +133,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             }
         }
         Map<DeviceSide, StatusCurrentRuntime> current = current(input, selected, previousRuntime,
-                tracking.getCurrentClearThreshold(), !started || rollingState.isWindowReset()
-                        || !validRollingSelection);
+                tracking.getCurrentClearThreshold(), rollingState.isWindowReset() || !validRollingSelection);
         Map<String, StatusCoilCacheEntry> coilCache = updateCoilCache(input, tracking,
                 previousRuntime, candidates, current, allocatedPorRepeatProdNos);
         runtimeRepositoryDispatcher.saveRuntime(StatusTrackingRuntime.builder()
@@ -155,7 +150,6 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 .coilCache(coilCache)
                 .build());
         trackingStepLogger.log(input, "计算完成", TrackingStepLogger.details(
-                "started", started,
                 "rollingDirection", rollingState.getDirection(),
                 "passNo", rollingState.getPassNo(),
                 "uncoiler", current.get(DeviceSide.UNCOILER),
@@ -768,6 +762,9 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
     }
 
     private BigDecimal startConditionValue(PointSnapshot snapshot, StatusTrackingSection tracking) {
+        if (tracking.getStartCondition() == null || tracking.getStartCondition().getPoint() == null) {
+            return null;
+        }
         try {
             return PointReader.decimalValue(snapshot,
                     pointPath(tracking, tracking.getStartCondition().getPoint()));
@@ -787,11 +784,6 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
     private Integer integerValue(PointSnapshot snapshot, String path) {
         BigDecimal value = decimalValue(snapshot, path);
         return value == null ? null : value.intValue();
-    }
-
-    private boolean started(BigDecimal actual, StartCondition condition) {
-        return actual != null && condition != null && condition.getThreshold() != null
-                && actual.compareTo(condition.getThreshold()) >= 0;
     }
 
     private String pointPath(StatusTrackingSection tracking, PointConfig point) {
@@ -856,9 +848,8 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
     }
 
     private void validateConfig(StatusTrackingSection tracking) {
-        if (tracking == null || tracking.getStartCondition() == null
-                || tracking.getStartCondition().getPoint() == null
-                || tracking.getStartCondition().getThreshold() == null
+        if (tracking == null || tracking.getStartCondition() != null
+                && tracking.getStartCondition().getPoint() == null
                 || tracking.getSampleCount() == null || tracking.getSampleCount() < 2
                 || tracking.getMinLengthChange() == null || tracking.getMinLengthChange().signum() < 0
                 || tracking.getCurrentClearThreshold() == null || tracking.getCurrentClearThreshold() < 1

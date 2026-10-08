@@ -20,6 +20,7 @@ import java.util.List;
 @AllArgsConstructor
 public class StatusTrackingSection {
     private String pointPrefix;
+    /** 可选的启动点位观测配置；status 每帧运行，threshold 不再控制候选清空。 */
     private StartCondition startCondition;
     private Integer sampleCount;
     private BigDecimal minLengthChange;

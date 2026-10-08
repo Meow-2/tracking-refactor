@@ -375,6 +375,16 @@ class StatusTrackingAlgorithmImplTest {
     }
 
     @Test
+    void runsWithoutStartConditionConfiguration() {
+        statusConfig.getTracking().setStartCondition(null);
+
+        calculate(true, "U1", "COIL-U1", "100", "U2", "", "0", "C1", "COIL-C1", "10");
+
+        assertThat(runtime.get().getStartConditionPointValue()).isNull();
+        assertThat(runtime.get().getCandidates().get("U1").getCoilNo()).isEqualTo("COIL-U1");
+    }
+
+    @Test
     void clearsCandidateOnlyAfterMissingCountExceedsThreshold() {
         statusConfig.getTracking().setPoints(Arrays.asList(group("por1", DeviceSide.UNCOILER)));
         statusConfig.getTracking().setCurrentClearThreshold(3);
@@ -456,20 +466,46 @@ class StatusTrackingAlgorithmImplTest {
     }
 
     @Test
-    void stoppedLineClearsHistoryAndReturnsTwoEmptyStates() {
+    void zeroSpeedContinuesCandidateWindows() {
         calculate(true, "U1", "COIL-U1", "100", "U2", "COIL-U2", "200", "C1", "COIL-C1", "10");
 
         Map<DeviceSide, StatusCurrentRuntime> current = calculate(false, "U1", "COIL-U1", "90", "U2", "COIL-U2", "190",
                 "C1", "COIL-C1", "20");
 
-        assertEmptySides(current);
+        assertThat(current.values()).allMatch(item -> Boolean.FALSE.equals(item.getRunning()));
         assertThat(runtime.get().getStartConditionPointValue()).isEqualByComparingTo("0");
-        assertThat(runtime.get().getCandidates()).isEmpty();
-        assertThat(runtime.get().getCurrent().values())
-                .allMatch(item -> Boolean.FALSE.equals(item.getRunning())
-                        && item.getNullCount() == 1
-                        && item.getCoilNo() == null && item.getRemainingLength() == null
-                        && item.getMaxLength() == null);
+        assertThat(runtime.get().getCandidates().get("U1").getLengths())
+                .containsExactly(new BigDecimal("100"), new BigDecimal("90"));
+        assertThat(runtime.get().getCandidates().get("U1").getMaxLength())
+                .isEqualByComparingTo("100");
+    }
+
+    @Test
+    void negativeAndMissingSpeedDoNotReallocateSamePorCoil() {
+        statusConfig.getTracking().setPoints(Arrays.asList(
+                group("por2", DeviceSide.UNCOILER), group("tr1", DeviceSide.COILER)));
+        statusConfig.getTracking().setMinLengthChange(new BigDecimal("0.01"));
+        when(repeatProdNoRepository.allocateNext("CP1", "COIL-A")).thenReturn(1, 2);
+
+        Map<String, Object> first = values(true, "por2", "COIL-A", "140", "tr1", "COIL-A", "680");
+        calculateWithPrevious(null, first);
+        Map<String, Object> negative = values(true, "por2", "COIL-A", "139", "tr1", "COIL-A", "681");
+        negative.put("/status/run", new BigDecimal("-0.01011"));
+        calculateWithPrevious(first, negative);
+        Map<String, Object> zero = values(false, "por2", "COIL-A", "138", "tr1", "COIL-A", "682");
+        calculateWithPrevious(negative, zero);
+        Map<String, Object> missing = values(true, "por2", "COIL-A", "137", "tr1", "COIL-A", "683");
+        missing.remove("/status/run");
+        calculateWithPrevious(zero, missing);
+
+        StatusCandidateRuntime candidate = runtime.get().getCandidates().get("por2");
+        assertThat(candidate.getRepeatProdNo()).isEqualTo(1);
+        assertThat(candidate.getMaxLength()).isEqualByComparingTo("140");
+        assertThat(candidate.getLengths()).containsExactly(
+                new BigDecimal("139"), new BigDecimal("138"), new BigDecimal("137"));
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getRepeatProdNo()).isEqualTo(1);
+        assertThat(runtime.get().getStartConditionPointValue()).isNull();
+        verify(repeatProdNoRepository, times(1)).allocateNext("CP1", "COIL-A");
     }
 
     @Test
