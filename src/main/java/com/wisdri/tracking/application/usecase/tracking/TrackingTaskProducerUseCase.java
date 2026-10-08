@@ -208,6 +208,7 @@ public class TrackingTaskProducerUseCase {
                         .deviceCode(candidate.getDeviceCode() == null ? code : candidate.getDeviceCode())
                         .deviceName(candidate.getDeviceName())
                         .dataComplete(candidate.getDataComplete())
+                        .nullCount(candidate.getNullCount())
                         .coilNo(candidate.getCoilNo())
                         .repeatProdNo(candidate.getRepeatProdNo())
                         .colorNo(candidate.getColorNo())

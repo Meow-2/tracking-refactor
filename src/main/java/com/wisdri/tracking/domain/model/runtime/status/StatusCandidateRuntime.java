@@ -35,6 +35,12 @@ public class StatusCandidateRuntime {
      */
     private Boolean dataComplete;
 
+    /**
+     * 设备卷号连续缺失计数；有效卷号为 1，空候选也逐帧递增，超过
+     * current_clear_threshold 后回到 1 并清除候选身份。旧版运行态为空时按 1 处理。
+     */
+    private Integer nullCount;
+
     private String coilNo;
     /**
      * 当前钢卷重复生产次数。

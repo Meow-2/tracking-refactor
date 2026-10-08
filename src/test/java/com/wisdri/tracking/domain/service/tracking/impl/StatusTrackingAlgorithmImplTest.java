@@ -330,7 +330,129 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(candidate.getRepeatProdNo()).isNull();
         assertThat(candidate.getLengths()).isEmpty();
         assertThat(candidate.getMaxLength()).isNull();
+        assertThat(candidate.getNullCount()).isEqualTo(1);
         assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("U2");
+    }
+
+    @Test
+    void rollingFirstPassKeepsPorCountAndLengthBaselineAcrossOneMissingCoilFrame() {
+        enablePositionMode();
+        statusConfig.getTracking().setSampleCount(4);
+        statusConfig.getTracking().setMinLengthChange(new BigDecimal("0.01"));
+        statusConfig.getTracking().setCurrentClearThreshold(10);
+        when(repeatProdNoRepository.allocateNext("CP1", "COIL-A")).thenReturn(1, 2);
+
+        for (int index = 0; index < 4; index++) {
+            algorithm.calculate(rollingInput(false, 1,
+                    "por1", "COIL-A", String.valueOf(1000 - index),
+                    "tr1", "", "0", "tr2", "COIL-A", String.valueOf(10 + index)));
+        }
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getMaxLength())
+                .isEqualByComparingTo("1000");
+
+        algorithm.calculate(rollingInput(false, 1,
+                "por1", "", "996", "tr1", "", "0", "tr2", "COIL-A", "14"));
+        StatusCandidateRuntime missing = runtime.get().getCandidates().get("por1");
+        assertThat(missing.getDataComplete()).isFalse();
+        assertThat(missing.getNullCount()).isEqualTo(2);
+        assertThat(missing.getCoilNo()).isEqualTo("COIL-A");
+        assertThat(missing.getRepeatProdNo()).isEqualTo(1);
+        assertThat(missing.getMaxLength()).isEqualByComparingTo("1000");
+        assertThat(missing.getLengths()).containsExactly(
+                new BigDecimal("1000"), new BigDecimal("999"),
+                new BigDecimal("998"), new BigDecimal("997"));
+        assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getNullCount()).isEqualTo(2);
+
+        algorithm.calculate(rollingInput(false, 1,
+                "por1", "COIL-A", "995", "tr1", "", "0", "tr2", "COIL-A", "15"));
+        StatusCurrentRuntime recovered = runtime.get().getCurrent().get(DeviceSide.UNCOILER);
+        assertThat(recovered.getNullCount()).isEqualTo(1);
+        assertThat(recovered.getRepeatProdNo()).isEqualTo(1);
+        assertThat(recovered.getMaxLength()).isEqualByComparingTo("1000");
+        assertThat(recovered.getMaxLength().subtract(recovered.getRemainingLength()))
+                .isEqualByComparingTo("5");
+        verify(repeatProdNoRepository, times(1)).allocateNext("CP1", "COIL-A");
+    }
+
+    @Test
+    void clearsCandidateOnlyAfterMissingCountExceedsThreshold() {
+        statusConfig.getTracking().setPoints(Arrays.asList(group("por1", DeviceSide.UNCOILER)));
+        statusConfig.getTracking().setCurrentClearThreshold(3);
+        when(repeatProdNoRepository.allocateNext("CP1", "COIL-A")).thenReturn(1, 2);
+        algorithm.calculate(input(values(true, "por1", "COIL-A", "100")));
+        // 模拟旧版 Redis 运行态：候选缺少 nullCount 时，首次缺值仍从 2 计数。
+        runtime.get().getCandidates().get("por1").setNullCount(null);
+
+        for (int expectedCount = 2; expectedCount <= 3; expectedCount++) {
+            algorithm.calculate(input(values(true, "por1", "", "90")));
+            StatusCandidateRuntime retained = runtime.get().getCandidates().get("por1");
+            assertThat(retained.getNullCount()).isEqualTo(expectedCount);
+            assertThat(retained.getCoilNo()).isEqualTo("COIL-A");
+            assertThat(retained.getMaxLength()).isEqualByComparingTo("100");
+        }
+        algorithm.calculate(input(values(true, "por1", "", "90")));
+        StatusCandidateRuntime cleared = runtime.get().getCandidates().get("por1");
+        assertThat(cleared.getNullCount()).isEqualTo(1);
+        assertThat(cleared.getCoilNo()).isNull();
+        assertThat(cleared.getLengths()).isEmpty();
+        assertThat(cleared.getMaxLength()).isNull();
+
+        algorithm.calculate(input(values(true, "por1", "COIL-A", "80")));
+        assertThat(runtime.get().getCandidates().get("por1").getRepeatProdNo()).isEqualTo(2);
+        verify(repeatProdNoRepository, times(2)).allocateNext("CP1", "COIL-A");
+    }
+
+    @Test
+    void emptyCandidateCountsMissingFramesLikeEmptyCurrent() {
+        statusConfig.getTracking().setPoints(Arrays.asList(group("por1", DeviceSide.UNCOILER)));
+        statusConfig.getTracking().setCurrentClearThreshold(3);
+
+        for (int expectedCount : Arrays.asList(1, 2, 3, 1, 2)) {
+            algorithm.calculate(input(values(true, "por1", "", "0")));
+            StatusCandidateRuntime candidate = runtime.get().getCandidates().get("por1");
+            StatusCurrentRuntime current = runtime.get().getCurrent().get(DeviceSide.UNCOILER);
+            assertThat(candidate.getNullCount()).isEqualTo(expectedCount);
+            assertThat(current.getNullCount()).isEqualTo(expectedCount);
+            assertThat(candidate.getCoilNo()).isNull();
+            assertThat(candidate.getLengths()).isEmpty();
+        }
+    }
+
+    @Test
+    void differentCoilDuringRetentionStartsNewCandidateImmediately() {
+        statusConfig.getTracking().setPoints(Arrays.asList(group("por1", DeviceSide.UNCOILER)));
+        statusConfig.getTracking().setCurrentClearThreshold(3);
+        when(repeatProdNoRepository.allocateNext("CP1", "COIL-A")).thenReturn(1);
+        when(repeatProdNoRepository.allocateNext("CP1", "COIL-B")).thenReturn(2);
+        algorithm.calculate(input(values(true, "por1", "COIL-A", "100")));
+        algorithm.calculate(input(values(true, "por1", "", "95")));
+
+        algorithm.calculate(input(values(true, "por1", "COIL-B", "80")));
+        StatusCandidateRuntime candidate = runtime.get().getCandidates().get("por1");
+        assertThat(candidate.getNullCount()).isEqualTo(1);
+        assertThat(candidate.getCoilNo()).isEqualTo("COIL-B");
+        assertThat(candidate.getRepeatProdNo()).isEqualTo(2);
+        assertThat(candidate.getMaxLength()).isEqualByComparingTo("80");
+        assertThat(candidate.getLengths()).containsExactly(new BigDecimal("80"));
+        verify(repeatProdNoRepository, times(1)).allocateNext("CP1", "COIL-B");
+    }
+
+    @Test
+    void missingLengthKeepsCoilIdentityWithoutAdvancingMissingCount() {
+        statusConfig.getTracking().setPoints(Arrays.asList(group("por1", DeviceSide.UNCOILER)));
+        statusConfig.getTracking().setCurrentClearThreshold(3);
+        algorithm.calculate(input(values(true, "por1", "COIL-A", "100")));
+        algorithm.calculate(input(values(true, "por1", "COIL-A", "bad")));
+
+        StatusCandidateRuntime candidate = runtime.get().getCandidates().get("por1");
+        assertThat(candidate.getDataComplete()).isFalse();
+        assertThat(candidate.getNullCount()).isEqualTo(1);
+        assertThat(candidate.getCoilNo()).isEqualTo("COIL-A");
+        assertThat(candidate.getLengths()).containsExactly(new BigDecimal("100"));
+        algorithm.calculate(input(values(true, "por1", "COIL-A", "95")));
+        assertThat(runtime.get().getCandidates().get("por1").getMaxLength())
+                .isEqualByComparingTo("100");
+        verify(repeatProdNoRepository, times(1)).allocateNext("CP1", "COIL-A");
     }
 
     @Test
@@ -737,6 +859,50 @@ class StatusTrackingAlgorithmImplTest {
                 "por1", "COIL-A", "80", "tr1", "COIL-A", "5", "tr2", "COIL-A", "25"));
         assertThat(runtime.get().getCurrent().get(DeviceSide.UNCOILER).getDeviceCode()).isEqualTo("tr1");
         assertThat(runtime.get().getCurrent().get(DeviceSide.COILER).getDeviceCode()).isEqualTo("tr2");
+    }
+
+    @Test
+    void passChangeDuringMissingCoilRetainsIdentityButResetsLengthWindow() {
+        enablePositionMode();
+        statusConfig.getTracking().setCurrentClearThreshold(10);
+        statusConfig.getTracking().setMinLengthChange(new BigDecimal("0.01"));
+        algorithm.calculate(rollingInput(false, 1,
+                "por1", "COIL-A", "1000", "tr1", "", "0", "tr2", "COIL-A", "100"));
+        algorithm.calculate(rollingInput(false, 1,
+                "por1", "COIL-A", "900", "tr1", "", "0", "tr2", "COIL-A", "200"));
+        algorithm.calculate(rollingInput(false, 1,
+                "por1", "COIL-A", "800", "tr1", "", "0", "tr2", "COIL-A", "300"));
+        assertThat(runtime.get().getCandidates().get("tr2").getMaxLength())
+                .isEqualByComparingTo("300");
+
+        algorithm.calculate(rollingInput(true, 2,
+                "por1", "COIL-A", "700", "tr1", "COIL-A", "5", "tr2", "", "30"));
+        StatusCandidateRuntime missing = runtime.get().getCandidates().get("tr2");
+        assertThat(missing.getCoilNo()).isEqualTo("COIL-A");
+        assertThat(missing.getRepeatProdNo()).isEqualTo(1);
+        assertThat(missing.getNullCount()).isEqualTo(2);
+        assertThat(missing.getMaxLength()).isNull();
+        assertThat(missing.getLengths()).isEmpty();
+        assertEmptySides(runtime.get().getCurrent());
+
+        algorithm.calculate(rollingInput(true, 2,
+                "por1", "COIL-A", "700", "tr1", "COIL-A", "15", "tr2", "COIL-A", "30"));
+        StatusCandidateRuntime recovered = runtime.get().getCandidates().get("tr2");
+        assertThat(recovered.getNullCount()).isEqualTo(1);
+        assertThat(recovered.getRepeatProdNo()).isEqualTo(1);
+        assertThat(recovered.getMaxLength()).isEqualByComparingTo("30");
+        assertThat(recovered.getLengths()).containsExactly(new BigDecimal("30"));
+        algorithm.calculate(rollingInput(true, 2,
+                "por1", "COIL-A", "700", "tr1", "COIL-A", "25", "tr2", "COIL-A", "20"));
+        algorithm.calculate(rollingInput(true, 2,
+                "por1", "COIL-A", "700", "tr1", "COIL-A", "35", "tr2", "COIL-A", "10"));
+        StatusCurrentRuntime uncoiler = runtime.get().getCurrent().get(DeviceSide.UNCOILER);
+        assertThat(uncoiler.getDeviceCode()).isEqualTo("tr2");
+        assertThat(uncoiler.getRepeatProdNo()).isEqualTo(1);
+        assertThat(uncoiler.getMaxLength().subtract(uncoiler.getRemainingLength()))
+                .isEqualByComparingTo("20");
+        assertThat(runtime.get().getPassNo()).isEqualTo(2);
+        verify(repeatProdNoRepository, times(1)).allocateNext("CP1", "COIL-A");
     }
 
     @Test

@@ -216,6 +216,7 @@ class TrackingRuntimeRepositoryImplTest {
         StatusCandidateRuntime candidate = StatusCandidateRuntime.builder()
                 .deviceCode("U1")
                 .deviceName("1#开卷机")
+                .nullCount(2)
                 .coilNo("C001")
                 .repeatProdNo(2)
                 .coilerMethod("11")
@@ -258,6 +259,7 @@ class TrackingRuntimeRepositoryImplTest {
         ).orElseThrow(AssertionError::new);
         assertEquals("U1", cached.getCandidates().get("U1").getDeviceCode());
         assertEquals("1#开卷机", cached.getCandidates().get("U1").getDeviceName());
+        assertEquals(2, cached.getCandidates().get("U1").getNullCount());
         assertEquals("C001", cached.getCandidates().get("U1").getCoilNo());
         assertEquals(2, cached.getCandidates().get("U1").getRepeatProdNo());
         assertEquals("11", cached.getCandidates().get("U1").getCoilerMethod());

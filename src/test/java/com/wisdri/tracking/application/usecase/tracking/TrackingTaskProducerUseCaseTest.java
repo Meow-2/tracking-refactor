@@ -88,6 +88,7 @@ class TrackingTaskProducerUseCaseTest {
         assertThat(input.getStatusContext().getRollingDirectReverse()).isFalse();
         assertThat(input.getStatusContext().getCandidates().get("U1").getDeviceCode()).isEqualTo("U1");
         assertThat(input.getStatusContext().getCandidates().get("U1").getDeviceName()).isEqualTo("1#开卷机");
+        assertThat(input.getStatusContext().getCandidates().get("U1").getNullCount()).isEqualTo(2);
         assertThat(input.getStatusContext().getCandidates().get("U1").getColorNo()).isEqualTo("12");
         assertThat(input.getStatusContext().getCandidates().get("U1").getRepeatProdNo()).isEqualTo(3);
         assertThat(input.getStatusContext().getCandidates().get("U1").getCoilerMethod()).isEqualTo("11");
@@ -238,6 +239,7 @@ class TrackingTaskProducerUseCaseTest {
                 .candidates(Collections.singletonMap("U1", StatusCandidateRuntime.builder()
                         .deviceCode("U1")
                         .deviceName("1#开卷机")
+                        .nullCount(2)
                         .coilNo("U001")
                         .repeatProdNo(3)
                         .colorNo("12")

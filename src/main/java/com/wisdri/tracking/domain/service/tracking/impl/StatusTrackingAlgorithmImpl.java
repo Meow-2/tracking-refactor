@@ -189,8 +189,14 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             boolean coilNoValid = coilNo != null && !coilNo.isEmpty();
             boolean dataComplete = coilNoValid && length != null;
             boolean sameCoil = coilNoValid && old != null && coilNo.equals(old.getCoilNo());
+            int missingCount = coilNoValid || old == null ? 1 : nextNullCount(old.getNullCount());
+            int nullCount = missingCount > tracking.getCurrentClearThreshold() ? 1 : missingCount;
+            // 候选身份的保留期与 current 一致；缺失帧不可参与趋势判断或追加匿名长度。
+            boolean retainedIdentity = !coilNoValid && old != null && !blank(old.getCoilNo())
+                    && missingCount <= tracking.getCurrentClearThreshold();
+            String candidateCoilNo = retainedIdentity ? old.getCoilNo() : coilNo;
             Integer repeatProdNo = !coilNoValid
-                    ? null
+                    ? retainedIdentity ? old.getRepeatProdNo() : null
                     : sameCoil ? old.getRepeatProdNo()
                     : porDevice(group) ? porRepeatProdNos.get(group.getCode())
                     : queryRepeatProdNo(input, group, coilNo, false);
@@ -201,7 +207,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     : resolveCoilerMethod(input.getLatestSnapshot(), tracking, group, side);
             List<BigDecimal> lengths = new ArrayList<>();
             BigDecimal maxLength = null;
-            if (sameCoil && !rollingState.isWindowReset()) {
+            if ((sameCoil || retainedIdentity) && !rollingState.isWindowReset()) {
                 if (old.getLengths() != null) {
                     lengths.addAll(old.getLengths());
                 }
@@ -219,9 +225,10 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     .deviceCode(group.getCode())
                     .deviceName(group.getName())
                     .dataComplete(dataComplete)
-                    .coilNo(coilNo)
+                    .nullCount(nullCount)
+                    .coilNo(candidateCoilNo)
                     .repeatProdNo(repeatProdNo)
-                    .colorNo(colorNo)
+                    .colorNo(retainedIdentity ? old.getColorNo() : colorNo)
                     .coilerMethod(coilerMethod == null ? null : coilerMethod.getCode())
                     .coilerMethodName(coilerMethod == null ? null : coilerMethod.getName())
                     .maxLength(maxLength)
@@ -240,9 +247,11 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                     "configuredSide", group.getSide(),
                     "actualSide", side,
                     "passNo", rollingState.getPassNo(),
-                    "coilNo", coilNo,
+                    "observedCoilNo", coilNo,
+                    "coilNo", candidateCoilNo,
                     "repeatProdNo", repeatProdNo,
-                    "colorNo", colorNo,
+                    "nullCount", nullCount,
+                    "colorNo", candidate.getColorNo(),
                     "coilerMethod", candidate.getCoilerMethod(),
                     "coilerMethodName", candidate.getCoilerMethodName(),
                     "maxLength", maxLength,
