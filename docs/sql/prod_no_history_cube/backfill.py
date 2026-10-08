@@ -162,32 +162,66 @@ def infer_events(device_runs, merge_seconds):
 
 
 def scan(connection, unit, start, end, days, minimum_samples, minimum_seconds, merge_seconds):
-    """按 Cube 原始采样重建事件；发现同卷抖动或跨设备重叠时列出异常。"""
+    """在 TDengine 聚合卷号段与采样会话，再重建上卷事件。"""
+    print(f"[{unit}] 正在校验 Cube 表和字段", file=sys.stderr, flush=True)
     fields = point_fields(unit)
     validate_source(connection, unit, fields)
     raw_runs = {device: [] for device in fields}
+    valid_segments = {device: [] for device in fields}
+    sessions = {device: [] for device in fields}
     anomalies = []
     table = identifier(TABLES[unit])
-    columns = ", ".join(identifier(field) for field in fields.values())
     for left, right in windows(start, end, days):
-        sql = (f"SELECT CAST(ts AS BIGINT), {columns} FROM cube.{table} "
-               f"WHERE ts >= {epoch_ms(left)} AND ts < {epoch_ms(right)} ORDER BY ts")
-        for row in query(connection, sql):
-            instant = local_time(row[0])
-            for device, raw_coil in zip(fields, row[1:]):
+        print(f"[{unit}] 开始查询 {left} 至 {right}（上海时间）", file=sys.stderr, flush=True)
+        segment_count = 0
+        for device, field_name in fields.items():
+            field = identifier(field_name)
+            bounds = (f"ts >= {epoch_ms(left)} AND ts < {epoch_ms(right)} "
+                      f"AND {field} IS NOT NULL")
+            # 服务端按原始卷号连续状态聚合，仍保留短暂占位值段供后续识别抖动。
+            state_sql = (
+                "SELECT CAST(_wstart AS BIGINT), CAST(_wend AS BIGINT), "
+                f"COUNT(*), FIRST({field}) FROM cube.{table} WHERE {bounds} "
+                f"STATE_WINDOW({field}) ORDER BY _wstart"
+            )
+            for first_ms, last_ms, count, raw_coil in query(connection, state_sql):
+                segment_count += 1
                 coil = normalize_coil(raw_coil)
                 if coil is None:
                     continue
+                first, last = local_time(first_ms), local_time(last_ms)
+                valid_segments[device].append((first, last, coil))
                 runs = raw_runs[device]
-                if runs and (instant - runs[-1][2]).total_seconds() > 3600:
-                    # 停采超过一小时无法确认期间是否发生了卸卷和再次上卷。
-                    anomalies.append((runs[-1][0], "sample_gap", f"{device} {runs[-1][2]} -> {instant}"))
-                    anomalies.append((coil, "sample_gap", f"{device} {runs[-1][2]} -> {instant}"))
+                if runs and (first - runs[-1][2]).total_seconds() > 3600:
+                    detail = f"{device} {runs[-1][2]} -> {first}"
+                    anomalies.extend(((runs[-1][0], "sample_gap", detail),
+                                      (coil, "sample_gap", detail)))
                 if not runs or runs[-1][0] != coil:
-                    runs.append([coil, instant, instant, 1])
+                    runs.append([coil, first, last, int(count)])
                 else:
-                    runs[-1][2] = instant
-                    runs[-1][3] += 1
+                    runs[-1][2] = last
+                    runs[-1][3] += int(count)
+            # 同一卷号段内也可能有停采；SESSION 找出相邻采样超过一小时的空洞。
+            session_sql = (
+                "SELECT CAST(_wstart AS BIGINT), CAST(_wend AS BIGINT), COUNT(*) "
+                f"FROM cube.{table} WHERE {bounds} SESSION(ts, 3600s) ORDER BY _wstart"
+            )
+            sessions[device].extend((local_time(first_ms), local_time(last_ms))
+                                    for first_ms, last_ms, _ in query(connection, session_sql))
+        print(f"[{unit}] 完成查询 {left} 至 {right}，卷号段 {segment_count} 个",
+              file=sys.stderr, flush=True)
+    for device, intervals in sessions.items():
+        segments = valid_segments[device]
+        for (_, previous_end), (next_start, _) in zip(intervals, intervals[1:]):
+            if (next_start - previous_end).total_seconds() <= 3600:
+                continue
+            before = next((coil for first, _, coil in reversed(segments)
+                           if first <= previous_end), None)
+            after = next((coil for _, last, coil in segments
+                          if last >= next_start), None)
+            detail = f"{device} {previous_end} -> {next_start}"
+            for coil in {before, after} - {None}:
+                anomalies.append((coil, "sample_gap", detail))
     device_runs = {}
     for device, rows in raw_runs.items():
         runs, unstable = stable_runs(rows, minimum_samples, minimum_seconds)
@@ -338,14 +372,16 @@ def main(argv=None):
         parser.error("请先在脚本顶部填写 TDENGINE_DSN")
     import taosws
     all_events, all_anomalies = [], []
+    print("正在连接 TDengine 并扫描 Cube 数据", file=sys.stderr, flush=True)
     with closing(taosws.connect(TDENGINE_DSN)) as connection:
+        print("TDengine 已连接", file=sys.stderr, flush=True)
         for unit in options.units:
             events, anomalies = scan(connection, unit, options.start, options.end,
                                       options.window_days, options.min_samples,
                                       options.min_seconds, options.merge_seconds)
             all_events.extend((unit, *event) for event in events)
             all_anomalies.extend((unit, *anomaly) for anomaly in anomalies)
-            print(f"已扫描 {unit}: 事件 {len(events)}，异常 {len(anomalies)}", file=sys.stderr)
+            print(f"已扫描 {unit}: 事件 {len(events)}，异常 {len(anomalies)}", file=sys.stderr, flush=True)
     print(json.dumps(write_preview(options.output_dir, all_events, all_anomalies,
                                    options.start, options.end, options), ensure_ascii=False))
     return 0

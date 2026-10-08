@@ -51,17 +51,33 @@ class PorEventTest(unittest.TestCase):
         self.assertEqual(1, len(overlaps))
 
     def test_short_spike_blocks_neighboring_coil(self):
-        samples = [(backfill.epoch_ms(self.start + timedelta(seconds=second)), coil)
-                   for second, coil in [(0, "A"), (5, "A"), (10, "A"),
-                                        (20, "B"), (30, "A"), (35, "A"), (40, "A")]]
+        instant = lambda second: backfill.epoch_ms(self.start + timedelta(seconds=second))
+        states = [(instant(0), instant(10), 3, "A"),
+                  (instant(20), instant(20), 1, "B"),
+                  (instant(30), instant(40), 3, "A")]
+        sessions = [(instant(0), instant(40), 7)]
+        source = lambda _connection, sql: iter(states if "STATE_WINDOW" in sql else sessions)
         with patch.object(backfill, "point_fields", return_value={"por1": "por_coil_no"}), \
              patch.object(backfill, "validate_source"), \
-             patch.object(backfill, "query", return_value=iter(samples)):
+             patch.object(backfill, "query", side_effect=source):
             events, anomalies = backfill.scan(object(), "ZRM1", self.start,
                 self.start + timedelta(hours=1), 1, 3, 10, 300)
         self.assertEqual(1, len(events))
         self.assertIn(("A", "unstable_neighbor"), {(row[0], row[1]) for row in anomalies})
         self.assertIn(("B", "unstable_neighbor"), {(row[0], row[1]) for row in anomalies})
+
+    def test_gap_inside_unchanged_coil_is_reported(self):
+        instant = lambda second: backfill.epoch_ms(self.start + timedelta(seconds=second))
+        states = [(instant(0), instant(8000), 6, "A")]
+        sessions = [(instant(0), instant(10), 3), (instant(7200), instant(8000), 3)]
+        source = lambda _connection, sql: iter(states if "STATE_WINDOW" in sql else sessions)
+        with patch.object(backfill, "point_fields", return_value={"por1": "por_coil_no"}), \
+             patch.object(backfill, "validate_source"), \
+             patch.object(backfill, "query", side_effect=source):
+            events, anomalies = backfill.scan(object(), "ZRM1", self.start,
+                self.start + timedelta(hours=3), 1, 3, 10, 300)
+        self.assertEqual(1, len(events))
+        self.assertIn(("A", "sample_gap"), {(row[0], row[1]) for row in anomalies})
 
 
 if __name__ == "__main__":
