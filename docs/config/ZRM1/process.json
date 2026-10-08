@@ -1,6 +1,6 @@
 {
   "enable": true,
-  "mqtt_topic": "zrm1_process_tracking",
+  "mqtt_topic": "collector/zrm1_process_tracking",
   "tracking": {
     "point_prefix": "/aygg_tracking/zrm1/process/tracking/",
     "speed_point": {

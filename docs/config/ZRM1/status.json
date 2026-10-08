@@ -1,6 +1,6 @@
 {
   "enable": true,
-  "mqtt_topic": "zrm1_status_tracking",
+  "mqtt_topic": "collector/zrm1_status_tracking",
   "tracking": {
     "point_prefix": "/aygg_tracking/zrm1/status/tracking/",
     "start_condition": {
