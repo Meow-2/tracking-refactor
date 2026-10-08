@@ -10,17 +10,15 @@ begin;
 create table public.qm_dc_repeat_prod_no_log
 (
     id                    bigint not null primary key,
-    unit_code             varchar(50) not null,
-    in_mat_no             varchar(50) not null,
-    in_mat_repeat_prod_no integer not null check (in_mat_repeat_prod_no > 0),
-    deleted               integer not null default 0,
+    unit_code             varchar(50),
+    in_mat_no             varchar(50),
+    in_mat_repeat_prod_no integer,
+    deleted               integer default 0,
     create_time           timestamp(6),
     create_org            bigint,
     create_user           bigint default 1831666618627928065,
     update_time           timestamp(6),
-    update_user           bigint,
-    constraint uq_qm_dc_repeat_prod_no_log_unit_mat_repeat
-        unique (unit_code, in_mat_no, in_mat_repeat_prod_no)
+    update_user           bigint
 );
 
 comment on table public.qm_dc_repeat_prod_no_log is '钢卷每次重复生产各存一条记录';
