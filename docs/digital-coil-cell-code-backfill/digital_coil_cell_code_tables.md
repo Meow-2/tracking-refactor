@@ -139,4 +139,4 @@
 
 ## 补全前置条件
 
-先为上述表逐一新增 `cell_code VARCHAR(255)` 普通列，再按[操作手册](digital_coil_cell_code_runbook.md)为[补全脚本](backfill_digital_coil_cell_code.sql)生成并核对固定时间范围，分批执行。脚本只补 `cell_code` 为 `NULL` 或空字符串的行；`pass_no` 为空时按 1 计算。新增列与补全脚本均未在远程数据库执行。
+本清单记录的是当时查询到的 93 张表。当前[分段重算脚本](README-script.md)仅处理其中 `cp1_`、`cbl1_`、`dcl1_`、`fcl1_`、`zrm1_` 和 `csl1_` 开头的 92 张表，且要求每张表具有普通列 `coil_no`、`pass_no` 和 `cell_code`；`baf1_batch` 不参与。正式执行前须重新核对生产表结构并按脚本说明先做小范围验证。
