@@ -46,8 +46,8 @@ PROCESS_TABLES = {
 
 # 本地运行前填写连接信息；生产账号和密码不得提交到 Git。
 # 扫描阶段只使用 TD_DSN，--apply 阶段只使用 PG_DSN。
-TD_DSN = "ws://<user>:<password>@<host>:6041"
-PG_DSN = "postgresql://<user>:<password>@<host>:5432/<database>"
+TD_DSN = "ws://root:taosdata@172.16.203.12:6041"
+PG_DSN = "postgresql://postgres:123456@172.16.203.30:5432/quality"
 
 # 这些对象由当前 status 配置及 Cube 元数据核对得出；启动时还会逐列验证。
 # 只读子表，避免同一超表含多个子表时重复统计。

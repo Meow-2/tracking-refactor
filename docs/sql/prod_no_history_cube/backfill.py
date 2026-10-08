@@ -32,8 +32,8 @@ TABLES = {
 }
 # 在此填写连接信息；账号仅需 cube 查询权限，PG 账号仅需目标表查询与插入权限。
 # 不要将实际密码提交到 Git；运行前在本机副本中填写。
-TDENGINE_DSN = "ws://<user>:<password>@<tdengine-host>:6041"
-POSTGRES_DSN = "postgresql://<user>:<password>@<postgres-host>:5432/<database>"
+TDENGINE_DSN = "ws://root:taosdata@172.16.203.12:6041"
+POSTGRES_DSN = "postgresql://postgres:postgres@127.0.0.1:5432/aygg_tracking"
 IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
 INVALID_PREFIX = re.compile(r"^request\s+color\b", re.IGNORECASE)
 
