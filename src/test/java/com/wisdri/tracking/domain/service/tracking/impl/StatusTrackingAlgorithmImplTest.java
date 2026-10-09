@@ -1088,6 +1088,37 @@ class StatusTrackingAlgorithmImplTest {
     }
 
     @Test
+    void decreasingPassNoDoesNotSubmitCompletedPass() {
+        enablePositionMode();
+        statusConfig.getTracking().getRolling().setQualityOutputEnabled(true);
+        statusConfig.getTracking().getRolling().setQualityMinSpeed(new BigDecimal("10"));
+        statusConfig.getTracking().getRolling().setOutThicknessPoint(point("out_thickness"));
+
+        TrackingInput first = qualityInput(true, 2, "11", "0.25", "80", "25");
+        first.getLatestSnapshot().getValues().put("/status/tr1_length", "5");
+        algorithm.calculate(first);
+        TrackingInput middle = qualityInput(true, 2, "11", "0.24", "80", "15");
+        middle.getLatestSnapshot().getValues().put("/status/tr1_length", "15");
+        algorithm.calculate(middle);
+        algorithm.calculate(qualityInput(true, 2, "11", "0.23", "80", "5"));
+        assertThat(runtime.get().getPassOutput()).isNotNull();
+
+        algorithm.calculate(qualityInput(false, 1, "11", "0.22", "60", "5"));
+
+        verify(outputSubmitter, never()).submit(any(RollingPassOutput.class));
+        assertThat(runtime.get().getPassNo()).isEqualTo(1);
+        assertThat(runtime.get().getPassOutput()).isNull();
+
+        algorithm.calculate(qualityInput(false, 1, "11", "0.21", "100", "5"));
+        algorithm.calculate(qualityInput(false, 1, "11", "0.20", "90", "15"));
+        algorithm.calculate(qualityInput(false, 1, "11", "0.19", "80", "25"));
+        assertThat(runtime.get().getPassOutput()).isNotNull();
+        assertThat(runtime.get().getPassOutput().getPassNo()).isEqualTo(1);
+        assertThat(runtime.get().getPassOutput().getOutMatThick()).isEqualByComparingTo("0.19");
+        verify(outputSubmitter, never()).submit(any(RollingPassOutput.class));
+    }
+
+    @Test
     void nextPassUsesItsOwnCellCodeAndMissingQualityValuesDoNotSubmit() {
         enablePositionMode();
         statusConfig.getTracking().getRolling().setQualityOutputEnabled(true);

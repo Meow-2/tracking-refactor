@@ -174,10 +174,12 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         return results;
     }
 
-    /** 换道时只读取旧运行态；当前帧已属于新道次，不能参与旧道次结算。 */
+    /** 道次号递增时只读取旧运行态结算；回退道次不代表旧道次完成。 */
     private RollingPassOutput completedPass(TrackingInput input, StatusTrackingSection tracking,
                                             StatusTrackingRuntime previous, RollingState rollingState) {
-        if (!qualityOutputEnabled(tracking) || !rollingState.isPassChanged() || previous == null) {
+        if (!qualityOutputEnabled(tracking) || !rollingState.isPassChanged() || previous == null
+                || previous.getPassNo() == null || rollingState.getPassNo() == null
+                || rollingState.getPassNo() <= previous.getPassNo()) {
             return null;
         }
         RollingPassOutputState old = previous.getPassOutput();

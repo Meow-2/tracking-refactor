@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CellBloodOutputRequest {
-    /** 机组代码。 */
+    /** 机组代码，发送给质量服务时使用大写形式。 */
     private String unitCode;
     /** 入口物料跟踪号。 */
     private String inMatNo;

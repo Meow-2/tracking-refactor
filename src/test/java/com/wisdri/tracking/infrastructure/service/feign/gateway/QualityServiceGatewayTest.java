@@ -82,7 +82,7 @@ class QualityServiceGatewayTest {
     }
 
     private RollingPassOutput output() {
-        return RollingPassOutput.builder().unitCode("ZRM1").inMatNo("COIL-A")
+        return RollingPassOutput.builder().unitCode("zrm1").inMatNo("COIL-A")
                 .inMatRepeatProdNo(2).cellCode("ZRM1003")
                 .startAt(Instant.parse("2026-10-09T00:00:00Z"))
                 .endAt(Instant.parse("2026-10-09T00:01:00Z"))

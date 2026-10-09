@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 /** 将旧道次结算数据转换并写入质量服务；只允许异步工作线程调用。 */
 @Component
@@ -22,9 +23,10 @@ public class QualityServiceGateway {
     @Resource
     private ExternalServiceRetryExecutor retryExecutor;
 
-    /** 请求和所有重试在调用线程完成，成功条件仅为响应 code=200。 */
+    /** 将机组代码转换为接口要求的大写形式；请求和所有重试在调用线程完成，成功条件仅为响应 code=200。 */
     public void write(RollingPassOutput output) {
-        CellBloodOutputRequest request = new CellBloodOutputRequest(output.getUnitCode(), output.getInMatNo(),
+        CellBloodOutputRequest request = new CellBloodOutputRequest(
+                output.getUnitCode().toUpperCase(Locale.ROOT), output.getInMatNo(),
                 String.valueOf(output.getInMatRepeatProdNo()), output.getCellCode(),
                 TIME_FORMAT.format(output.getStartAt()), TIME_FORMAT.format(output.getEndAt()),
                 output.getOutMatThick(), output.getOutMatLength());
