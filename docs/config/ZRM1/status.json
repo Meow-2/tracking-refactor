@@ -23,7 +23,13 @@
         "name": "pass_no_pv",
         "type": "short"
       },
-      "direct_reverse": false
+      "direct_reverse": false,
+      "quality_output_enabled": true,
+      "quality_min_speed": 10,
+      "out_thickness_point": {
+        "name": "exit_thickness_pv",
+        "type": "float"
+      }
     },
     "coiler_method_def": {
       "uncoiler": {

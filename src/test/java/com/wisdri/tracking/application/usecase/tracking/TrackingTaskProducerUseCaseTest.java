@@ -17,7 +17,7 @@ import com.wisdri.tracking.infrastructure.service.mqtt.MqttSubscriptionRegistry;
 import com.wisdri.tracking.infrastructure.dto.mqtt.TrackingSubscription;
 import com.wisdri.tracking.infrastructure.service.rocketmq.TrackingTaskProducer;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithmDispatcher;
-import com.wisdri.tracking.domain.service.tracking.StatusRepeatProdNoResolver;
+import com.wisdri.tracking.domain.service.tracking.status.StatusRepeatProdNoResolver;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;

@@ -12,7 +12,7 @@ import com.wisdri.tracking.domain.model.tracking.ironloss.IronLossResult;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.tracking.CellCodeResolver;
-import com.wisdri.tracking.domain.service.tracking.StatusRepeatProdNoResolver;
+import com.wisdri.tracking.domain.service.tracking.status.StatusRepeatProdNoResolver;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
 import org.springframework.stereotype.Component;
 

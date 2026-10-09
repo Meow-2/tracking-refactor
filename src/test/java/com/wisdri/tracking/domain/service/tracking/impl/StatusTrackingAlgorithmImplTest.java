@@ -3,7 +3,7 @@ package com.wisdri.tracking.domain.service.tracking.impl;
 import com.wisdri.tracking.domain.model.config.PointConfig;
 import com.wisdri.tracking.domain.model.config.PointDataType;
 import com.wisdri.tracking.domain.model.config.StartCondition;
-import com.wisdri.tracking.domain.model.config.process.RollingConfig;
+import com.wisdri.tracking.domain.model.config.status.StatusRollingConfig;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodConfig;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodDefinition;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodDefinitions;
@@ -20,8 +20,10 @@ import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.status.StatusResult;
+import com.wisdri.tracking.domain.model.tracking.status.RollingPassOutput;
 import com.wisdri.tracking.domain.repository.product.RepeatProdNoRepository;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
+import com.wisdri.tracking.domain.service.tracking.status.RollingPassOutputSubmitter;
 import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,6 +58,7 @@ class StatusTrackingAlgorithmImplTest {
     private StatusTrackingConfig statusConfig;
     private RepeatProdNoRepository repeatProdNoRepository;
     private TrackingStepLogger trackingStepLogger;
+    private RollingPassOutputSubmitter outputSubmitter;
 
     @BeforeEach
     void setUp() {
@@ -78,6 +81,8 @@ class StatusTrackingAlgorithmImplTest {
         trackingStepLogger = mock(TrackingStepLogger.class);
         ReflectionTestUtils.setField(algorithm, "trackingStepLogger", trackingStepLogger);
         ReflectionTestUtils.setField(algorithm, "repeatProdNoRepository", repeatProdNoRepository);
+        outputSubmitter = mock(RollingPassOutputSubmitter.class);
+        ReflectionTestUtils.setField(algorithm, "rollingPassOutputSubmitter", outputSubmitter);
     }
 
     @Test
@@ -845,7 +850,7 @@ class StatusTrackingAlgorithmImplTest {
     }
 
     private void enableRolling(boolean directReverse) {
-        statusConfig.getTracking().setRolling(RollingConfig.builder()
+        statusConfig.getTracking().setRolling(StatusRollingConfig.builder()
                 .directPoint(point("rolling_direction"))
                 .passNoPoint(point("pass_no"))
                 .directReverse(directReverse)
@@ -1047,6 +1052,75 @@ class StatusTrackingAlgorithmImplTest {
                 positionedGroup("tr2", DeviceSide.COILER, DevicePosition.LEFT)));
         enableCoilerMethods();
         enableRolling(false);
+    }
+
+    @Test
+    void completesOldPassFromLastValidQualityFrameWithoutStoppingStatus() {
+        enablePositionMode();
+        statusConfig.getTracking().getRolling().setQualityOutputEnabled(true);
+        statusConfig.getTracking().getRolling().setQualityMinSpeed(new BigDecimal("10"));
+        statusConfig.getTracking().getRolling().setOutThicknessPoint(point("out_thickness"));
+
+        algorithm.calculate(qualityInput(false, 1, "11", "0.30", "100", "5"));
+        algorithm.calculate(qualityInput(false, 1, "11", "0.29", "90", "15"));
+        algorithm.calculate(qualityInput(false, 1, "11", "0.28", "80", "25"));
+        Instant startedAt = runtime.get().getPassOutput().getStartAt();
+        algorithm.calculate(qualityInput(false, 1, "11", "0.27", "70", "35"));
+        Instant endedAt = runtime.get().getPassOutput().getEndAt();
+        algorithm.calculate(qualityInput(false, 1, "10", "0.26", "60", "45"));
+        assertThat(runtime.get().getPassOutput().getOutMatLength()).isEqualByComparingTo("35");
+        assertThat(runtime.get().getPassOutput().getOutMatThick()).isEqualByComparingTo("0.27");
+
+        algorithm.calculate(qualityInput(true, 2, "11", "0.25", "60", "45"));
+
+        ArgumentCaptor<RollingPassOutput> captor = ArgumentCaptor.forClass(RollingPassOutput.class);
+        verify(outputSubmitter).submit(captor.capture());
+        RollingPassOutput completed = captor.getValue();
+        assertThat(completed.getCellCode()).isEqualTo("CP1001");
+        assertThat(completed.getInMatNo()).isEqualTo("COIL-A");
+        assertThat(completed.getInMatRepeatProdNo()).isEqualTo(1);
+        assertThat(completed.getOutMatLength()).isEqualByComparingTo("35");
+        assertThat(completed.getOutMatThick()).isEqualByComparingTo("0.27");
+        assertThat(completed.getStartAt()).isEqualTo(startedAt);
+        assertThat(completed.getEndAt()).isEqualTo(endedAt);
+        assertThat(runtime.get().getPassNo()).isEqualTo(2);
+        assertThat(runtime.get().getPassOutput()).isNull();
+    }
+
+    @Test
+    void nextPassUsesItsOwnCellCodeAndMissingQualityValuesDoNotSubmit() {
+        enablePositionMode();
+        statusConfig.getTracking().getRolling().setQualityOutputEnabled(true);
+        statusConfig.getTracking().getRolling().setQualityMinSpeed(new BigDecimal("10"));
+        statusConfig.getTracking().getRolling().setOutThicknessPoint(point("out_thickness"));
+        algorithm.calculate(qualityInput(false, 1, "11", null, "100", "5"));
+        algorithm.calculate(qualityInput(false, 1, "11", null, "90", "15"));
+        algorithm.calculate(qualityInput(false, 1, "11", null, "80", "25"));
+        TrackingInput secondFirst = qualityInput(true, 2, "11", "0.25", "80", "25");
+        secondFirst.getLatestSnapshot().getValues().put("/status/tr1_length", "5");
+        algorithm.calculate(secondFirst);
+        verify(outputSubmitter, never()).submit(any(RollingPassOutput.class));
+
+        TrackingInput secondMiddle = qualityInput(true, 2, "11", "0.24", "80", "15");
+        secondMiddle.getLatestSnapshot().getValues().put("/status/tr1_length", "15");
+        algorithm.calculate(secondMiddle);
+        algorithm.calculate(qualityInput(true, 2, "11", "0.23", "80", "5"));
+        algorithm.calculate(qualityInput(false, 3, "11", "0.22", "60", "5"));
+        ArgumentCaptor<RollingPassOutput> captor = ArgumentCaptor.forClass(RollingPassOutput.class);
+        verify(outputSubmitter).submit(captor.capture());
+        assertThat(captor.getValue().getCellCode()).isEqualTo("CP1002");
+    }
+
+    private TrackingInput qualityInput(boolean direction, int passNo, String speed, String thickness,
+                                       String porLength, String leftTrLength) {
+        TrackingInput input = rollingInput(direction, passNo,
+                "por1", "COIL-A", porLength, "tr1", "COIL-A", "25",
+                "tr2", "COIL-A", leftTrLength);
+        input.getLatestSnapshot().getValues().put("/status/run", new BigDecimal(speed));
+        if (thickness != null) {
+            input.getLatestSnapshot().getValues().put("/status/out_thickness", new BigDecimal(thickness));
+        }
+        return input;
     }
 
     private StatusPointGroup positionedGroup(String code, DeviceSide side, DevicePosition position) {

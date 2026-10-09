@@ -32,4 +32,5 @@ public class RollingConfig {
      * 配置 true 时交换上述含义，实际方向为方向点值与本字段异或。
      */
     private Boolean directReverse;
+
 }

@@ -22,7 +22,7 @@ import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
 import com.wisdri.tracking.domain.service.tracking.CellCodeResolver;
-import com.wisdri.tracking.domain.service.tracking.StatusRepeatProdNoResolver;
+import com.wisdri.tracking.domain.service.tracking.status.StatusRepeatProdNoResolver;
 import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
 import lombok.AllArgsConstructor;
 import lombok.Getter;

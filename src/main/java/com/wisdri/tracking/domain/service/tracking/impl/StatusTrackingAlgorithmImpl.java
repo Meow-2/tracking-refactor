@@ -13,13 +13,17 @@ import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCoilCacheEntry;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.RollingPassOutputState;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.status.StatusResult;
+import com.wisdri.tracking.domain.model.tracking.status.RollingPassOutput;
 import com.wisdri.tracking.domain.repository.product.RepeatProdNoRepository;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
+import com.wisdri.tracking.domain.service.tracking.CellCodeResolver;
+import com.wisdri.tracking.domain.service.tracking.status.RollingPassOutputSubmitter;
 import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -61,6 +65,10 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
 
     @Resource
     private RepeatProdNoRepository repeatProdNoRepository;
+
+    /** 只负责快速入队；质量服务 HTTP 调用在独立线程执行。 */
+    @Resource
+    private RollingPassOutputSubmitter rollingPassOutputSubmitter;
 
     @Override
     public boolean support(TrackingType trackingType) {
@@ -136,6 +144,9 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 tracking.getCurrentClearThreshold(), rollingState.isWindowReset() || !validRollingSelection);
         Map<String, StatusCoilCacheEntry> coilCache = updateCoilCache(input, tracking,
                 previousRuntime, candidates, current, allocatedPorRepeatProdNos);
+        RollingPassOutput completedPass = completedPass(input, tracking, previousRuntime, rollingState);
+        RollingPassOutputState passOutput = passOutput(input, tracking, previousRuntime,
+                rollingState, current, startValue);
         runtimeRepositoryDispatcher.saveRuntime(StatusTrackingRuntime.builder()
                 .unitCode(input.getUnitCode())
                 .trackingType(TrackingType.STATUS)
@@ -145,10 +156,14 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 .rollingDirection(rollingState.getDirection())
                 .rollingDirectReverse(tracking.getRolling() == null ? null : rollingState.isReverse())
                 .passNo(rollingState.getPassNo())
+                .passOutput(passOutput)
                 .candidates(candidates)
                 .current(current)
                 .coilCache(coilCache)
                 .build());
+        if (completedPass != null) {
+            rollingPassOutputSubmitter.submit(completedPass);
+        }
         trackingStepLogger.log(input, "计算完成", TrackingStepLogger.details(
                 "rollingDirection", rollingState.getDirection(),
                 "passNo", rollingState.getPassNo(),
@@ -157,6 +172,82 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
                 "currentCount", current.size(),
                 "resultCount", results.size()));
         return results;
+    }
+
+    /** 换道时只读取旧运行态；当前帧已属于新道次，不能参与旧道次结算。 */
+    private RollingPassOutput completedPass(TrackingInput input, StatusTrackingSection tracking,
+                                            StatusTrackingRuntime previous, RollingState rollingState) {
+        if (!qualityOutputEnabled(tracking) || !rollingState.isPassChanged() || previous == null) {
+            return null;
+        }
+        RollingPassOutputState old = previous.getPassOutput();
+        if (old == null || old.getPassNo() == null || !old.getPassNo().equals(previous.getPassNo())) {
+            log.warn("换道时跳过质量接口：旧道次无完整有效采样，机组={}，道次={}",
+                    input.getUnitCode(), previous.getPassNo());
+            return null;
+        }
+        String cellCode = CellCodeResolver.resolve(input.getUnitCode(), null, null, old.getPassNo(), null);
+        if (cellCode == null || old.getStartAt() == null || old.getEndAt() == null) {
+            log.warn("换道时跳过质量接口：旧道次编码或时间无效，机组={}，道次={}",
+                    input.getUnitCode(), old.getPassNo());
+            return null;
+        }
+        return RollingPassOutput.builder()
+                .unitCode(input.getUnitCode()).inMatNo(old.getInMatNo())
+                .inMatRepeatProdNo(old.getInMatRepeatProdNo()).cellCode(cellCode)
+                .startAt(old.getStartAt()).endAt(old.getEndAt())
+                .outMatThick(old.getOutMatThick()).outMatLength(old.getOutMatLength())
+                .build();
+    }
+
+    /** 仅更新质量结算状态，不改变 status 设备识别、运行态保存与换道判断。 */
+    private RollingPassOutputState passOutput(TrackingInput input, StatusTrackingSection tracking,
+                                              StatusTrackingRuntime previous, RollingState rollingState,
+                                              Map<DeviceSide, StatusCurrentRuntime> current,
+                                              BigDecimal speed) {
+        if (!qualityOutputEnabled(tracking)) {
+            return null;
+        }
+        Integer passNo = rollingState.getPassNo();
+        RollingPassOutputState old = previous == null ? null : previous.getPassOutput();
+        RollingPassOutputState retained = old != null && passNo != null && passNo.equals(old.getPassNo())
+                ? old : null;
+        StatusCurrentRuntime uncoiler = current.get(DeviceSide.UNCOILER);
+        StatusCurrentRuntime coiler = current.get(DeviceSide.COILER);
+        // 同道次若入口卷身份变化，旧卷的开始时间不能与新卷的出口数据拼接。
+        if (retained != null && uncoiler != null && Boolean.TRUE.equals(uncoiler.getRunning())
+                && Integer.valueOf(1).equals(uncoiler.getNullCount()) && !blank(uncoiler.getCoilNo())
+                && (!uncoiler.getCoilNo().equals(retained.getInMatNo())
+                || !java.util.Objects.equals(uncoiler.getRepeatProdNo(), retained.getInMatRepeatProdNo()))) {
+            retained = null;
+        }
+        if (passNo == null || passNo < 1 || passNo > 999 || rollingState.getDirection() == null
+                || speed == null || speed.compareTo(tracking.getRolling().getQualityMinSpeed()) <= 0) {
+            return retained;
+        }
+        BigDecimal thickness = PointReader.decimalValue(input.getLatestSnapshot(),
+                pointPath(tracking, tracking.getRolling().getOutThicknessPoint()));
+        Instant receivedAt = input.getLatestSnapshot() == null ? null : input.getLatestSnapshot().getReceivedAt();
+        if (uncoiler == null || coiler == null || !Boolean.TRUE.equals(uncoiler.getRunning())
+                || !Boolean.TRUE.equals(coiler.getRunning()) || blank(uncoiler.getCoilNo())
+                || uncoiler.getNullCount() == null || uncoiler.getNullCount() != 1
+                || coiler.getNullCount() == null || coiler.getNullCount() != 1
+                || uncoiler.getRepeatProdNo() == null || coiler.getRemainingLength() == null
+                || coiler.getRemainingLength().signum() <= 0 || thickness == null
+                || thickness.signum() <= 0 || receivedAt == null) {
+            return retained;
+        }
+        return RollingPassOutputState.builder()
+                .passNo(passNo).startAt(retained == null ? receivedAt : retained.getStartAt())
+                .endAt(receivedAt).inMatNo(uncoiler.getCoilNo())
+                .inMatRepeatProdNo(uncoiler.getRepeatProdNo())
+                .outMatThick(thickness).outMatLength(coiler.getRemainingLength())
+                .build();
+    }
+
+    private boolean qualityOutputEnabled(StatusTrackingSection tracking) {
+        return tracking.getRolling() != null
+                && Boolean.TRUE.equals(tracking.getRolling().getQualityOutputEnabled());
     }
 
     private Map<String, StatusCandidateRuntime> updateCandidates(

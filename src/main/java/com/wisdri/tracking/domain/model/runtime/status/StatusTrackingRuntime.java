@@ -34,6 +34,8 @@ public class StatusTrackingRuntime extends TrackingRuntime {
     private Boolean rollingDirectReverse;
     /** 最近一次有效的轧制道次号。 */
     private Integer passNo;
+    /** 当前道次供质量接口结算的数据；未形成完整有效采样时为空。 */
+    private RollingPassOutputState passOutput;
     private Map<String, StatusCandidateRuntime> candidates = new LinkedHashMap<>();
     private Map<DeviceSide, StatusCurrentRuntime> current = new LinkedHashMap<>();
 

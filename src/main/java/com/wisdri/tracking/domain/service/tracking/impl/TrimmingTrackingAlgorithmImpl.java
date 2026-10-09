@@ -19,7 +19,7 @@ import com.wisdri.tracking.domain.model.tracking.trimming.TrimmingResult;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
-import com.wisdri.tracking.domain.service.tracking.StatusRepeatProdNoResolver;
+import com.wisdri.tracking.domain.service.tracking.status.StatusRepeatProdNoResolver;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import org.springframework.stereotype.Component;

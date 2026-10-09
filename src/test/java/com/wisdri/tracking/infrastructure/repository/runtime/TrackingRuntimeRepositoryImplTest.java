@@ -10,7 +10,7 @@ import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingSection;
-import com.wisdri.tracking.domain.model.config.process.RollingConfig;
+import com.wisdri.tracking.domain.model.config.status.StatusRollingConfig;
 import com.wisdri.tracking.domain.model.runtime.batch.BatchTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessSegmentRuntime;
 import com.wisdri.tracking.domain.model.runtime.process.ProcessTrackingRuntime;
@@ -439,7 +439,7 @@ class TrackingRuntimeRepositoryImplTest {
         StatusTrackingConfig changedDevices = StatusTrackingConfig.builder()
                 .unitCode("CP1").trackingType(TrackingType.STATUS)
                 .tracking(StatusTrackingSection.builder()
-                        .rolling(RollingConfig.builder().directReverse(false).build())
+                        .rolling(StatusRollingConfig.builder().directReverse(false).build())
                         .points(Arrays.asList(StatusPointGroup.builder().code("TR1").build(),
                                 StatusPointGroup.builder().code("TR2").build()))
                         .build())
@@ -450,7 +450,7 @@ class TrackingRuntimeRepositoryImplTest {
         StatusTrackingConfig changedDirection = StatusTrackingConfig.builder()
                 .unitCode("CP1").trackingType(TrackingType.STATUS)
                 .tracking(StatusTrackingSection.builder()
-                        .rolling(RollingConfig.builder().directReverse(true).build())
+                        .rolling(StatusRollingConfig.builder().directReverse(true).build())
                         .points(Collections.singletonList(StatusPointGroup.builder().code("TR1").build()))
                         .build())
                 .build();

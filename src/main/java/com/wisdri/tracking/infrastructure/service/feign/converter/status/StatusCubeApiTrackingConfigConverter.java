@@ -71,6 +71,14 @@ public class StatusCubeApiTrackingConfigConverter extends AbstractCubeApiTrackin
                 || invalidPoint(tracking.getRolling().getPassNoPoint()))) {
             throw new TrackingException("status.rolling 配置无效");
         }
+        if (tracking.getRolling() != null
+                && Boolean.TRUE.equals(tracking.getRolling().getQualityOutputEnabled())
+                && (invalidPoint(tracking.getRolling().getOutThicknessPoint())
+                || tracking.getRolling().getQualityMinSpeed() == null
+                || tracking.getRolling().getQualityMinSpeed().signum() < 0
+                || condition == null || invalidPoint(condition.getPoint()))) {
+            throw new TrackingException("status.rolling 质量输出配置需要厚度点位、非负速度阈值和速度点位");
+        }
         validateCoilerMethodDefinitions(tracking.getCoilerMethodDef());
         Set<String> codes = new HashSet<>();
         for (StatusPointGroup group : tracking.getPoints()) {

@@ -33,3 +33,6 @@ cube-api:
 
 time-series-storage:
   base-url: http://localhost:8886
+
+quality:
+  base-url: http://127.0.0.1:1234

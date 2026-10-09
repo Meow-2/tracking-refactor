@@ -7,6 +7,7 @@ import com.wisdri.tracking.domain.model.config.status.DeviceSide;
 import com.wisdri.tracking.domain.model.config.status.DevicePosition;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
+import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeNode;
 import com.wisdri.tracking.infrastructure.service.feign.converter.status.StatusCubeApiTrackingConfigConverter;
 import org.junit.jupiter.api.Test;
@@ -105,6 +106,13 @@ class StatusCubeApiTrackingConfigConverterTest {
         String json = new String(Files.readAllBytes(Paths.get("docs/config/ZRM1/status.json")),
                 StandardCharsets.UTF_8);
         StatusTrackingConfig config = (StatusTrackingConfig) converter.convert("ZRM1", node(json));
+        assertThat(config.getTracking().getRolling().getQualityOutputEnabled()).isTrue();
+        assertThat(config.getTracking().getRolling().getQualityMinSpeed()).isEqualByComparingTo("10");
+        assertThat(config.getTracking().getRolling().getOutThicknessPoint().getName())
+                .isEqualTo("exit_thickness_pv");
+        assertThat(PointReader.pathResolve(config.getTracking().getPointPrefix(),
+                config.getTracking().getRolling().getOutThicknessPoint().getName()))
+                .isEqualTo("/aygg_tracking/zrm1/status/tracking/exit_thickness_pv");
         assertThat(config.getTracking().getPoints()).hasSize(3);
         assertThat(config.getTracking().getPoints().get(0).getPosition()).isEqualTo(DevicePosition.RIGHT);
         assertThat(config.getTracking().getPoints().get(2).getPosition()).isEqualTo(DevicePosition.LEFT);

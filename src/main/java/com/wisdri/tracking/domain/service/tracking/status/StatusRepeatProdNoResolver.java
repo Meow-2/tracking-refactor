@@ -1,4 +1,4 @@
-package com.wisdri.tracking.domain.service.tracking;
+package com.wisdri.tracking.domain.service.tracking.status;
 
 import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCoilCacheEntry;
