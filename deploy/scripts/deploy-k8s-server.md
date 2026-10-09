@@ -24,7 +24,7 @@ data:
   TRACKING_STORAGE_SHEAR_ENABLED: "true"
   TRACKING_STORAGE_COILER_ENABLED: "true"
   TRACKING_STORAGE_TRIMMING_ENABLED: "true"
-  QUALITY_BASEURL: "http://quality-mat.ay:8080"
+  QUALITY_BASEURL: "http://quality-mat.aytest:8080"
 ```
 
 Service 的 selector 必须匹配各自 Deployment Pod 的 label。

@@ -37,4 +37,4 @@ data:
   CUBEAPI_BASEURL: "http://172.16.203.12:30800"
 
   TIMESERIESSTORAGE_BASEURL: "http://quality-ts:8080"
-  QUALITY_BASEURL: "http://quality-mat.ay:8080"
+  QUALITY_BASEURL: "http://quality-mat.aytest:8080"
