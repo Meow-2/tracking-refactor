@@ -1,6 +1,7 @@
 package com.wisdri.tracking.infrastructure.repository.tracking;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
@@ -46,6 +47,7 @@ class TrimmingTrackingResultRepositoryImplTest {
 
         ArgumentCaptor<QmTrimmingLogEntity> entity = ArgumentCaptor.forClass(QmTrimmingLogEntity.class);
         verify(mapper).insert(entity.capture());
+        verify(mapper).selectCount(any());
         verify(mapper, never()).update(any(), any());
         assertThat(entity.getValue().getUnitCode()).isEqualTo("CP1");
         assertThat(entity.getValue().getInMatNo()).isEqualTo("C001");
@@ -54,6 +56,27 @@ class TrimmingTrackingResultRepositoryImplTest {
         assertThat(entity.getValue().getCoilWidthSv()).isEqualTo("1000");
         assertThat(entity.getValue().getTrimmingLength()).isEqualTo("2.50");
         assertThat(entity.getValue().getCreateTime()).isEqualTo(Instant.parse("2026-08-29T01:00:00Z"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void updatesDatabaseRecordWhenRuntimeTreatsItAsNew() {
+        TrimmingTrackingResultRepositoryImpl repository = repository();
+        QmTrimmingLogMapper mapper = mapper(repository);
+        when(mapper.selectCount(any())).thenReturn(1L);
+        when(mapper.update(any(), any())).thenReturn(1);
+
+        repository.save(Collections.singletonList(result(false)));
+
+        ArgumentCaptor<LambdaQueryWrapper<QmTrimmingLogEntity>> query =
+                ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(mapper).selectCount(query.capture());
+        assertThat(query.getValue().getSqlSegment().toLowerCase())
+                .contains("unit_code =", "in_mat_no =", "repeat_prod_no =");
+        assertThat(query.getValue().getParamNameValuePairs().values())
+                .contains("CP1", "C001", "2");
+        verify(mapper).update(any(), any());
+        verify(mapper, never()).insert(any());
     }
 
     @Test
@@ -69,6 +92,7 @@ class TrimmingTrackingResultRepositoryImplTest {
         ArgumentCaptor<LambdaUpdateWrapper<QmTrimmingLogEntity>> wrapper =
                 ArgumentCaptor.forClass(LambdaUpdateWrapper.class);
         verify(mapper).update(entity.capture(), wrapper.capture());
+        verify(mapper, never()).selectCount(any());
         verify(mapper, never()).insert(any());
         assertThat(wrapper.getValue().getSqlSegment().toLowerCase())
                 .contains("unit_code =", "in_mat_no =", "repeat_prod_no =");

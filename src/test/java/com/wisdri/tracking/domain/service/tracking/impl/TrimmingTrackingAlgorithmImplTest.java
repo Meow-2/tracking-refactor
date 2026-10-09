@@ -11,6 +11,7 @@ import com.wisdri.tracking.domain.model.config.trimming.TrimmingTrackingSection;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
+import com.wisdri.tracking.domain.model.runtime.status.StatusCoilCacheEntry;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.runtime.trimming.TrimmingSegmentRuntime;
 import com.wisdri.tracking.domain.model.runtime.trimming.TrimmingTrackingRuntime;
@@ -100,6 +101,37 @@ class TrimmingTrackingAlgorithmImplTest {
 
         assertThat(algorithm.calculate(
                 input(values("1010", "1000"), status("C001", 2, true)))).isEmpty();
+    }
+
+    @Test
+    void statusModeDoesNotFallbackWhenCurrentRepeatProdNoIsMissing() {
+        stub(config(TrimmingLengthMode.STATUS), Optional.empty());
+        StatusTrackingContext context = status("C001", 2, true);
+        context.getCurrent().get(DeviceSide.UNCOILER).setRepeatProdNo(null);
+        context.getCoilCache().put("C001", StatusCoilCacheEntry.builder().repeatProdNo(7).build());
+        context.getCandidates().put("por1", StatusCandidateRuntime.builder()
+                .coilNo("C001").repeatProdNo(6).build());
+
+        assertThat(algorithm.calculate(input(values("1004", "1000"), context))).isEmpty();
+    }
+
+    @Test
+    void welderModeUsesCoilCacheWhenCurrentAndCandidatesDoNotMatch() {
+        TrimmingTrackingConfig config = config(TrimmingLengthMode.WELDER);
+        config.getTracking().setPoints(Collections.singletonList(group("coil1", "length1")));
+        stub(config, Optional.empty());
+        Map<String, Object> snapshotValues = values("1004", "1000");
+        snapshotValues.put("coil1", "C001");
+        snapshotValues.put("length1", new BigDecimal("5"));
+        StatusTrackingContext context = status("OTHER", 2, true);
+        context.setCandidates(Collections.singletonMap("por1", StatusCandidateRuntime.builder()
+                .coilNo("ANOTHER").repeatProdNo(3).build()));
+        context.getCoilCache().put("C001", StatusCoilCacheEntry.builder().repeatProdNo(8).build());
+
+        TrimmingResult result = algorithm.calculate(input(snapshotValues, context)).get(0);
+
+        assertThat(result.getInMatNo()).isEqualTo("C001");
+        assertThat(result.getRepeatProdNo()).isEqualTo(8);
     }
 
     @Test

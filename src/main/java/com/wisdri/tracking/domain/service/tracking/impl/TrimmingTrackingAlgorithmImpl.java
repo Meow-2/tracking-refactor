@@ -9,7 +9,6 @@ import com.wisdri.tracking.domain.model.config.trimming.TrimmingLengthMode;
 import com.wisdri.tracking.domain.model.config.trimming.TrimmingTrackingConfig;
 import com.wisdri.tracking.domain.model.config.trimming.TrimmingTrackingSection;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
-import com.wisdri.tracking.domain.model.runtime.status.StatusCandidateRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
 import com.wisdri.tracking.domain.model.runtime.trimming.TrimmingSegmentRuntime;
 import com.wisdri.tracking.domain.model.runtime.trimming.TrimmingTrackingRuntime;
@@ -20,6 +19,7 @@ import com.wisdri.tracking.domain.model.tracking.trimming.TrimmingResult;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
+import com.wisdri.tracking.domain.service.tracking.StatusRepeatProdNoResolver;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import org.springframework.stereotype.Component;
@@ -196,33 +196,12 @@ public class TrimmingTrackingAlgorithmImpl implements TrackingAlgorithm<Trimming
             if (blank(coilNo) || headLength == null || headLength.compareTo(BigDecimal.ZERO) < 0) {
                 continue;
             }
-            Integer repeatProdNo = repeatProdNo(input.getStatusContext(), coilNo);
+            Integer repeatProdNo = StatusRepeatProdNoResolver.find(input.getStatusContext(), coilNo);
             if (selected == null || headLength.compareTo(selected.headLength) < 0) {
                 selected = new Material(coilNo, repeatProdNo, headLength);
             }
         }
         return selected;
-    }
-
-    private Integer repeatProdNo(StatusTrackingContext context, String coilNo) {
-        if (context == null) {
-            return null;
-        }
-        if (context.getCurrent() != null) {
-            for (StatusCurrentRuntime current : context.getCurrent().values()) {
-                if (current != null && Objects.equals(coilNo, current.getCoilNo())) {
-                    return current.getRepeatProdNo();
-                }
-            }
-        }
-        if (context.getCandidates() != null) {
-            for (StatusCandidateRuntime candidate : context.getCandidates().values()) {
-                if (candidate != null && Objects.equals(coilNo, candidate.getCoilNo())) {
-                    return candidate.getRepeatProdNo();
-                }
-            }
-        }
-        return null;
     }
 
     private BigDecimal trimmingLength(BigDecimal widthPv, BigDecimal widthSv) {

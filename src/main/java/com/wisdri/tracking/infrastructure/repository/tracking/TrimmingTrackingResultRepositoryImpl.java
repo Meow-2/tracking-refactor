@@ -50,6 +50,9 @@ public class TrimmingTrackingResultRepositoryImpl
             for (TrimmingResult result : results) {
                 if (Boolean.TRUE.equals(result.getUpdateExisting())) {
                     update(result);
+                } else if (exists(result)) {
+                    // 重启后切边运行态尚未恢复，数据库中的同卷记录仍应更新。
+                    update(result);
                 } else {
                     baseMapper.insert(toEntity(result));
                 }
@@ -58,7 +61,15 @@ public class TrimmingTrackingResultRepositoryImpl
         });
     }
 
-    /** 按业务键直接更新，去重判断由 trimming runtime 完成，无需预读数据库。 */
+    /** 插入前按机组、卷号和重复生产次数确认是否已有切边记录。 */
+    private boolean exists(TrimmingResult result) {
+        return baseMapper.selectCount(Wrappers.<QmTrimmingLogEntity>lambdaQuery()
+                .eq(QmTrimmingLogEntity::getUnitCode, PostgresUnitCode.uppercase(result.getUnitCode()))
+                .eq(QmTrimmingLogEntity::getInMatNo, result.getInMatNo())
+                .eq(QmTrimmingLogEntity::getInMatRepeatProdNo, String.valueOf(result.getRepeatProdNo()))) > 0;
+    }
+
+    /** 按业务键更新；记录在查询后被删除时回退为插入。 */
     private void update(TrimmingResult result) {
         QmTrimmingLogEntity entity = toEntity(result);
         entity.setCreateTime(null);
@@ -67,7 +78,7 @@ public class TrimmingTrackingResultRepositoryImpl
                 .eq(QmTrimmingLogEntity::getUnitCode, PostgresUnitCode.uppercase(result.getUnitCode()))
                 .eq(QmTrimmingLogEntity::getInMatNo, result.getInMatNo())
                 .eq(QmTrimmingLogEntity::getInMatRepeatProdNo, String.valueOf(result.getRepeatProdNo())));
-        // 数据库被清理但进程 runtime 尚在时，自愈为插入，仍不额外查询数据库。
+        // 数据库被清理但进程 runtime 尚在时，自愈为插入。
         if (updated == 0) {
             baseMapper.insert(toEntity(result));
         }
