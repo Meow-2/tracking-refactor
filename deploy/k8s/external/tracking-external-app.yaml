@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tracking-external
+  namespace: tracking
+  labels:
+    app: tracking-external
+    version: v1
+    app.kubernetes.io/name: tracking-external
+    app.kubernetes.io/version: v1
+spec:
+  replicas: 1
+  # 内存任务属于单进程，更新期间不并行运行两个实例。
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: tracking-external
+      version: v1
+      app.kubernetes.io/name: tracking-external
+      app.kubernetes.io/version: v1
+  template:
+    metadata:
+      labels:
+        app: tracking-external
+        version: v1
+        app.kubernetes.io/name: tracking-external
+        app.kubernetes.io/version: v1
+    spec:
+      containers:
+        - name: tracking
+          image: 172.16.200.26/quality/tracking
+          imagePullPolicy: Always
+          envFrom:
+            - configMapRef:
+                name: tracking-external-config
+          resources:
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+          volumeMounts:
+            - name: tracking-logs
+              mountPath: /logs
+      volumes:
+        - name: tracking-logs
+          persistentVolumeClaim:
+            claimName: tracking-external-pvc
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tracking-external
+  namespace: tracking
+  labels:
+    app: tracking-external
+    version: v1
+    app.kubernetes.io/name: tracking-external
+    app.kubernetes.io/version: v1
+spec:
+  selector:
+    app: tracking-external
+    version: v1
+    app.kubernetes.io/name: tracking-external
+    app.kubernetes.io/version: v1
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 32338
+  type: NodePort

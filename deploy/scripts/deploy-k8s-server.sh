@@ -28,7 +28,7 @@ SKIP_TESTS="${SKIP_TESTS:-true}"
 LOCAL_K8S_DIR="${LOCAL_K8S_DIR:-${PROJECT_DIR}/deploy/k8s}"
 LOCAL_DOCKER_DIR="${LOCAL_DOCKER_DIR:-${PROJECT_DIR}/deploy/docker}"
 
-UNITS=("baf1" "cbl1" "cp1" "csl1" "dcl1" "fcl1" "zrm1")
+UNITS=("baf1" "cbl1" "cp1" "csl1" "dcl1" "fcl1" "zrm1" "external")
 RUN_ID="$(date +%y%m%d-%H%M)-$$"
 
 log() {
@@ -61,6 +61,7 @@ Then it applies the manifests and restarts:
   tracking-dcl1
   tracking-fcl1
   tracking-zrm1
+  tracking-external
 
 Each ConfigMap must set its own TRACKING_UNIT environment variable.
 EOF
@@ -223,11 +224,11 @@ copy_to_remote "${K8S_SSH_PASS}" "${K8S_USER}" "${K8S_HOST}" "${K8S_PORT}" \
 remote_bash "${K8S_SSH_PASS}" "${K8S_USER}" "${K8S_HOST}" "${K8S_PORT}" \
   "$(build_k8s_apply_command "${REMOTE_K8S_ARCHIVE}")"
 
-log "Checking seven Deployments, Services, ConfigMaps, and PVCs"
+log "Checking eight Deployments, Services, ConfigMaps, and PVCs"
 remote_bash "${K8S_SSH_PASS}" "${K8S_USER}" "${K8S_HOST}" "${K8S_PORT}" \
   "$(build_k8s_preflight_command)"
 
-log "Restarting seven tracking Deployments"
+log "Restarting eight tracking Deployments"
 remote_bash "${K8S_SSH_PASS}" "${K8S_USER}" "${K8S_HOST}" "${K8S_PORT}" \
   "$(build_k8s_rollout_command)"
 

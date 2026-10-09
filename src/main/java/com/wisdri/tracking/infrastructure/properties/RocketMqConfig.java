@@ -5,6 +5,7 @@ import lombok.Data;
 import org.apache.rocketmq.client.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.client.support.DefaultListenerContainer;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -98,6 +99,7 @@ public class RocketMqConfig {
      * 根据 rocketmq.push-consumer.* 配置创建 RocketMQ push consumer 容器。
      */
     @Bean
+    @ConditionalOnExpression("!'external'.equalsIgnoreCase('${tracking.unit:}')")
     public DefaultListenerContainer trackingTaskConsumerContainer(TrackingTaskConsumer trackingTaskConsumer) {
         DefaultListenerContainer container = new DefaultListenerContainer();
         container.setName("trackingTaskConsumerContainer");
