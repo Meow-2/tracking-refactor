@@ -18,6 +18,8 @@ public class QmShearLogEntity {
     private Long id;
     /** 产生剪切事件的机组代码。 */
     private String unitCode;
+    /** 加工单元代码，格式为大写机组代码加三位道次或默认序号。 */
+    private String cellCode;
     /** 剪切归属物料设备上的钢卷号。 */
     private String inMatNo;
     /** 剪切归属物料钢卷的生产次数。 */

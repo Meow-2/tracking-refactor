@@ -20,6 +20,7 @@ import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDi
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
+import com.wisdri.tracking.domain.service.tracking.CellCodeResolver;
 import com.wisdri.tracking.domain.service.tracking.shear.ShearDecisionService;
 import com.wisdri.tracking.domain.service.tracking.shear.ShearDeviceResolver;
 import com.wisdri.tracking.domain.service.tracking.shear.ShearRuntimeService;
@@ -93,11 +94,13 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 && tracking.getMode() == ShearMode.DISCONTINUOUS;
         List<ShearDeviceSnapshot> devices = shearDeviceResolver.resolveCandidates(
                 context, statusConfig, csl1Discontinuous);
+        String cellCode = CellCodeResolver.resolve(input.getUnitCode(), null, null,
+                context.getPassNo(), null);
         ShearRuntimeCommit commit = shearRuntimeService.prepare(input.getUnitCode(), devices, tracking);
         Set<String> processedTriggerDevices = new HashSet<>();
-        processPoints(input, tracking, devices, commit,
+        processPoints(input, tracking, devices, commit, cellCode,
                 tracking.getUncoilerShearPoint(), true, csl1Discontinuous, processedTriggerDevices, results);
-        processPoints(input, tracking, devices, commit,
+        processPoints(input, tracking, devices, commit, cellCode,
                 tracking.getCoilerShearPoint(), false, csl1Discontinuous, processedTriggerDevices, results);
 
         if (results.isEmpty() || !trackingProperties.shearStorageEnabled()) {
@@ -117,6 +120,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                                ShearTrackingSection tracking,
                                List<ShearDeviceSnapshot> devices,
                                ShearRuntimeCommit commit,
+                               String cellCode,
                                List<ShearPointConfig> points,
                                boolean uncoilerSide,
                                boolean compareCommonCoilPrefix,
@@ -152,7 +156,7 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
                 ShearDecision decision = shearDecisionService.decide(input.getLatestSnapshot(),
                         tracking, point, uncoilerSide, compareCommonCoilPrefix, devices,
                         commit.getRuntimes());
-                ShearResult result = buildResult(input, point, decision);
+                ShearResult result = buildResult(input, point, decision, cellCode);
                 shearRuntimeService.stage(commit, decision.getInMatDevice(), decision.getKind(),
                         decision.getNextCounter(), decision.getShearDevice(), receivedAt);
                 processedTriggerDevices.add(shearDevice.getDeviceCode());
@@ -181,13 +185,15 @@ public class ShearTrackingAlgorithmImpl implements TrackingAlgorithm<ShearResult
     /** 将完整判定映射为剪切表领域结果，并保留 runtime key 与触发时间。 */
     private ShearResult buildResult(TrackingInput input,
                                    ShearPointConfig point,
-                                   ShearDecision decision) {
+                                   ShearDecision decision,
+                                   String cellCode) {
         ShearDeviceSnapshot material = decision.getInMatDevice();
         ShearDeviceSnapshot shear = decision.getShearDevice();
         Instant receivedAt = input.getLatestSnapshot().getReceivedAt();
         ShearKind kind = decision.getKind();
         return ShearResult.builder()
                 .unitCode(input.getUnitCode())
+                .cellCode(cellCode)
                 .trackingType(TrackingType.SHEAR)
                 .generatedAt(Instant.now())
                 .receivedAt(receivedAt)

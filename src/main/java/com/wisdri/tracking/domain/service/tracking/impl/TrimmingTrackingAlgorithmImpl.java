@@ -21,6 +21,7 @@ import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
 import com.wisdri.tracking.domain.service.tracking.status.StatusRepeatProdNoResolver;
 import com.wisdri.tracking.domain.service.tracking.TrackingAlgorithm;
+import com.wisdri.tracking.domain.service.tracking.CellCodeResolver;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
 import org.springframework.stereotype.Component;
 
@@ -88,8 +89,12 @@ public class TrimmingTrackingAlgorithmImpl implements TrackingAlgorithm<Trimming
             return skip(input, "宽度实际值或设定值不存在");
         }
         BigDecimal trimmingLength = trimmingLength(widthPv, widthSv);
+        StatusTrackingContext statusContext = input.getStatusContext();
+        String cellCode = CellCodeResolver.resolve(input.getUnitCode(), null, null,
+                statusContext == null ? null : statusContext.getPassNo(), null);
         TrimmingSegmentRuntime existing = existing(input.getUnitCode());
-        boolean sameMaterial = existing != null
+        boolean sameMaterial = cellCode != null && existing != null
+                && Objects.equals(cellCode, existing.getCellCode())
                 && Objects.equals(material.coilNo, existing.getCoilNo())
                 && Objects.equals(material.repeatProdNo, existing.getRepeatProdNo());
         if (sameMaterial && existing.getTrimmingLength() != null
@@ -102,6 +107,7 @@ public class TrimmingTrackingAlgorithmImpl implements TrackingAlgorithm<Trimming
 
         TrimmingResult result = TrimmingResult.builder()
                 .unitCode(input.getUnitCode())
+                .cellCode(cellCode)
                 .trackingType(TrackingType.TRIMMING)
                 .generatedAt(Instant.now())
                 .receivedAt(snapshot.getReceivedAt())
@@ -136,6 +142,7 @@ public class TrimmingTrackingAlgorithmImpl implements TrackingAlgorithm<Trimming
                 .map(TrimmingTrackingConfig::getTracking).orElse(null);
         TrimmingSegmentRuntime segment = TrimmingSegmentRuntime.builder()
                 .segmentCode(result.getSegmentCode())
+                .cellCode(result.getCellCode())
                 .coilNo(result.getInMatNo())
                 .repeatProdNo(result.getRepeatProdNo())
                 .headLength(result.getHeadLength())

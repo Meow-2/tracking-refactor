@@ -258,6 +258,7 @@ public class TrackingTaskProducerUseCase {
                 .side(source.getSide())
                 .running(source.getRunning())
                 .passNo(source.getPassNo())
+                .cellCode(source.getCellCode())
                 .deviceCode(source.getDeviceCode())
                 .deviceName(source.getDeviceName())
                 .coilerMethod(source.getCoilerMethod())

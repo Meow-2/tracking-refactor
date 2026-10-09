@@ -20,6 +20,8 @@ import java.time.Instant;
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class ShearResult extends TrackingResult {
+    /** 剪切事件所属加工单元代码；道次为空时使用默认序号 1，越界时为空。 */
+    private String cellCode;
     /** 剪切信号点名，仅供诊断，不落入 qm_dc_shear_log。 */
     private String shearPointCode;
     /** 触发剪切的设备代码，幂等时间归属此设备。 */

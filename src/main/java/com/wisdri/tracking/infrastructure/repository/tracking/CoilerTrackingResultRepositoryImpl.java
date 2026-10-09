@@ -56,22 +56,23 @@ public class CoilerTrackingResultRepositoryImpl
     }
 
     /**
-     * 同一物料号、重复生产号和道次号只保留一条记录，后续事件更新对应侧的方式和设备字段。
+     * 同一加工单元、物料号和重复生产号只保留一条记录，后续事件更新对应侧的方式和设备字段。
      */
     private void upsert(CoilerResult result) {
+        if (result.getCellCode() == null) {
+            // 加工单元代码无效时不匹配已有记录，仍保留本次开卷卷取结果。
+            baseMapper.insert(toEntity(result));
+            return;
+        }
         String repeatProdNo = result.getRepeatProdNo() == null
                 ? null : String.valueOf(result.getRepeatProdNo());
         LambdaQueryWrapper<QmCoilerLogEntity> query = Wrappers.<QmCoilerLogEntity>lambdaQuery()
+                .eq(QmCoilerLogEntity::getCellCode, result.getCellCode())
                 .eq(QmCoilerLogEntity::getInMatNo, result.getInMatNo());
         if (repeatProdNo == null) {
             query.isNull(QmCoilerLogEntity::getInMatRepeatProdNo);
         } else {
             query.eq(QmCoilerLogEntity::getInMatRepeatProdNo, repeatProdNo);
-        }
-        if (result.getPassNo() == null) {
-            query.isNull(QmCoilerLogEntity::getPassNo);
-        } else {
-            query.eq(QmCoilerLogEntity::getPassNo, result.getPassNo());
         }
         QmCoilerLogEntity entity = baseMapper.selectOne(query
                 .orderByAsc(QmCoilerLogEntity::getId)
@@ -96,6 +97,7 @@ public class CoilerTrackingResultRepositoryImpl
 
     private void merge(QmCoilerLogEntity entity, CoilerResult result) {
         entity.setUnitCode(PostgresUnitCode.uppercase(result.getUnitCode()));
+        entity.setCellCode(result.getCellCode());
         entity.setInMatNo(result.getInMatNo());
         entity.setInMatRepeatProdNo(result.getRepeatProdNo() == null
                 ? null : String.valueOf(result.getRepeatProdNo()));

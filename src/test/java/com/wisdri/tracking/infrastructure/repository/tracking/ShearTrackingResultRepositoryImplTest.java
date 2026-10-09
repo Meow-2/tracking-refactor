@@ -30,6 +30,7 @@ class ShearTrackingResultRepositoryImplTest {
         Instant time = Instant.parse("2026-01-01T00:00:00Z");
         ShearResult result = ShearResult.builder()
                 .unitCode("line-x").trackingType(TrackingType.SHEAR)
+                .cellCode("LINE-X007")
                 .inMatNo("MAT-1").repeatProdNo("3")
                 .shearType("711").shearTypeName("feed-device-x_head")
                 .shearLength(new BigDecimal("2.5")).setNumber(4).shearTime(time)
@@ -45,6 +46,7 @@ class ShearTrackingResultRepositoryImplTest {
         QmShearLogEntity entity = ReflectionTestUtils.invokeMethod(repository, "toEntity", result);
 
         assertThat(entity.getUnitCode()).isEqualTo("LINE-X");
+        assertThat(entity.getCellCode()).isEqualTo("LINE-X007");
         assertThat(entity.getInMatNo()).isEqualTo("MAT-1");
         assertThat(entity.getInMatRepeatProdNo()).isEqualTo("3");
         assertThat(entity.getShearType()).isEqualTo("711");

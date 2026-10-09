@@ -44,6 +44,7 @@ class CoilerTrackingResultRepositoryImplTest {
         Instant time = Instant.parse("2026-08-27T01:00:00Z");
         CoilerResult result = CoilerResult.builder()
                 .unitCode("cp1").trackingType(TrackingType.COILER).receivedAt(time)
+                .cellCode("CP1001")
                 .inMatNo("COIL-1").repeatProdNo(3)
                 .coilerMethod("99").coilerMethodName("下卷取")
                 .coilerDeviceCode("tr1").coilerDeviceName("1#卷取机")
@@ -52,6 +53,7 @@ class CoilerTrackingResultRepositoryImplTest {
         QmCoilerLogEntity entity = ReflectionTestUtils.invokeMethod(repository, "toEntity", result);
 
         assertThat(entity.getUnitCode()).isEqualTo("CP1");
+        assertThat(entity.getCellCode()).isEqualTo("CP1001");
         assertThat(entity.getInMatNo()).isEqualTo("COIL-1");
         assertThat(entity.getInMatRepeatProdNo()).isEqualTo("3");
         assertThat(entity.getPassNo()).isNull();
@@ -107,14 +109,16 @@ class CoilerTrackingResultRepositoryImplTest {
         when(mapper.selectOne(any())).thenAnswer(invocation -> {
             LambdaQueryWrapper<QmCoilerLogEntity> query = invocation.getArgument(0);
             String sql = query.getSqlSegment().toLowerCase();
-            assertThat(sql).contains("in_mat_no =", "repeat_prod_no =", "pass_no =");
+            assertThat(sql).contains("cell_code =", "in_mat_no =", "repeat_prod_no =")
+                    .doesNotContain("pass_no =", "unit_code =");
             assertThat(query.getParamNameValuePairs())
-                    .containsValue("COIL-1").containsValue("3").containsValue(2);
+                    .containsValue("CP1002").containsValue("COIL-1").containsValue("3");
             return existing;
         });
 
         repository.save(Collections.singletonList(CoilerResult.builder()
                 .unitCode("CP1").trackingType(TrackingType.COILER)
+                .cellCode("CP1002")
                 .inMatNo("COIL-1").repeatProdNo(3).passNo(2)
                 .coilerMethod("99").coilerMethodName("下卷取")
                 .coilerDeviceCode("tr1").coilerDeviceName("1#卷取机")
@@ -127,6 +131,7 @@ class CoilerTrackingResultRepositoryImplTest {
         QmCoilerLogEntity updated = captor.getValue();
         assertThat(updated.getId()).isEqualTo(10L);
         assertThat(updated.getPassNo()).isEqualTo(2);
+        assertThat(updated.getCellCode()).isEqualTo("CP1002");
         assertThat(updated.getUncoilerMethod()).isEqualTo("11");
         assertThat(updated.getUncoilerMethodName()).isEqualTo("上开卷");
         assertThat(updated.getUncoilerDeviceCode()).isEqualTo("por1");
@@ -146,13 +151,15 @@ class CoilerTrackingResultRepositoryImplTest {
         when(mapper.selectOne(any())).thenAnswer(invocation -> {
             LambdaQueryWrapper<QmCoilerLogEntity> query = invocation.getArgument(0);
             String sql = query.getSqlSegment().toLowerCase();
-            assertThat(sql).contains("in_mat_no =", "repeat_prod_no is null", "pass_no is null");
+            assertThat(sql).contains("cell_code =", "in_mat_no =", "repeat_prod_no is null")
+                    .doesNotContain("pass_no is null", "unit_code =");
             assertThat(query.getParamNameValuePairs()).containsValue("COIL-2");
             return null;
         });
 
         repository.save(Collections.singletonList(CoilerResult.builder()
                 .unitCode("CP1").trackingType(TrackingType.COILER)
+                .cellCode("CP1001")
                 .inMatNo("COIL-2")
                 .uncoilerMethod("91").uncoilerMethodName("下开卷")
                 .uncoilerDeviceCode("por2").uncoilerDeviceName("2#开卷机")
@@ -163,6 +170,7 @@ class CoilerTrackingResultRepositoryImplTest {
         verify(mapper).insert(captor.capture());
         verify(mapper, never()).updateById(any(QmCoilerLogEntity.class));
         assertThat(captor.getValue().getInMatNo()).isEqualTo("COIL-2");
+        assertThat(captor.getValue().getCellCode()).isEqualTo("CP1001");
         assertThat(captor.getValue().getInMatRepeatProdNo()).isNull();
         assertThat(captor.getValue().getPassNo()).isNull();
         assertThat(captor.getValue().getUncoilerMethod()).isEqualTo("91");
@@ -172,6 +180,21 @@ class CoilerTrackingResultRepositoryImplTest {
         assertThat(captor.getValue().getCoilerMethod()).isNull();
         assertThat(captor.getValue().getCoilerDeviceCode()).isNull();
         assertThat(captor.getValue().getDeleted()).isZero();
+    }
+
+    @Test
+    void nullCellCodeInsertsWithoutSelectingExistingCoil() {
+        CoilerTrackingResultRepositoryImpl repository = enabledRepository();
+        QmCoilerLogMapper mapper = mapper(repository);
+
+        repository.save(Collections.singletonList(CoilerResult.builder()
+                .unitCode("CP1").inMatNo("COIL-1")
+                .coilerMethod("99").coilerMethodName("卷取")
+                .build()));
+
+        verify(mapper).insert(any(QmCoilerLogEntity.class));
+        verify(mapper, never()).selectOne(any());
+        verify(mapper, never()).updateById(any());
     }
 
     @Test

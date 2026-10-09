@@ -48,6 +48,11 @@ public class TrimmingTrackingResultRepositoryImpl
         }
         transactionTemplate.execute(status -> {
             for (TrimmingResult result : results) {
+                if (result.getCellCode() == null) {
+                    // 加工单元代码无效时不能匹配已有记录，仍保留本次切边结果。
+                    baseMapper.insert(toEntity(result));
+                    continue;
+                }
                 if (Boolean.TRUE.equals(result.getUpdateExisting())) {
                     update(result);
                 } else if (exists(result)) {
@@ -61,10 +66,10 @@ public class TrimmingTrackingResultRepositoryImpl
         });
     }
 
-    /** 插入前按机组、卷号和重复生产次数确认是否已有切边记录。 */
+    /** 插入前按加工单元、卷号和重复生产次数确认是否已有切边记录。 */
     private boolean exists(TrimmingResult result) {
         return baseMapper.selectCount(Wrappers.<QmTrimmingLogEntity>lambdaQuery()
-                .eq(QmTrimmingLogEntity::getUnitCode, PostgresUnitCode.uppercase(result.getUnitCode()))
+                .eq(QmTrimmingLogEntity::getCellCode, result.getCellCode())
                 .eq(QmTrimmingLogEntity::getInMatNo, result.getInMatNo())
                 .eq(QmTrimmingLogEntity::getInMatRepeatProdNo, String.valueOf(result.getRepeatProdNo()))) > 0;
     }
@@ -75,7 +80,7 @@ public class TrimmingTrackingResultRepositoryImpl
         entity.setCreateTime(null);
         entity.setUpdateTime(eventTime(result));
         int updated = baseMapper.update(entity, Wrappers.<QmTrimmingLogEntity>lambdaUpdate()
-                .eq(QmTrimmingLogEntity::getUnitCode, PostgresUnitCode.uppercase(result.getUnitCode()))
+                .eq(QmTrimmingLogEntity::getCellCode, result.getCellCode())
                 .eq(QmTrimmingLogEntity::getInMatNo, result.getInMatNo())
                 .eq(QmTrimmingLogEntity::getInMatRepeatProdNo, String.valueOf(result.getRepeatProdNo())));
         // 数据库被清理但进程 runtime 尚在时，自愈为插入。
@@ -87,6 +92,7 @@ public class TrimmingTrackingResultRepositoryImpl
     private QmTrimmingLogEntity toEntity(TrimmingResult result) {
         QmTrimmingLogEntity entity = new QmTrimmingLogEntity();
         entity.setUnitCode(PostgresUnitCode.uppercase(result.getUnitCode()));
+        entity.setCellCode(result.getCellCode());
         entity.setInMatNo(result.getInMatNo());
         entity.setInMatRepeatProdNo(result.getRepeatProdNo() == null
                 ? null : String.valueOf(result.getRepeatProdNo()));

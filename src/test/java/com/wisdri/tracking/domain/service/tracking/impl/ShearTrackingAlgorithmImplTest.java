@@ -102,6 +102,7 @@ class ShearTrackingAlgorithmImplTest {
     @Test
     void firstSliceAndFirstCutOfNextGroupHaveZeroLength() {
         ShearResult first = only(algorithm.calculate(input("500")));
+        assertThat(first.getCellCode()).isEqualTo("LINE-X001");
         assertThat(first.getShearKind()).isEqualTo(ShearKind.SLICE);
         assertThat(first.getShearNo()).isEqualTo(1);
         assertThat(first.getCutNo()).isEqualTo(1);
@@ -112,6 +113,23 @@ class ShearTrackingAlgorithmImplTest {
         assertThat(nextGroup.getShearNo()).isEqualTo(2);
         assertThat(nextGroup.getCutNo()).isEqualTo(1);
         assertThat(nextGroup.getShearLength()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void statusPassNoDeterminesCellCode() {
+        TrackingInput input = input("500");
+        input.getStatusContext().setPassNo(7);
+
+        assertThat(only(algorithm.calculate(input)).getCellCode()).isEqualTo("LINE-X007");
+    }
+
+    @Test
+    void missingStatusPassNoDefaultsToOneButOutOfRangeRemainsNull() {
+        TrackingInput input = input("500");
+
+        assertThat(only(algorithm.calculate(input)).getCellCode()).isEqualTo("LINE-X001");
+        input.getStatusContext().setPassNo(1000);
+        assertThat(only(algorithm.calculate(input)).getCellCode()).isNull();
     }
 
     @Test

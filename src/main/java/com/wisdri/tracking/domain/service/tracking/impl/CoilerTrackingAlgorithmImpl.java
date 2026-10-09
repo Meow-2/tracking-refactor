@@ -47,6 +47,7 @@ public class CoilerTrackingAlgorithmImpl implements TrackingAlgorithm<CoilerResu
             validate(status);
             CoilerResult result = CoilerResult.builder()
                     .unitCode(status.getUnitCode())
+                    .cellCode(status.getCellCode())
                     .trackingType(TrackingType.COILER)
                     .generatedAt(generatedAt)
                     .receivedAt(status.getReceivedAt())

@@ -174,6 +174,7 @@ class TrackingTaskProducerUseCaseTest {
                 .coilNo("COIL-1")
                 .repeatProdNo(2)
                 .passNo(3)
+                .cellCode("CP1003")
                 .remainingLength(new BigDecimal("100"))
                 .maxLength(new BigDecimal("100"))
                 .build();
@@ -203,6 +204,7 @@ class TrackingTaskProducerUseCaseTest {
             assertThat(result.getCoilNo()).isEqualTo("COIL-1");
             assertThat(result.getCoilerMethod()).isEqualTo("11");
             assertThat(result.getPassNo()).isEqualTo(3);
+            assertThat(result.getCellCode()).isEqualTo("CP1003");
             assertThat(result.getRemainingLength()).isEqualByComparingTo("100");
         });
     }

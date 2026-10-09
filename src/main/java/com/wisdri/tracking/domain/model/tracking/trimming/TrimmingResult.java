@@ -16,6 +16,8 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class TrimmingResult extends TrackingResult {
+    /** 切边结果所属加工单元；道次为空时使用默认序号 1，越界时为空。 */
+    private String cellCode;
     private String segmentCode;
     private String inMatNo;
     private Integer repeatProdNo;

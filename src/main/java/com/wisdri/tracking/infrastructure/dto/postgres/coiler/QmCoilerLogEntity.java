@@ -17,6 +17,8 @@ public class QmCoilerLogEntity {
     @TableId
     private Long id;
     private String unitCode;
+    /** 加工单元代码；道次为空时使用默认序号 1，越界时为空。 */
+    private String cellCode;
     private String inMatNo;
     /** 入口钢卷本次重复生产序号；沿用记录表的字符串列类型，允许为空。 */
     @TableField("in_mat_repeat_prod_no")

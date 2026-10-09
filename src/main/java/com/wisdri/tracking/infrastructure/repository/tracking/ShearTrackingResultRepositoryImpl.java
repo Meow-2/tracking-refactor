@@ -68,6 +68,7 @@ public class ShearTrackingResultRepositoryImpl
     private QmShearLogEntity toEntity(ShearResult result) {
         QmShearLogEntity entity = new QmShearLogEntity();
         entity.setUnitCode(PostgresUnitCode.uppercase(result.getUnitCode()));
+        entity.setCellCode(result.getCellCode());
         String inMatNo = result.getInMatNo();
         // 只调整 CSL1 的入库字段，领域结果仍保留设备上报的完整卷号供算法使用。
         if ("CSL1".equalsIgnoreCase(result.getUnitCode())

@@ -25,6 +25,8 @@ public class StatusResult extends TrackingResult {
     private DeviceSide side;
     private Boolean running;
     private Integer passNo;
+    /** 状态结果所属加工单元代码；道次为空时使用默认序号 1，越界时为空。 */
+    private String cellCode;
     private String deviceCode;
     private String deviceName;
     private String coilerMethod;

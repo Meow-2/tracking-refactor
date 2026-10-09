@@ -324,6 +324,10 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             if (side != null && coilNoValid && (!sameCoil || rollingState.isWindowReset())) {
                 StatusResult result = StatusResult.from(candidate, group, side,
                         rollingState.getPassNo(), input.getUnitCode(), generatedAt, receivedAt(input));
+                if (result != null) {
+                    result.setCellCode(CellCodeResolver.resolve(input.getUnitCode(), null, null,
+                            result.getPassNo(), null));
+                }
                 if (result != null && !blank(result.getCoilerMethod())
                         && !blank(result.getCoilerMethodName())) {
                     results.add(result);

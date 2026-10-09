@@ -136,6 +136,7 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(first).extracting(StatusResult::getSide)
                 .containsExactly(DeviceSide.UNCOILER, DeviceSide.UNCOILER, DeviceSide.COILER);
         assertThat(first).extracting(StatusResult::getPassNo).containsOnly(1);
+        assertThat(first).extracting(StatusResult::getCellCode).containsOnly("CP1001");
 
         algorithm.calculate(rollingInput(false, 1,
                 "U1", "COIL-U1", "95", "U2", "COIL-U2", "195", "C1", "COIL-C1", "15"));
@@ -148,6 +149,7 @@ class StatusTrackingAlgorithmImplTest {
         assertThat(nextPass).extracting(StatusResult::getSide)
                 .containsExactly(DeviceSide.COILER, DeviceSide.COILER, DeviceSide.UNCOILER);
         assertThat(nextPass).extracting(StatusResult::getPassNo).containsOnly(2);
+        assertThat(nextPass).extracting(StatusResult::getCellCode).containsOnly("CP1002");
         assertThat(nextPass.get(0).getCoilerMethodName()).isEqualTo("上卷取");
         assertThat(nextPass.get(2).getCoilerMethodName()).isEqualTo("上开卷");
         assertThat(runtime.get().getRollingDirection()).isTrue();
@@ -204,6 +206,7 @@ class StatusTrackingAlgorithmImplTest {
                 .containsExactly("U1", "U2", "C1");
         assertThat(first).extracting(StatusResult::getDeviceName)
                 .containsExactly("U1 device", "U2 device", "C1 device");
+        assertThat(first).extracting(StatusResult::getCellCode).containsOnly("CP1001");
         assertThat(first.get(0).getRunning()).isNull();
         assertThat(first.get(0).getTrackingType()).isEqualTo(TrackingType.STATUS);
         assertThat(first.get(0).getCoilNo()).isEqualTo("COIL-U1");

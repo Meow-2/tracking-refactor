@@ -16,6 +16,8 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class CoilerResult extends TrackingResult {
+    /** 从 status 结果直接传递的加工单元代码。 */
+    private String cellCode;
     private String inMatNo;
     private Integer repeatProdNo;
     /**

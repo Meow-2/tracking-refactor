@@ -16,6 +16,8 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class TrimmingSegmentRuntime {
     private String segmentCode;
+    /** 当前物料所属加工单元；旧运行态无此字段时由数据库记录完成判重。 */
+    private String cellCode;
     private String coilNo;
     private Integer repeatProdNo;
     private BigDecimal headLength;

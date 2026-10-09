@@ -28,6 +28,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 class TrimmingTrackingResultRepositoryImplTest {
@@ -50,6 +51,7 @@ class TrimmingTrackingResultRepositoryImplTest {
         verify(mapper).selectCount(any());
         verify(mapper, never()).update(any(), any());
         assertThat(entity.getValue().getUnitCode()).isEqualTo("CP1");
+        assertThat(entity.getValue().getCellCode()).isEqualTo("CP1001");
         assertThat(entity.getValue().getInMatNo()).isEqualTo("C001");
         assertThat(entity.getValue().getInMatRepeatProdNo()).isEqualTo("2");
         assertThat(entity.getValue().getCoilWidthPv()).isEqualTo("1005.0");
@@ -73,9 +75,10 @@ class TrimmingTrackingResultRepositoryImplTest {
                 ArgumentCaptor.forClass(LambdaQueryWrapper.class);
         verify(mapper).selectCount(query.capture());
         assertThat(query.getValue().getSqlSegment().toLowerCase())
-                .contains("unit_code =", "in_mat_no =", "repeat_prod_no =");
+                .contains("cell_code =", "in_mat_no =", "repeat_prod_no =")
+                .doesNotContain("unit_code =");
         assertThat(query.getValue().getParamNameValuePairs().values())
-                .contains("CP1", "C001", "2");
+                .contains("CP1001", "C001", "2");
         verify(mapper).update(any(), any());
         verify(mapper, never()).insert(any());
     }
@@ -96,16 +99,31 @@ class TrimmingTrackingResultRepositoryImplTest {
         verify(mapper, never()).selectCount(any());
         verify(mapper, never()).insert(any());
         assertThat(wrapper.getValue().getSqlSegment().toLowerCase())
-                .contains("unit_code =", "in_mat_no =", "repeat_prod_no =");
+                .contains("cell_code =", "in_mat_no =", "repeat_prod_no =")
+                .doesNotContain("unit_code =");
         assertThat(wrapper.getValue().getParamNameValuePairs().values())
-                .contains("CP1", "C001", "2");
+                .contains("CP1001", "C001", "2");
         assertThat(entity.getValue().getCreateTime()).isNull();
         assertThat(entity.getValue().getUpdateTime()).isEqualTo(Instant.parse("2026-08-29T01:00:00Z"));
+    }
+
+    @Test
+    void nullCellCodeInsertsWithoutMatchingExistingRecord() {
+        TrimmingTrackingResultRepositoryImpl repository = repository();
+        QmTrimmingLogMapper mapper = mapper(repository);
+        TrimmingResult result = result(true);
+        result.setCellCode(null);
+
+        repository.save(Collections.singletonList(result));
+
+        verify(mapper).insert(any());
+        verifyNoMoreInteractions(mapper);
     }
 
     private TrimmingResult result(boolean update) {
         return TrimmingResult.builder()
                 .unitCode("cp1").trackingType(TrackingType.TRIMMING)
+                .cellCode("CP1001")
                 .receivedAt(Instant.parse("2026-08-29T01:00:00Z"))
                 .inMatNo("C001").repeatProdNo(2)
                 .coilWidthPv(new BigDecimal("1005.0"))
