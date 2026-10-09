@@ -8,6 +8,7 @@
   "mqtt_topic": "baf1_batch_tracking_{template}",
   "tracking": {
     "point_prefix": "/aygg_tracking/baf1/batch/{template}/tracking/{template}_",
+    "current_clear_threshold": 1,
     "start_condition": {
       "point": {
         "name": "prod_status",

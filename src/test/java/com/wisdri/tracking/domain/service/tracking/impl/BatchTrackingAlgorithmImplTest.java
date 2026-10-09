@@ -13,6 +13,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.batch.BatchResult;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
+import com.wisdri.tracking.domain.repository.product.RepeatProdNoRepository;
 import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
 import com.wisdri.tracking.domain.service.steplog.TrackingStepLogger;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +29,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -37,9 +40,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -49,6 +52,8 @@ class BatchTrackingAlgorithmImplTest {
     private TrackingRuntimeRepositoryDispatcher runtimeRepositoryDispatcher;
     private PointEventHandlerDispatcher pointEventHandlerDispatcher;
     private TrackingStepLogger trackingStepLogger;
+    private RepeatProdNoRepository repeatProdNoRepository;
+    private AtomicReference<BatchTrackingRuntime> currentRuntime;
     private BatchTrackingAlgorithmImpl algorithm;
 
     @BeforeEach
@@ -56,14 +61,29 @@ class BatchTrackingAlgorithmImplTest {
         runtimeRepositoryDispatcher = mock(TrackingRuntimeRepositoryDispatcher.class);
         pointEventHandlerDispatcher = mock(PointEventHandlerDispatcher.class);
         trackingStepLogger = mock(TrackingStepLogger.class);
+        repeatProdNoRepository = mock(RepeatProdNoRepository.class);
+        currentRuntime = new AtomicReference<>();
         algorithm = new BatchTrackingAlgorithmImpl();
         ReflectionTestUtils.setField(algorithm, "runtimeRepositoryDispatcher", runtimeRepositoryDispatcher);
         ReflectionTestUtils.setField(algorithm, "pointEventHandlerDispatcher", pointEventHandlerDispatcher);
         ReflectionTestUtils.setField(algorithm, "trackingStepLogger", trackingStepLogger);
+        ReflectionTestUtils.setField(algorithm, "repeatProdNoRepository", repeatProdNoRepository);
+        AtomicInteger sequence = new AtomicInteger();
+        when(repeatProdNoRepository.allocateNext(eq("BAF1"), any(String.class)))
+                .thenAnswer(invocation -> sequence.incrementAndGet());
+        when(repeatProdNoRepository.findLatest(eq("BAF1"), any(String.class))).thenReturn(1);
+        when(repeatProdNoRepository.findLatestOrAllocate(eq("BAF1"), any(String.class)))
+                .thenReturn(1);
+        when(runtimeRepositoryDispatcher.findRuntimeAs(
+                eq("BAF1"), eq(TrackingType.BATCH), eq("fb1"), eq(BatchTrackingRuntime.class)))
+                .thenAnswer(invocation -> Optional.ofNullable(currentRuntime.get()));
         when(runtimeRepositoryDispatcher.findConfigAs(
                 "BAF1", TrackingType.BATCH, BatchTrackingConfig.class
         )).thenReturn(Optional.of(config()));
-        doNothing().when(runtimeRepositoryDispatcher).saveRuntime(any(TrackingRuntime.class));
+        org.mockito.Mockito.doAnswer(invocation -> {
+            currentRuntime.set(invocation.getArgument(0));
+            return null;
+        }).when(runtimeRepositoryDispatcher).saveRuntime(any(TrackingRuntime.class));
     }
 
     @Test
@@ -83,6 +103,7 @@ class BatchTrackingAlgorithmImplTest {
         assertEquals("fb1", north.getTemplateCode());
         assertEquals("north", north.getSegmentCode());
         assertEquals("N001", north.getCoilNo());
+        assertEquals(1, north.getRepeatProdNo());
         assertEquals("north", north.getParameters().get("shared"));
         assertEquals(10, north.getParameters().get("common_only"));
         assertEquals(20, north.getParameters().get("north_only"));
@@ -95,6 +116,7 @@ class BatchTrackingAlgorithmImplTest {
 
         BatchResult south = results.get(1);
         assertEquals("south", south.getSegmentCode());
+        assertEquals(2, south.getRepeatProdNo());
         assertEquals("south", south.getParameters().get("shared"));
         assertFalse(south.getParameters().containsKey("south_only"));
     }
@@ -149,6 +171,104 @@ class BatchTrackingAlgorithmImplTest {
         assertEquals(1, algorithm.calculate(input).size());
         assertEquals(1, algorithm.calculate(input).size());
         verify(runtimeRepositoryDispatcher, times(2)).saveRuntime(any(TrackingRuntime.class));
+        verify(repeatProdNoRepository).allocateNext("BAF1", "N001");
+    }
+
+    @Test
+    void allocatesBelowProductionThresholdAndKeepsEachSideIndependent() {
+        List<BatchResult> below = algorithm.calculate(input(baseValues(-1, "N001", "S001")));
+        assertTrue(below.isEmpty());
+        verify(repeatProdNoRepository).allocateNext("BAF1", "N001");
+        verify(repeatProdNoRepository).allocateNext("BAF1", "S001");
+
+        List<BatchResult> results = algorithm.calculate(input(baseValues(1, "N001", "S002")));
+        assertEquals(2, results.size());
+        assertEquals(1, results.get(0).getRepeatProdNo());
+        assertEquals(3, results.get(1).getRepeatProdNo());
+        verify(repeatProdNoRepository).allocateNext("BAF1", "S002");
+    }
+
+    @Test
+    void retainsFirstMissingFrameAndAllocatesAgainAfterSecond() {
+        algorithm.calculate(input(baseValues(1, "N001", null)));
+        algorithm.calculate(input(baseValues(1, null, null)));
+        assertEquals("N001", currentRuntime.get().getSegments().get("north").getCoilNo());
+        algorithm.calculate(input(baseValues(1, "N001", null)));
+        verify(repeatProdNoRepository).allocateNext("BAF1", "N001");
+
+        algorithm.calculate(input(baseValues(1, null, null)));
+        algorithm.calculate(input(baseValues(1, null, null)));
+        assertNull(currentRuntime.get().getSegments().get("north").getCoilNo());
+        List<BatchResult> results = algorithm.calculate(input(baseValues(1, "N001", null)));
+        assertEquals(2, results.get(0).getRepeatProdNo());
+        verify(repeatProdNoRepository, times(2)).allocateNext("BAF1", "N001");
+    }
+
+    @Test
+    void zeroClearThresholdTreatsFirstMissingFrameAsUnmount() {
+        BatchTrackingConfig immediateClear = config();
+        immediateClear.getTracking().setCurrentClearThreshold(0);
+        when(runtimeRepositoryDispatcher.findConfigAs(
+                "BAF1", TrackingType.BATCH, BatchTrackingConfig.class))
+                .thenReturn(Optional.of(immediateClear));
+
+        algorithm.calculate(input(baseValues(1, "N001", null)));
+        algorithm.calculate(input(baseValues(1, null, null)));
+        assertNull(currentRuntime.get().getSegments().get("north").getCoilNo());
+        algorithm.calculate(input(baseValues(1, "N001", null)));
+
+        verify(repeatProdNoRepository, times(2)).allocateNext("BAF1", "N001");
+    }
+
+    @Test
+    void readsLegacyRuntimeWithoutAllocatingAndRetriesFailedNewAllocation() {
+        currentRuntime.set(BatchTrackingRuntime.builder().unitCode("BAF1")
+                .trackingType(TrackingType.BATCH).templateCode("fb1")
+                .coilNos(Collections.singletonMap("north", "N001")).build());
+        List<BatchResult> legacy = algorithm.calculate(input(baseValues(1, "N001", null)));
+        assertEquals(1, legacy.get(0).getRepeatProdNo());
+        verify(repeatProdNoRepository).findLatestOrAllocate("BAF1", "N001");
+        verify(repeatProdNoRepository, never()).allocateNext("BAF1", "N001");
+
+        when(repeatProdNoRepository.allocateNext("BAF1", "N002"))
+                .thenThrow(new IllegalStateException("PG unavailable")).thenReturn(4);
+        assertNull(algorithm.calculate(input(baseValues(1, "N002", null)))
+                .get(0).getRepeatProdNo());
+        assertTrue(Boolean.TRUE.equals(currentRuntime.get().getSegments()
+                .get("north").getAllocationPending()));
+        assertEquals(4, algorithm.calculate(input(baseValues(1, "N002", null)))
+                .get(0).getRepeatProdNo());
+        verify(repeatProdNoRepository, times(2)).allocateNext("BAF1", "N002");
+    }
+
+    @Test
+    void retriesLegacyBackfillWhenPgWriteFails() {
+        currentRuntime.set(BatchTrackingRuntime.builder().unitCode("BAF1")
+                .trackingType(TrackingType.BATCH).templateCode("fb1")
+                .coilNos(Collections.singletonMap("north", "N001")).build());
+        when(repeatProdNoRepository.findLatestOrAllocate("BAF1", "N001"))
+                .thenThrow(new IllegalStateException("PG unavailable")).thenReturn(1);
+
+        assertNull(algorithm.calculate(input(baseValues(1, "N001", null)))
+                .get(0).getRepeatProdNo());
+        assertEquals(1, algorithm.calculate(input(baseValues(1, "N001", null)))
+                .get(0).getRepeatProdNo());
+        verify(repeatProdNoRepository, times(2)).findLatestOrAllocate("BAF1", "N001");
+    }
+
+    @Test
+    void sameCoilInAnotherTemplateAllocatesForItsOwnSegment() {
+        algorithm.calculate(input(baseValues(1, "N001", null)));
+        TrackingInput fb2 = input(baseValues(1, "N001", null));
+        fb2.setTemplateCode("fb2");
+        fb2.getLatestSnapshot().getValues().put("tracking/fb2_prod_status", 1);
+        fb2.getLatestSnapshot().getValues().put("tracking/fb2_north_coil_no", "N001");
+
+        List<BatchResult> results = algorithm.calculate(fb2);
+
+        assertEquals(1, results.size());
+        assertEquals("fb2", results.get(0).getTemplateCode());
+        verify(repeatProdNoRepository, times(2)).allocateNext("BAF1", "N001");
     }
 
     @Test

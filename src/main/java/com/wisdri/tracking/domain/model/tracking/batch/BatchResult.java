@@ -37,6 +37,9 @@ public class BatchResult extends TrackingResult {
      */
     private String coilNo;
 
+    /** 当前工艺侧该卷的重复生产序号；PG 取号暂时失败时为空。 */
+    private Integer repeatProdNo;
+
     /**
      * 生成本条结果时读取到的生产状态值。
      */

@@ -16,6 +16,7 @@ import com.wisdri.tracking.domain.model.config.shear.ShearTrackingConfig;
 import com.wisdri.tracking.domain.model.config.trimming.TrimmingTrackingConfig;
 import com.wisdri.tracking.domain.model.config.ironloss.IronLossTrackingConfig;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.batch.BatchTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.shear.ShearTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusTrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.status.StatusCurrentRuntime;
@@ -50,6 +51,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository {
     /** status 运行态仅在最近一帧距当前时间不超过一分钟时允许跨进程恢复。 */
     private static final Duration STATUS_RESTORE_MAX_AGE = Duration.ofMinutes(1);
+    /** batch 仅恢复短暂重启前的模板状态，避免长时间停机后漏计同号新卷。 */
+    private static final Duration BATCH_RESTORE_MAX_AGE = Duration.ofMinutes(1);
 
     /**
      * 配置缓存。
@@ -63,6 +66,8 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
 
     /** 每个 status key 只尝试从 Redis 恢复一次，避免过期数据被反复读取。 */
     private final Set<String> statusRestoreAttempted = ConcurrentHashMap.newKeySet();
+    /** 每个模板实例只尝试恢复一次，避免过期状态反复参与计算。 */
+    private final Set<String> batchRestoreAttempted = ConcurrentHashMap.newKeySet();
 
     /** 恢复时效的时间源，测试中可固定时间以覆盖一分钟边界。 */
     private Clock clock = Clock.systemUTC();
@@ -119,13 +124,13 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
         return Optional.ofNullable(configCache.get(configKey(unitCode, trackingType)));
     }
 
-    /** 从本地缓存读取运行态；status 首次读取时可从 Redis 恢复一分钟内的状态。 */
+    /** 从本地缓存读取运行态；status 和 batch 首次读取时可从 Redis 恢复近期状态。 */
     @Override
     public Optional<TrackingRuntime> findRuntime(String unitCode, TrackingType trackingType) {
         return findRuntime(unitCode, trackingType, null);
     }
 
-    /** 从本地缓存读取运行态；仅 status 支持在缓存未命中时恢复。 */
+    /** 从本地缓存读取运行态；status 和 batch 在缓存未命中时尝试恢复。 */
     @Override
     public Optional<TrackingRuntime> findRuntime(String unitCode,
                                                   TrackingType trackingType,
@@ -136,8 +141,72 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
         if (cached != null) {
             return Optional.of(cached);
         }
-        return TrackingType.STATUS == trackingType
-                ? restoreStatusRuntime(key, unitCode) : Optional.empty();
+        if (TrackingType.STATUS == trackingType) {
+            return restoreStatusRuntime(key, unitCode);
+        }
+        return TrackingType.BATCH == trackingType
+                ? restoreBatchRuntime(key, unitCode, templateCode) : Optional.empty();
+    }
+
+    /** 从 Redis 恢复同一模板最近一分钟的状态，兼容只包含 coilNos 的旧版 JSON。 */
+    private synchronized Optional<TrackingRuntime> restoreBatchRuntime(String key,
+                                                                        String unitCode,
+                                                                        String templateCode) {
+        TrackingRuntime cached = runtimeCache.get(key);
+        if (cached != null) {
+            return Optional.of(cached);
+        }
+        if (!batchRestoreAttempted.add(key)) {
+            return Optional.empty();
+        }
+        try {
+            String json = stringRedisTemplate.opsForValue().get(key);
+            if (json == null || json.trim().isEmpty()) {
+                return Optional.empty();
+            }
+            BatchTrackingRuntime restored = objectMapper.readValue(json, BatchTrackingRuntime.class);
+            Instant updatedAt = restored.getUpdatedAt();
+            Duration age = updatedAt == null ? null : Duration.between(updatedAt, clock.instant());
+            if (!unitCode.equalsIgnoreCase(restored.getUnitCode())
+                    || restored.getTrackingType() != TrackingType.BATCH
+                    || !templateCode.equals(restored.getTemplateCode())
+                    || age == null || age.isNegative() || age.compareTo(BATCH_RESTORE_MAX_AGE) > 0
+                    || !compatibleBatchConfig(unitCode, templateCode, restored)) {
+                log.info("跳过过期或身份、配置不匹配的 batch 运行态，key={}", key);
+                return Optional.empty();
+            }
+            TrackingRuntime existing = runtimeCache.putIfAbsent(key, restored);
+            return Optional.of(existing == null ? restored : existing);
+        } catch (IOException | RuntimeException e) {
+            log.warn("读取 Redis batch 运行态失败，key={}", key, e);
+            return Optional.empty();
+        }
+    }
+
+    /** 模板必须仍在配置范围内，保留的工艺侧也必须存在于当前批次配置。 */
+    private boolean compatibleBatchConfig(String unitCode, String templateCode,
+                                          BatchTrackingRuntime runtime) {
+        TrackingConfig config = configCache.get(configKey(unitCode, TrackingType.BATCH));
+        if (!(config instanceof BatchTrackingConfig)) {
+            return false;
+        }
+        BatchTrackingConfig batch = (BatchTrackingConfig) config;
+        if (batch.getTemplate() == null || !batch.getTemplate().resolveCodes().contains(templateCode)) {
+            return false;
+        }
+        Set<String> configured = new HashSet<>();
+        if (batch.getTracking() != null && batch.getTracking().getPoints() != null) {
+            batch.getTracking().getPoints().stream().filter(point -> point != null
+                    && point.getSegment() != null).forEach(point ->
+                    configured.add(point.getSegment().toLowerCase(java.util.Locale.ROOT)));
+        }
+        if (runtime.getCoilNos() != null && runtime.getCoilNos().keySet().stream()
+                .anyMatch(code -> !configured.contains(code.toLowerCase(java.util.Locale.ROOT)))) {
+            return false;
+        }
+        return runtime.getSegments() == null || runtime.getSegments().entrySet().stream()
+                .allMatch(entry -> entry.getValue() == null || entry.getValue().getCoilNo() == null
+                        || configured.contains(entry.getKey().toLowerCase(java.util.Locale.ROOT)));
     }
 
     /**

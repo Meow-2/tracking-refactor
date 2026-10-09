@@ -9,4 +9,7 @@ public interface RepeatProdNoRepository {
 
     /** 仅读取已分配的最大次数；记录不存在时按首次生产返回 1，不写入记录。 */
     Integer findLatest(String unitCode, String coilNo);
+
+    /** 读取已分配的最大次数；记录不存在时插入首次生产记录并返回 1。 */
+    Integer findLatestOrAllocate(String unitCode, String coilNo);
 }

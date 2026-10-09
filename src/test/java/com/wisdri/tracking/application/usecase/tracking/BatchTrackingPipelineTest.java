@@ -12,6 +12,7 @@ import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.batch.BatchResult;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
+import com.wisdri.tracking.domain.repository.product.RepeatProdNoRepository;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepository;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepositoryDispatcher;
 import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
@@ -53,6 +54,9 @@ class BatchTrackingPipelineTest {
         ReflectionTestUtils.setField(batchAlgorithm, "pointEventHandlerDispatcher",
                 mock(PointEventHandlerDispatcher.class));
         ReflectionTestUtils.setField(batchAlgorithm, "trackingStepLogger", mock(TrackingStepLogger.class));
+        RepeatProdNoRepository repeatProdNoRepository = mock(RepeatProdNoRepository.class);
+        when(repeatProdNoRepository.allocateNext("BAF1", "N001")).thenReturn(1);
+        ReflectionTestUtils.setField(batchAlgorithm, "repeatProdNoRepository", repeatProdNoRepository);
         TrackingAlgorithmDispatcher algorithmDispatcher = new TrackingAlgorithmDispatcher();
         ReflectionTestUtils.setField(algorithmDispatcher, "algorithms", Collections.singletonList(batchAlgorithm));
 
@@ -75,6 +79,8 @@ class BatchTrackingPipelineTest {
         assertEquals("fb1", result.getTemplateCode());
         assertEquals("north", result.getSegmentCode());
         assertEquals("N001", result.getCoilNo());
+        assertEquals(1, result.getRepeatProdNo());
+        verify(repeatProdNoRepository).allocateNext("BAF1", "N001");
     }
 
     private BatchTrackingConfig config() {

@@ -3,6 +3,9 @@ package com.wisdri.tracking.infrastructure.repository.runtime;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import com.wisdri.tracking.domain.model.config.batch.BatchTrackingConfig;
+import com.wisdri.tracking.domain.model.config.batch.TemplateConfig;
+import com.wisdri.tracking.domain.model.config.batch.TrackingPointGroup;
+import com.wisdri.tracking.domain.model.config.batch.TrackingSection;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
@@ -125,6 +128,46 @@ class TrackingRuntimeRepositoryImplTest {
         assertEquals("N001", cached.getCoilNos().get("north"));
         assertFalse(repository().findRuntimeAs(
                 "BAF1", TrackingType.BATCH, "fb1", BatchTrackingRuntime.class).isPresent());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void restoresRecentBatchRuntimeButRejectsExpiredAndMismatchedTemplate() {
+        Instant now = Instant.parse("2026-07-17T08:00:00Z");
+        BatchTrackingRuntime stored = batchRuntime("fb1", "N001");
+        stored.setUpdatedAt(now.minusSeconds(60));
+        repository().saveRuntime(stored);
+
+        TrackingRuntimeRepositoryImpl recent = configuredBatchRepository(now);
+        BatchTrackingRuntime restored = recent.findRuntimeAs(
+                "BAF1", TrackingType.BATCH, "fb1", BatchTrackingRuntime.class)
+                .orElseThrow(AssertionError::new);
+        assertEquals("N001", restored.getCoilNos().get("north"));
+
+        TrackingRuntimeRepositoryImpl expired = configuredBatchRepository(now.plusSeconds(1));
+        assertFalse(expired.findRuntimeAs("BAF1", TrackingType.BATCH, "fb1",
+                BatchTrackingRuntime.class).isPresent());
+
+        TrackingRuntimeRepositoryImpl wrongTemplate = configuredBatchRepository(now);
+        redis.put("tracking:baf1:batch:fb1:runtime",
+                redis.get("tracking:baf1:batch:fb1:runtime").replace("\"fb1\"", "\"fb2\""));
+        assertFalse(wrongTemplate.findRuntimeAs("BAF1", TrackingType.BATCH, "fb1",
+                BatchTrackingRuntime.class).isPresent());
+    }
+
+    @SuppressWarnings("unchecked")
+    private TrackingRuntimeRepositoryImpl configuredBatchRepository(Instant now) {
+        TrackingRuntimeRepositoryImpl repository = repository();
+        ReflectionTestUtils.setField(repository, "clock", Clock.fixed(now, ZoneOffset.UTC));
+        Map<String, TrackingConfig> cache = (Map<String, TrackingConfig>)
+                ReflectionTestUtils.getField(repository, "configCache");
+        cache.put("tracking:baf1:batch:config", BatchTrackingConfig.builder()
+                .unitCode("BAF1").trackingType(TrackingType.BATCH)
+                .template(TemplateConfig.builder().code("fb{index}").indexFrom(1).indexTo(2).build())
+                .tracking(TrackingSection.builder().points(Collections.singletonList(
+                        TrackingPointGroup.builder().segment("north").build())).build())
+                .build());
+        return repository;
     }
 
     @Test

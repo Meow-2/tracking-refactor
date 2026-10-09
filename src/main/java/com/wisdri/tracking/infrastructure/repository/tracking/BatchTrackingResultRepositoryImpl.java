@@ -42,6 +42,7 @@ public class BatchTrackingResultRepositoryImpl
             tableRule("fb_code", TimeSeriesDataType.INT.getCode(), true),
             tableRule("segment_code", TimeSeriesDataType.INT.getCode(), false),
             tableRule("coil_no", TimeSeriesDataType.STRING.getCode(), true),
+            tableRule("repeat_prod_no", TimeSeriesDataType.INT.getCode(), true),
             tableRule("head_length", TimeSeriesDataType.FLOAT.getCode(), false),
             tableRule("speed", TimeSeriesDataType.FLOAT.getCode(), false),
             tableRule("pass_no", TimeSeriesDataType.INT.getCode(), true),
@@ -159,6 +160,9 @@ public class BatchTrackingResultRepositoryImpl
         add(values, "fb_code", fbCode(result.getTemplateCode()), true, timestamp);
         add(values, "segment_code", segmentCode(result.getSegmentCode()), false, timestamp);
         add(values, "coil_no", result.getCoilNo(), true, timestamp);
+        if (result.getRepeatProdNo() != null) {
+            add(values, "repeat_prod_no", result.getRepeatProdNo(), true, timestamp);
+        }
         add(values, "prod_status", result.getProductionStatus(), false, timestamp);
         if (result.getParameters() != null) {
             for (Map.Entry<String, Object> entry : result.getParameters().entrySet()) {

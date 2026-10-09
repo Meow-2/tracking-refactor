@@ -101,6 +101,33 @@ class RepeatProdNoRepositoryImplTest {
     }
 
     @Test
+    void findLatestOrAllocateReusesExistingRecord() {
+        RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
+        RepeatProdNoRepositoryImpl repository = repository(mapper);
+        when(mapper.selectOne(any())).thenReturn(record(4));
+
+        assertThat(repository.findLatestOrAllocate("cp1", "COIL-A")).isEqualTo(4);
+        verify(mapper).selectOne(any());
+        org.mockito.Mockito.verifyNoMoreInteractions(mapper);
+    }
+
+    @Test
+    void findLatestOrAllocateInsertsFirstRecordWhenMissing() {
+        RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
+        RepeatProdNoRepositoryImpl repository = repository(mapper);
+        when(mapper.insert(any())).thenReturn(1);
+
+        assertThat(repository.findLatestOrAllocate("cp1", "COIL-A")).isEqualTo(1);
+
+        ArgumentCaptor<QmDcRepeatProdNoLogEntity> inserted =
+                ArgumentCaptor.forClass(QmDcRepeatProdNoLogEntity.class);
+        verify(mapper).insert(inserted.capture());
+        assertThat(inserted.getValue().getUnitCode()).isEqualTo("CP1");
+        assertThat(inserted.getValue().getInMatNo()).isEqualTo("COIL-A");
+        assertThat(inserted.getValue().getInMatRepeatProdNo()).isEqualTo(1);
+    }
+
+    @Test
     void rejectsBlankBusinessKeyBeforeQuerying() {
         RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
         RepeatProdNoRepositoryImpl repository = repository(mapper);

@@ -69,6 +69,7 @@ class BatchTrackingResultRepositoryImplTest {
         assertRule(request.getRule(), "fb_code", "int", true);
         assertRule(request.getRule(), "segment_code", "int", false);
         assertRule(request.getRule(), "coil_no", "string", true);
+        assertRule(request.getRule(), "repeat_prod_no", "int", true);
         assertRule(request.getRule(), "prod_status", "float", false);
         assertRule(request.getRule(), "head_length", "float", false);
         assertRule(request.getRule(), "speed", "float", false);
@@ -96,6 +97,7 @@ class BatchTrackingResultRepositoryImplTest {
         assertValue(northRequest.getValues(), "fb_code", 1, true, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "segment_code", 1, false, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "coil_no", "N001", true, NORTH_TIMESTAMP);
+        assertValue(northRequest.getValues(), "repeat_prod_no", 2, true, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "prod_status", new BigDecimal("1"), false, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "shared", "north-value", false, NORTH_TIMESTAMP);
         assertFalse(northRequest.getValues().stream().anyMatch(value -> "empty".equals(value.getId())));
@@ -106,6 +108,19 @@ class BatchTrackingResultRepositoryImplTest {
         TimeSeriesDataRequest southRequest = captor.getAllValues().get(1);
         assertEquals(RECEIVED_AT.toEpochMilli(), southRequest.getTimestamp());
         assertValue(southRequest.getValues(), "segment_code", 0, false);
+    }
+
+    @Test
+    void omitsRepeatProdNoWhenAllocationIsUnavailable() {
+        BatchResult result = result("fb1", "north", "N001");
+        result.setRepeatProdNo(null);
+
+        repository.save(Collections.singletonList(result));
+
+        ArgumentCaptor<TimeSeriesDataRequest> captor = ArgumentCaptor.forClass(TimeSeriesDataRequest.class);
+        verify(gateway).saveColumn(eq("baf1_batch"), captor.capture());
+        assertFalse(captor.getValue().getValues().stream()
+                .anyMatch(value -> "repeat_prod_no".equals(value.getId())));
     }
 
     @Test
@@ -167,6 +182,7 @@ class BatchTrackingResultRepositoryImplTest {
                 .templateCode(templateCode)
                 .segmentCode(segmentCode)
                 .coilNo(coilNo)
+                .repeatProdNo(2)
                 .productionStatus(BigDecimal.ONE)
                 .parameters(parameters)
                 .receivedAt(RECEIVED_AT)

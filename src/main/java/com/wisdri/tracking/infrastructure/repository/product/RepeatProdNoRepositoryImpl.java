@@ -46,6 +46,13 @@ public class RepeatProdNoRepositoryImpl
         return latest == null ? 1 : latest;
     }
 
+    @Override
+    public Integer findLatestOrAllocate(String unitCode, String coilNo) {
+        validateKey(unitCode, coilNo);
+        Integer latest = findLatestStored(PostgresUnitCode.uppercase(unitCode), coilNo);
+        return latest == null ? allocateNext(unitCode, coilNo) : latest;
+    }
+
     /** 只取同机组同卷序号最大的一行，不修改任何历史记录。 */
     private Integer findLatestStored(String storedUnitCode, String coilNo) {
         LambdaQueryWrapper<QmDcRepeatProdNoLogEntity> query = Wrappers

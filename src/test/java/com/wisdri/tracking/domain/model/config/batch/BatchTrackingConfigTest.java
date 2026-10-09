@@ -39,6 +39,7 @@ class BatchTrackingConfigTest {
                 .containsExactly("north", "south");
         assertThat(config.getTracking().getStartCondition().getPoint().getType())
                 .isEqualTo(PointDataType.SHORT);
+        assertThat(config.getTracking().getCurrentClearThreshold()).isEqualTo(1);
         assertThat(config.getSegments())
                 .extracting(SegmentConfig::getCode)
                 .containsExactly("south", "north", "common");

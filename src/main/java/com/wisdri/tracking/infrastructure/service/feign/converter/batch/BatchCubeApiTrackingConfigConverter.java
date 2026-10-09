@@ -41,6 +41,11 @@ public class BatchCubeApiTrackingConfigConverter extends AbstractCubeApiTracking
         if (config.getSegments() == null || config.getSegments().isEmpty()) {
             throw new TrackingException("batch.segments 不能为空");
         }
+        if (config.getTracking() != null
+                && config.getTracking().getCurrentClearThreshold() != null
+                && config.getTracking().getCurrentClearThreshold() < 0) {
+            throw new TrackingException("batch.tracking.current_clear_threshold 不能小于 0");
+        }
 
         List<String> templateCodes;
         try {

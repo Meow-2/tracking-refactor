@@ -27,6 +27,10 @@ public class TrackingSection {
      */
     private StartCondition startCondition;
 
+    /** 连续卷号空帧的容忍数；默认保留首个空帧，超过后清空该侧卷身份。 */
+    @Builder.Default
+    private Integer currentClearThreshold = 1;
+
     /**
      * 各工艺侧的卷号点位配置；JSON 字段使用单数 point。
      */
