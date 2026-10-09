@@ -9,6 +9,7 @@ import com.wisdri.tracking.domain.model.config.batch.TrackingSection;
 import com.wisdri.tracking.domain.model.point.PointSnapshot;
 import com.wisdri.tracking.domain.model.runtime.TrackingRuntime;
 import com.wisdri.tracking.domain.model.runtime.batch.BatchTrackingRuntime;
+import com.wisdri.tracking.domain.model.runtime.batch.BatchSegmentRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.batch.BatchResult;
@@ -189,35 +190,59 @@ class BatchTrackingAlgorithmImplTest {
     }
 
     @Test
-    void retainsFirstMissingFrameAndAllocatesAgainAfterSecond() {
+    void retainsCoilUntilMissingCountExceedsConfiguredThreshold() {
+        BatchTrackingConfig tolerant = config();
+        tolerant.getTracking().setCurrentClearThreshold(3);
+        when(runtimeRepositoryDispatcher.findConfigAs(
+                "BAF1", TrackingType.BATCH, BatchTrackingConfig.class))
+                .thenReturn(Optional.of(tolerant));
+
         algorithm.calculate(input(baseValues(1, "N001", null)));
+        assertEquals(1, currentRuntime.get().getSegments().get("north").getNullCount());
         algorithm.calculate(input(baseValues(1, null, null)));
         assertEquals("N001", currentRuntime.get().getSegments().get("north").getCoilNo());
+        assertEquals(2, currentRuntime.get().getSegments().get("north").getNullCount());
         algorithm.calculate(input(baseValues(1, "N001", null)));
+        assertEquals(1, currentRuntime.get().getSegments().get("north").getNullCount());
         verify(repeatProdNoRepository).allocateNext("BAF1", "N001");
 
         algorithm.calculate(input(baseValues(1, null, null)));
         algorithm.calculate(input(baseValues(1, null, null)));
+        assertEquals("N001", currentRuntime.get().getSegments().get("north").getCoilNo());
+        assertEquals(3, currentRuntime.get().getSegments().get("north").getNullCount());
+        algorithm.calculate(input(baseValues(1, null, null)));
         assertNull(currentRuntime.get().getSegments().get("north").getCoilNo());
+        assertEquals(1, currentRuntime.get().getSegments().get("north").getNullCount());
         List<BatchResult> results = algorithm.calculate(input(baseValues(1, "N001", null)));
         assertEquals(2, results.get(0).getRepeatProdNo());
         verify(repeatProdNoRepository, times(2)).allocateNext("BAF1", "N001");
     }
 
     @Test
-    void zeroClearThresholdTreatsFirstMissingFrameAsUnmount() {
-        BatchTrackingConfig immediateClear = config();
-        immediateClear.getTracking().setCurrentClearThreshold(0);
-        when(runtimeRepositoryDispatcher.findConfigAs(
-                "BAF1", TrackingType.BATCH, BatchTrackingConfig.class))
-                .thenReturn(Optional.of(immediateClear));
-
+    void defaultThresholdClearsOnFirstMissingFrameLikeStatus() {
         algorithm.calculate(input(baseValues(1, "N001", null)));
+        assertEquals(1, currentRuntime.get().getSegments().get("north").getNullCount());
         algorithm.calculate(input(baseValues(1, null, null)));
         assertNull(currentRuntime.get().getSegments().get("north").getCoilNo());
+        assertEquals(1, currentRuntime.get().getSegments().get("north").getNullCount());
         algorithm.calculate(input(baseValues(1, "N001", null)));
 
         verify(repeatProdNoRepository, times(2)).allocateNext("BAF1", "N001");
+    }
+
+    @Test
+    void treatsLegacyZeroBasedCountAsOneBeforeFirstMissingFrame() {
+        currentRuntime.set(BatchTrackingRuntime.builder().unitCode("BAF1")
+                .trackingType(TrackingType.BATCH).templateCode("fb1")
+                .segments(Collections.singletonMap("north",
+                        BatchSegmentRuntime.builder()
+                                .coilNo("N001").repeatProdNo(1).nullCount(0).build()))
+                .build());
+
+        algorithm.calculate(input(baseValues(1, null, null)));
+
+        assertNull(currentRuntime.get().getSegments().get("north").getCoilNo());
+        assertEquals(1, currentRuntime.get().getSegments().get("north").getNullCount());
     }
 
     @Test

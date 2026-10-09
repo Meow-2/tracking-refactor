@@ -17,7 +17,7 @@ public class BatchSegmentRuntime {
     /** 已写入 PG 的生产序号；旧运行态或取号失败时可为空。 */
     private Integer repeatProdNo;
 
-    /** 连续卷号空帧数，有效卷号帧归零。 */
+    /** 与 status 一致：有效卷号为 1，缺值逐帧加 1，超过阈值后清空并重置为 1。 */
     private Integer nullCount;
 
     /** true 表示新卷取号失败，下一有效帧须重试；false 表示补查旧次数，缺记录时插入首次记录。 */

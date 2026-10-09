@@ -27,7 +27,7 @@ public class TrackingSection {
      */
     private StartCondition startCondition;
 
-    /** 连续卷号空帧的容忍数；默认保留首个空帧，超过后清空该侧卷身份。 */
+    /** 卷号缺值清空阈值；有效帧计数为 1，默认值 1 表示首个空帧即清空。 */
     @Builder.Default
     private Integer currentClearThreshold = 1;
 

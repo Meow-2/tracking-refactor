@@ -155,7 +155,7 @@ public class BatchTrackingAlgorithmImpl implements TrackingAlgorithm<BatchResult
                 productionStatus, coilNos, segmentStates, results);
     }
 
-    /** 每侧按自身的卷身份判断上卷；短暂缺值保留身份，但缺值帧不生成结果。 */
+    /** 每侧按自身的卷身份判断上卷；nullCount 与 status 一样从 1 起计数。 */
     private Map<String, BatchSegmentRuntime> resolveSegments(TrackingInput input,
                                                                BatchTrackingConfig config,
                                                                Map<String, String> coilNos,
@@ -168,14 +168,14 @@ public class BatchTrackingAlgorithmImpl implements TrackingAlgorithm<BatchResult
             BatchSegmentRuntime old = previousSegment(previous, segmentCode);
             String coilNo = coilNos.get(segmentCode);
             if (coilNo == null) {
-                int missing = old == null || old.getNullCount() == null ? 1
-                        : old.getNullCount() == Integer.MAX_VALUE ? Integer.MAX_VALUE : old.getNullCount() + 1;
+                int missing = old == null ? 1 : nextNullCount(old.getNullCount());
                 states.put(segmentCode, old != null && old.getCoilNo() != null
                         && missing <= clearThreshold
                         ? BatchSegmentRuntime.builder().coilNo(old.getCoilNo())
                                 .repeatProdNo(old.getRepeatProdNo()).nullCount(missing)
                                 .allocationPending(old.getAllocationPending()).build()
-                        : BatchSegmentRuntime.builder().nullCount(missing).build());
+                        : BatchSegmentRuntime.builder()
+                                .nullCount(missing > clearThreshold ? 1 : missing).build());
                 continue;
             }
 
@@ -200,9 +200,15 @@ public class BatchTrackingAlgorithmImpl implements TrackingAlgorithm<BatchResult
                 }
             }
             states.put(segmentCode, BatchSegmentRuntime.builder().coilNo(coilNo)
-                    .repeatProdNo(repeatProdNo).nullCount(0).allocationPending(pending).build());
+                    .repeatProdNo(repeatProdNo).nullCount(1).allocationPending(pending).build());
         }
         return states;
+    }
+
+    /** 旧状态缺少计数或使用旧版零起点时，首个空帧按 status 规则从 2 计数。 */
+    private int nextNullCount(Integer previousNullCount) {
+        int normalized = previousNullCount == null || previousNullCount < 1 ? 1 : previousNullCount;
+        return normalized == Integer.MAX_VALUE ? Integer.MAX_VALUE : normalized + 1;
     }
 
     /** 旧版运行态只有 coilNos；升级时保留卷身份，缺少 PG 记录则补写首次序号。 */
@@ -216,7 +222,7 @@ public class BatchTrackingAlgorithmImpl implements TrackingAlgorithm<BatchResult
             return state;
         }
         String coilNo = previous.getCoilNos() == null ? null : previous.getCoilNos().get(segmentCode);
-        return coilNo == null ? null : BatchSegmentRuntime.builder().coilNo(coilNo).nullCount(0).build();
+        return coilNo == null ? null : BatchSegmentRuntime.builder().coilNo(coilNo).nullCount(1).build();
     }
 
     private List<BatchResult> complete(TrackingInput input,
