@@ -94,6 +94,7 @@ public class TrimmingTrackingResultRepositoryImpl
         entity.setCoilWidthSv(decimalText(result.getCoilWidthSv()));
         entity.setTrimmingLength(decimalText(result.getTrimmingLength()));
         entity.setCreateTime(eventTime(result));
+        entity.setDeleted(0);
         return entity;
     }
 

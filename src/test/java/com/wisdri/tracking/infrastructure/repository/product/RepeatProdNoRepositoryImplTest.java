@@ -38,22 +38,17 @@ class RepeatProdNoRepositoryImplTest {
         RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
         RepeatProdNoRepositoryImpl repository = repository(mapper);
         QmDcRepeatProdNoLogEntity previous = record(2);
-        when(mapper.selectOne(any())).thenReturn(previous);
+        when(mapper.selectHistoricalMaxRepeatProdNo("CP1", "COIL-A")).thenReturn(2);
         when(mapper.insert(any())).thenReturn(1);
 
         assertThat(repository.allocateNext("cp1", "COIL-A")).isEqualTo(3);
 
-        ArgumentCaptor<LambdaQueryWrapper<QmDcRepeatProdNoLogEntity>> query =
-                ArgumentCaptor.forClass(LambdaQueryWrapper.class);
         ArgumentCaptor<QmDcRepeatProdNoLogEntity> inserted =
                 ArgumentCaptor.forClass(QmDcRepeatProdNoLogEntity.class);
         org.mockito.InOrder calls = inOrder(mapper);
-        calls.verify(mapper).selectOne(query.capture());
+        calls.verify(mapper).selectHistoricalMaxRepeatProdNo("CP1", "COIL-A");
         calls.verify(mapper).insert(inserted.capture());
         calls.verifyNoMoreInteractions();
-        assertThat(query.getValue().getSqlSegment().toLowerCase())
-                .contains("unit_code =", "in_mat_no =", "in_mat_repeat_prod_no desc", "limit 1");
-        assertThat(query.getValue().getParamNameValuePairs().values()).contains("CP1", "COIL-A");
         assertThat(inserted.getValue().getUnitCode()).isEqualTo("CP1");
         assertThat(inserted.getValue().getInMatNo()).isEqualTo("COIL-A");
         assertThat(inserted.getValue().getInMatRepeatProdNo()).isEqualTo(3);
@@ -67,8 +62,8 @@ class RepeatProdNoRepositoryImplTest {
         RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
         RepeatProdNoRepositoryImpl repository = repository(mapper);
         List<QmDcRepeatProdNoLogEntity> persisted = new ArrayList<>();
-        when(mapper.selectOne(any())).thenAnswer(invocation ->
-                persisted.isEmpty() ? null : persisted.get(persisted.size() - 1));
+        when(mapper.selectHistoricalMaxRepeatProdNo("CP1", "COIL-A")).thenAnswer(invocation ->
+                persisted.isEmpty() ? null : persisted.get(persisted.size() - 1).getInMatRepeatProdNo());
         when(mapper.insert(any())).thenAnswer(invocation -> {
             persisted.add(invocation.getArgument(0));
             return 1;
@@ -125,6 +120,36 @@ class RepeatProdNoRepositoryImplTest {
         assertThat(inserted.getValue().getUnitCode()).isEqualTo("CP1");
         assertThat(inserted.getValue().getInMatNo()).isEqualTo("COIL-A");
         assertThat(inserted.getValue().getInMatRepeatProdNo()).isEqualTo(1);
+    }
+
+    @Test
+    void allocatesAfterDeletedLatestRecord() {
+        RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
+        RepeatProdNoRepositoryImpl repository = repository(mapper);
+        when(mapper.selectHistoricalMaxRepeatProdNo("CP1", "COIL-A")).thenReturn(5);
+        when(mapper.insert(any())).thenReturn(1);
+
+        assertThat(repository.allocateNext("cp1", "COIL-A")).isEqualTo(6);
+
+        ArgumentCaptor<QmDcRepeatProdNoLogEntity> inserted =
+                ArgumentCaptor.forClass(QmDcRepeatProdNoLogEntity.class);
+        verify(mapper).insert(inserted.capture());
+        assertThat(inserted.getValue().getInMatRepeatProdNo()).isEqualTo(6);
+        assertThat(inserted.getValue().getDeleted()).isZero();
+    }
+
+    @Test
+    void allocatesNewNumberWhenAllRecordsAreDeleted() {
+        RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
+        RepeatProdNoRepositoryImpl repository = repository(mapper);
+        when(mapper.selectHistoricalMaxRepeatProdNo("CP1", "COIL-A")).thenReturn(5);
+        when(mapper.insert(any())).thenReturn(1);
+
+        assertThat(repository.findLatest("cp1", "COIL-A")).isEqualTo(1);
+        assertThat(repository.findLatestOrAllocate("cp1", "COIL-A")).isEqualTo(6);
+
+        verify(mapper, org.mockito.Mockito.times(2)).selectOne(any());
+        verify(mapper).selectHistoricalMaxRepeatProdNo("CP1", "COIL-A");
     }
 
     @Test

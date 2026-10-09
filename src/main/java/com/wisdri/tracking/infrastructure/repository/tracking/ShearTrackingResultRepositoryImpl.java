@@ -92,6 +92,7 @@ public class ShearTrackingResultRepositoryImpl
         entity.setShearDeviceMaxLength(result.getShearDeviceMaxLength());
         entity.setCutNo(result.getCutNo());
         entity.setShearNo(result.getShearNo());
+        entity.setDeleted(0);
         return entity;
     }
 }

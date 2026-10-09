@@ -2,6 +2,7 @@ package com.wisdri.tracking.infrastructure.dto.postgres.trimming;
 
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
@@ -25,4 +26,7 @@ public class QmTrimmingLogEntity {
     private String trimmingLength;
     private Instant createTime;
     private Instant updateTime;
+    /** 逻辑删除标记：0 表示有效，1 表示已删除；新记录显式写入 0。 */
+    @TableLogic(value = "0", delval = "1")
+    private Integer deleted;
 }

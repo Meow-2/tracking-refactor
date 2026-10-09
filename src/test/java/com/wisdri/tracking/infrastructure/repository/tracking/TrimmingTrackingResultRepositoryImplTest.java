@@ -56,6 +56,7 @@ class TrimmingTrackingResultRepositoryImplTest {
         assertThat(entity.getValue().getCoilWidthSv()).isEqualTo("1000");
         assertThat(entity.getValue().getTrimmingLength()).isEqualTo("2.50");
         assertThat(entity.getValue().getCreateTime()).isEqualTo(Instant.parse("2026-08-29T01:00:00Z"));
+        assertThat(entity.getValue().getDeleted()).isZero();
     }
 
     @Test

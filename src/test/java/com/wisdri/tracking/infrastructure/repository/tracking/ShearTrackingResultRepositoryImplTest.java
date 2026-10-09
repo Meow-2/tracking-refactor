@@ -58,6 +58,7 @@ class ShearTrackingResultRepositoryImplTest {
         assertThat(entity.getShearDeviceCoilNo()).isEqualTo("TR-1");
         assertThat(entity.getCutNo()).isEqualTo(2);
         assertThat(entity.getShearNo()).isEqualTo(1);
+        assertThat(entity.getDeleted()).isZero();
     }
 
     @Test

@@ -90,6 +90,7 @@ public class CoilerTrackingResultRepositoryImpl
         Instant createTime = result.getReceivedAt() == null
                 ? result.getGeneratedAt() : result.getReceivedAt();
         entity.setCreateTime(createTime);
+        entity.setDeleted(0);
         return entity;
     }
 

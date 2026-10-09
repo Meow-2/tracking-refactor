@@ -2,6 +2,7 @@ package com.wisdri.tracking.infrastructure.dto.postgres.product;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
@@ -24,7 +25,8 @@ public class QmDcRepeatProdNoLogEntity {
     /** 从 1 开始的重复生产序号，同一机组和卷号下逐次递增。 */
     private Integer inMatRepeatProdNo;
 
-    /** 逻辑删除标记；逐次记录不删除，固定写 0。 */
+    /** 逻辑删除标记：0 表示有效，1 表示已删除；新记录写 0，已删除序号仍不可复用。 */
+    @TableLogic(value = "0", delval = "1")
     private Integer deleted;
 
     /** 本次分配时间，使用应用进程本地时区，写入 PG timestamp(6) 列。 */

@@ -22,7 +22,7 @@ public class RepeatProdNoRepositoryImpl
         validateKey(unitCode, coilNo);
         String storedUnitCode = PostgresUnitCode.uppercase(unitCode);
         // 同一机组同一卷只由一个请求取号；表唯一约束仍阻止意外的重复序号。
-        Integer latest = findLatestStored(storedUnitCode, coilNo);
+        Integer latest = baseMapper.selectHistoricalMaxRepeatProdNo(storedUnitCode, coilNo);
         if (latest != null && latest == Integer.MAX_VALUE) {
             throw new IllegalStateException("钢卷重复生产次数已达到整数上限: 机组=" + unitCode + "，钢卷=" + coilNo);
         }
@@ -53,7 +53,7 @@ public class RepeatProdNoRepositoryImpl
         return latest == null ? allocateNext(unitCode, coilNo) : latest;
     }
 
-    /** 只取同机组同卷序号最大的一行，不修改任何历史记录。 */
+    /** 只取同机组同卷有效记录中的最大序号，不修改任何历史记录。 */
     private Integer findLatestStored(String storedUnitCode, String coilNo) {
         LambdaQueryWrapper<QmDcRepeatProdNoLogEntity> query = Wrappers
                 .<QmDcRepeatProdNoLogEntity>lambdaQuery()

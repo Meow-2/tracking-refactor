@@ -66,6 +66,7 @@ class CoilerTrackingResultRepositoryImplTest {
         assertThat(entity.getUncoilerDeviceName()).isNull();
         assertThat(entity.getUncoilerMaxLength()).isNull();
         assertThat(entity.getCreateTime()).isEqualTo(time);
+        assertThat(entity.getDeleted()).isZero();
     }
 
     @Test
@@ -170,6 +171,7 @@ class CoilerTrackingResultRepositoryImplTest {
         assertThat(captor.getValue().getUncoilerMaxLength()).isEqualTo("900");
         assertThat(captor.getValue().getCoilerMethod()).isNull();
         assertThat(captor.getValue().getCoilerDeviceCode()).isNull();
+        assertThat(captor.getValue().getDeleted()).isZero();
     }
 
     @Test
