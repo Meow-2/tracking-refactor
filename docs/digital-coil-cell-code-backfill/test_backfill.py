@@ -103,7 +103,7 @@ class BackfillTest(unittest.TestCase):
                      "--start", "1970-01-01 08:00:00",
                      "--end", "1970-01-01 09:00:00", "--window-hours", "1"]
         with patch.dict(sys.modules, {"taosws": connector}), \
-                patch.dict(backfill.os.environ, {"TD_DSN": "mock-dsn"}), \
+                patch.object(backfill, "TD_DSN", "mock-dsn"), \
                 patch.object(sys, "argv", arguments), \
                 patch.object(backfill, "load_tables", return_value={"cp1_process_sf": "CP1"}), \
                 patch.object(backfill, "execute", return_value=("ms",)), \

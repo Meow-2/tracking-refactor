@@ -6,12 +6,17 @@
 
 ## 准备
 
-安装 `taos-ws-py`，通过环境变量提供连接串，不在脚本、命令行参数或日志中保存凭据：
+安装 `taos-ws-py`，然后在 `backfill.py` 顶部填写 `TD_DSN`：
 
 ```powershell
 python -m pip install taos-ws-py
-$env:TD_DSN = 'ws://<user>:<password>@<host>:6041'
 ```
+
+```python
+TD_DSN = "ws://<user>:<password>@<host>:6041"
+```
+
+把占位符替换为实际连接信息；密码含有 `@`、`:` 等 URL 特殊字符时应先编码。连接串含敏感凭据，不要提交填写后的脚本，也不要将其粘贴到日志或报告中。脚本不会打印该连接串。
 
 执行前确认目标库为 `digital_coil`、毫秒精度。脚本逐表检查 `ts TIMESTAMP`、`coil_no` 字符串列、`pass_no INT` 和 `cell_code` 普通字符串列。缺少 `coil_no` 或 `pass_no` 的表会记录原因并跳过，不执行任何回填；其他必要列不符合要求时停止。脚本不会添加列或改表结构。`--end` 必须是一次确定后保持不变的上海本地时间；所有窗口采用 `[start, end)`，不会在运行中向前推进截止点。
 

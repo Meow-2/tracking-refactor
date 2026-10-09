@@ -43,3 +43,7 @@ build/
 ### Runtime logs ###
 logs/
 **.log**
+
+### Python generated files ###
+__pycache__/
+*.pyc

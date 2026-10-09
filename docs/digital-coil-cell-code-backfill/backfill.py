@@ -2,13 +2,12 @@
 """按上海时间分段重算 digital_coil 普通表的 cell_code。
 
 表范围来自同目录的审核清单；只通过 TDengine WebSocket 执行单表、单窗口查询和写入。
-连接串从环境变量读取，日志不输出连接信息或业务行数据。
+连接串在文件顶部配置，日志不输出连接信息或业务行数据。
 """
 
 from __future__ import annotations
 
 import argparse
-import os
 import re
 import sys
 import threading
@@ -24,6 +23,10 @@ TABLE_PATTERN = re.compile(r"^- `([a-z][a-z0-9_]+)`$", re.MULTILINE)
 UNIT_PREFIXES = frozenset(("cp1", "cbl1", "dcl1", "fcl1", "zrm1", "csl1"))
 MILLISECOND = 1
 PROGRESS_INTERVAL_SECONDS = 30
+# 本地运行前填写；连接串含敏感凭据，禁止输出到日志或提交真实值。
+# TD_DSN = "ws://<user>:<password>@<host>:6041"
+TD_DSN = "ws://root:taosdata@172.16.203.12:6041"
+
 
 
 def log_progress(message: str):
@@ -222,16 +225,15 @@ def main() -> int:
         parser.error("--table 必须来自六类机组的 92 张表清单")
     if len(set(selected)) != len(selected):
         parser.error("--table 不能重复")
-    dsn = os.environ.get("TD_DSN")
-    if not dsn:
-        parser.error("请通过 TD_DSN 环境变量提供 TDengine WebSocket 连接串")
+    if not TD_DSN or "<" in TD_DSN or ">" in TD_DSN:
+        parser.error("请先在脚本顶部填写 TD_DSN 连接串")
     import taosws  # 延迟导入，离线校验参数和单元测试不依赖数据库驱动。
 
     run_started = time.monotonic()
     log_progress(f"开始连接 TDengine；模式={'写入' if args.apply else '预览'}，"
                  f"固定截止={format_time(args.end)}，计划检查 {len(selected)} 张表，"
                  f"初始窗口={args.window_hours} 小时，单批上限={args.max_rows} 行")
-    connection = taosws.connect(dsn)
+    connection = taosws.connect(TD_DSN)
     try:
         precision = execute(connection, "SELECT `precision` FROM information_schema.ins_databases WHERE name = 'digital_coil'")
         if not precision or str(precision[0]).lower() != "ms":
