@@ -18,6 +18,21 @@ public class RepeatProdNoRepositoryImpl
         extends ServiceImpl<RepeatProdNoMapper, QmDcRepeatProdNoLogEntity>
         implements RepeatProdNoRepository {
     @Override
+    public Integer findLatestBefore(String unitCode, String coilNo, LocalDateTime passStartTime) {
+        validateKey(unitCode, coilNo);
+        if (passStartTime == null) {
+            throw new IllegalArgumentException("道次开始时间不能为空");
+        }
+        QmDcRepeatProdNoLogEntity latest = baseMapper.selectOne(Wrappers.<QmDcRepeatProdNoLogEntity>lambdaQuery()
+                .eq(QmDcRepeatProdNoLogEntity::getUnitCode, PostgresUnitCode.uppercase(unitCode))
+                .eq(QmDcRepeatProdNoLogEntity::getInMatNo, coilNo)
+                .lt(QmDcRepeatProdNoLogEntity::getCreateTime, passStartTime)
+                .orderByDesc(QmDcRepeatProdNoLogEntity::getInMatRepeatProdNo)
+                .last("LIMIT 1"));
+        return latest == null ? 1 : latest.getInMatRepeatProdNo();
+    }
+
+    @Override
     public Integer allocateNext(String unitCode, String coilNo) {
         validateKey(unitCode, coilNo);
         String storedUnitCode = PostgresUnitCode.uppercase(unitCode);

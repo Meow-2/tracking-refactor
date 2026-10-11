@@ -33,6 +33,25 @@ class RepeatProdNoRepositoryImplTest {
     }
 
     @Test
+    void findLatestBeforeUsesStrictShanghaiCutoffAndNeverAllocates() {
+        RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);
+        RepeatProdNoRepositoryImpl repository = repository(mapper);
+        java.time.LocalDateTime start = java.time.LocalDateTime.parse("2026-10-09T00:00:00.123456789");
+        when(mapper.selectOne(any())).thenAnswer(call -> {
+            com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<QmDcRepeatProdNoLogEntity> query = call.getArgument(0);
+            assertThat(query.getSqlSegment()).contains("create_time <", "ORDER BY in_mat_repeat_prod_no DESC", "LIMIT 1");
+            assertThat(query.getParamNameValuePairs().values()).contains("ZRM1", "A",
+                    java.time.LocalDateTime.of(2026, 10, 9, 0, 0, 0, 123456789));
+            return record(4);
+        });
+        assertThat(repository.findLatestBefore("zrm1", "A", start)).isEqualTo(4);
+        org.mockito.Mockito.doReturn(null).when(mapper).selectOne(any());
+        assertThat(repository.findLatestBefore("zrm1", "A", start)).isEqualTo(1);
+        verify(mapper, org.mockito.Mockito.times(2)).selectOne(any());
+        org.mockito.Mockito.verifyNoMoreInteractions(mapper);
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void allocatesAfterLatestWithoutUpdatingPreviousRows() {
         RepeatProdNoMapper mapper = mock(RepeatProdNoMapper.class);

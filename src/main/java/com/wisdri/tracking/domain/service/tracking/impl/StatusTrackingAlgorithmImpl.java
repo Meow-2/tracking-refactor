@@ -2,7 +2,7 @@ package com.wisdri.tracking.domain.service.tracking.impl;
 
 import com.wisdri.tracking.domain.model.config.PointConfig;
 import com.wisdri.tracking.domain.model.config.status.DeviceSide;
-import com.wisdri.tracking.domain.model.config.status.DevicePosition;
+import com.wisdri.tracking.domain.service.tracking.status.StatusDeviceResolver;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodConfig;
 import com.wisdri.tracking.domain.model.config.status.CoilerMethodDefinition;
 import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
@@ -42,7 +42,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.regex.Pattern;
+import static com.wisdri.tracking.domain.service.tracking.status.StatusCoilNoNormalizer.*;
 
 /**
  * 根据连续多帧剩余长度变化识别当前运行的开卷机和卷取机。
@@ -52,10 +52,6 @@ import java.util.regex.Pattern;
 public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResult> {
     private static final List<DeviceSide> RESULT_ORDER = Arrays.asList(
             DeviceSide.UNCOILER, DeviceSide.COILER);
-
-    /** 现场点位可能上送的“请求颜色号”占位前缀，不应作为真实钢卷号参与跟踪。 */
-    private static final Pattern INVALID_COIL_NO_PREFIX =
-            Pattern.compile("^request\\s+color\\b", Pattern.CASE_INSENSITIVE);
 
     @Resource
     private TrackingRuntimeRepositoryDispatcher runtimeRepositoryDispatcher;
@@ -266,7 +262,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         Map<String, StatusCandidateRuntime> updated = new LinkedHashMap<>();
         for (StatusPointGroup group : tracking.getPoints()) {
             DeviceSide side = actualSide(group, tracking, rollingState);
-            String coilNo = normalizeCoilNo(PointReader.stringValue(input.getLatestSnapshot(),
+            String coilNo = normalize(PointReader.stringValue(input.getLatestSnapshot(),
                     pointPath(tracking, group.getCoilNo())));
             String colorNo = trimInvisible(PointReader.stringValue(input.getLatestSnapshot(),
                     pointPath(tracking, group.getColorNo())));
@@ -463,7 +459,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
         if (path == null || !snapshot.getValues().containsKey(path)) {
             return false;
         }
-        String coilNo = normalizeCoilNo(PointReader.stringValue(snapshot, path));
+        String coilNo = normalize(PointReader.stringValue(snapshot, path));
         if (coilNo != null) {
             coils.add(coilNo);
         }
@@ -544,7 +540,7 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
             if (!porDevice(group)) {
                 continue;
             }
-            String coilNo = normalizeCoilNo(PointReader.stringValue(input.getLatestSnapshot(),
+            String coilNo = normalize(PointReader.stringValue(input.getLatestSnapshot(),
                     pointPath(tracking, group.getCoilNo())));
             StatusCandidateRuntime old = previous == null ? null : previous.get(group.getCode());
             if (coilNo != null && (old == null || !coilNo.equals(old.getCoilNo()))) {
@@ -730,18 +726,8 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
      * 实际方向为 direct_point XOR direct_reverse，false 时从右往左，true 时从左往右。</p>
      */
     private DeviceSide positionSide(StatusPointGroup group, RollingState rollingState) {
-        DevicePosition source = rollingState.getDirection() ^ rollingState.isReverse()
-                ? DevicePosition.LEFT : DevicePosition.RIGHT;
-        boolean sourceDevice = group.getPosition() == source;
-        String code = group.getCode().toLowerCase(Locale.ROOT);
-        if (rollingState.getPassNo() == 1) {
-            if (sourceDevice && code.startsWith("por")) {
-                return DeviceSide.UNCOILER;
-            }
-            return !sourceDevice && code.startsWith("tr") ? DeviceSide.COILER : null;
-        }
-        return code.startsWith("tr")
-                ? sourceDevice ? DeviceSide.UNCOILER : DeviceSide.COILER : null;
+        return StatusDeviceResolver.positionSide(group, rollingState.getPassNo(),
+                rollingState.getDirection(), rollingState.isReverse());
     }
 
     /** 两端都有符合本道次类别和物理位置的设备配置时才允许形成当前设备对。 */
@@ -885,47 +871,6 @@ public class StatusTrackingAlgorithmImpl implements TrackingAlgorithm<StatusResu
 
     private String pointPath(StatusTrackingSection tracking, PointConfig point) {
         return PointReader.pathResolve(tracking.getPointPrefix(), point == null ? null : point.getName());
-    }
-
-    private String trimInvisible(String value) {
-        if (value == null) {
-            return null;
-        }
-        int start = 0;
-        int end = value.length();
-        while (start < end && invisible(value.charAt(start))) {
-            start++;
-        }
-        while (end > start && invisible(value.charAt(end - 1))) {
-            end--;
-        }
-        return value.substring(start, end);
-    }
-
-    /**
-     * 过滤空值、纯英文句点和现场“request color”占位值，保留合法的字母数字混合钢卷号。
-     */
-    private String normalizeCoilNo(String value) {
-        String trimmed = trimInvisible(value);
-        if (trimmed == null || trimmed.isEmpty()) {
-            return null;
-        }
-        if (INVALID_COIL_NO_PREFIX.matcher(trimmed).find()) {
-            return null;
-        }
-        for (int index = 0; index < trimmed.length(); index++) {
-            if (trimmed.charAt(index) != '.') {
-                return trimmed;
-            }
-        }
-        return null;
-    }
-
-    private boolean invisible(char value) {
-        return Character.isWhitespace(value)
-                || Character.isSpaceChar(value)
-                || Character.isISOControl(value)
-                || Character.getType(value) == Character.FORMAT;
     }
 
     private Instant receivedAt(TrackingInput input) {

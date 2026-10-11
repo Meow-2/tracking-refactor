@@ -11,7 +11,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
-/** 将旧道次结算数据转换并写入质量服务；只允许异步工作线程调用。 */
+/** 将道次数据转换并写入质量服务，实时异步发送与历史同步补全共用。 */
 @Component
 public class QualityServiceGateway {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter
