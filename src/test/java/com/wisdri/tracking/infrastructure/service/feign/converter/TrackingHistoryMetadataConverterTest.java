@@ -9,10 +9,11 @@ import com.wisdri.tracking.domain.model.history.TrackingHistoryMetadata;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeNode;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeResponse;
-import com.wisdri.tracking.infrastructure.service.feign.converter.process.ProcessCubeApiTrackingConfigConverter;
-import com.wisdri.tracking.infrastructure.service.feign.converter.status.StatusCubeApiTrackingConfigConverter;
+import com.wisdri.tracking.infrastructure.properties.feign.timeseries.history.TimeSeriesHistoryProperties;
 import com.wisdri.tracking.infrastructure.service.feign.converter.history.PointHistoryMetadataConverter;
 import com.wisdri.tracking.infrastructure.service.feign.converter.history.TrackingHistoryMetadataConverter;
+import com.wisdri.tracking.infrastructure.service.feign.converter.process.ProcessCubeApiTrackingConfigConverter;
+import com.wisdri.tracking.infrastructure.service.feign.converter.status.StatusCubeApiTrackingConfigConverter;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -27,11 +28,20 @@ class TrackingHistoryMetadataConverterTest {
     private static final String PREFIX = "/aygg_tracking/zrm1/status/tracking/";
     private final ObjectMapper mapper = new ObjectMapper();
     private final TrackingHistoryMetadataConverter converter = new TrackingHistoryMetadataConverter();
+    private final TimeSeriesHistoryProperties historyProperties = new TimeSeriesHistoryProperties();
 
     TrackingHistoryMetadataConverterTest() {
         ReflectionTestUtils.setField(converter, "converters", Arrays.asList(
                 new StatusCubeApiTrackingConfigConverter(), new ProcessCubeApiTrackingConfigConverter()));
         ReflectionTestUtils.setField(converter, "pointMetadataConverter", new PointHistoryMetadataConverter());
+        ReflectionTestUtils.setField(converter, "historyProperties", historyProperties);
+    }
+
+    @Test
+    void usesConfiguredHistoryDatabaseForEveryPoint() throws Exception {
+        historyProperties.setDatabase("history_sample");
+        assertThat(convert(tree()).getPointMetadata().values())
+                .allSatisfy(point -> assertThat(point.getDatabase()).isEqualTo("history_sample"));
     }
 
     @Test

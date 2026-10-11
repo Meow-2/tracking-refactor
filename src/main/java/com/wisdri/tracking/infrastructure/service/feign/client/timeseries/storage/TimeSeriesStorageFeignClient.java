@@ -1,9 +1,9 @@
-package com.wisdri.tracking.infrastructure.service.feign.client;
+package com.wisdri.tracking.infrastructure.service.feign.client.timeseries.storage;
 
 import com.wisdri.tracking.common.response.R;
-import com.wisdri.tracking.infrastructure.dto.feign.timeseries.TimeSeriesDataRequest;
-import com.wisdri.tracking.infrastructure.dto.feign.timeseries.TimeSeriesTableRequest;
-import com.wisdri.tracking.infrastructure.service.feign.config.TimeSeriesStorageFeignConfig;
+import com.wisdri.tracking.infrastructure.dto.feign.timeseries.storage.TimeSeriesDataRequest;
+import com.wisdri.tracking.infrastructure.dto.feign.timeseries.storage.TimeSeriesTableRequest;
+import com.wisdri.tracking.infrastructure.service.feign.config.timeseries.storage.TimeSeriesStorageFeignConfig;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;

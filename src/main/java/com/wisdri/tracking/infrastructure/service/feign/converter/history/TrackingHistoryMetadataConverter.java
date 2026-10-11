@@ -7,6 +7,7 @@ import com.wisdri.tracking.domain.model.history.TrackingHistoryMetadata;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeNode;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeResponse;
+import com.wisdri.tracking.infrastructure.properties.feign.timeseries.history.TimeSeriesHistoryProperties;
 import com.wisdri.tracking.infrastructure.service.feign.converter.CubeApiTrackingConfigConverter;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +25,9 @@ public class TrackingHistoryMetadataConverter {
 
     @Resource
     private PointHistoryMetadataConverter pointMetadataConverter;
+
+    @Resource
+    private TimeSeriesHistoryProperties historyProperties;
 
     /** 历史入口严格校验，配置转换异常直接向调用方传播。 */
     public TrackingHistoryMetadata convert(CubeApiTreeResponse tree, String unitCode,
@@ -54,7 +58,7 @@ public class TrackingHistoryMetadataConverter {
             throw new TrackingException("Cube 跟踪配置转换结果为空: " + normalizedUnit + " " + trackingType);
         }
         return new TrackingHistoryMetadata(config,
-                pointMetadataConverter.convert(selected.node, selected.path, "cube"));
+                pointMetadataConverter.convert(selected.node, selected.path, historyProperties.getDatabase()));
     }
 
     /** 当前节点有配置时使用其完整子树；其下的工艺段配置属于该配置的一部分。 */

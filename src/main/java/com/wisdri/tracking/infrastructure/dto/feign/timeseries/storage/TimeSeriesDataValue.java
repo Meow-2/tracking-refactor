@@ -1,24 +1,34 @@
-package com.wisdri.tracking.infrastructure.dto.feign.timeseries;
+package com.wisdri.tracking.infrastructure.dto.feign.timeseries.storage;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
 /**
- * 时序数据存储服务表列定义。
+ * 时序数据存储服务单列值。
  */
 @Data
 @AllArgsConstructor
-public class TimeSeriesTableRule {
+public class TimeSeriesDataValue {
     /**
      * 列名。
      */
     private String id;
 
     /**
-     * 数据类型。
+     * 值。
      */
-    private String datatype;
+    private Object v;
+
+    /**
+     * 是否有效。
+     */
+    private Boolean q;
+
+    /**
+     * 时间戳。
+     */
+    private Long t;
 
     /**
      * 是否为 tag。

@@ -1,4 +1,4 @@
-package com.wisdri.tracking.infrastructure.dto.feign.timeseries;
+package com.wisdri.tracking.infrastructure.dto.feign.timeseries.storage;
 
 import com.wisdri.tracking.domain.model.config.PointDataType;
 import lombok.Getter;

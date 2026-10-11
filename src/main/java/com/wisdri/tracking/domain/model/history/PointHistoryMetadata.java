@@ -26,7 +26,7 @@ public class PointHistoryMetadata {
     String unit;
     /** Cube 有效标记；false 会被历史转换器拒绝，null 表示未提供。 */
     Boolean valid;
-    /** TDengine 查询数据库名，由调用方指定；Cube 历史元信息入口使用 cube。 */
+    /** TDengine 查询数据库名，Cube 历史元信息入口使用 time-series-history.database。 */
     String database;
     /** TDengine 查询对象名，通过移除 cubeKey 末尾的 "_" + code 得到。 */
     String objectName;

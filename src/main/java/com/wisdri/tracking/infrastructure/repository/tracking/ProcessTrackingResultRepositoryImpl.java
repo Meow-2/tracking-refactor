@@ -6,10 +6,10 @@ import com.wisdri.tracking.domain.model.config.process.SegmentConfig;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.process.ProcessResult;
 import com.wisdri.tracking.domain.repository.tracking.TrackingResultRepository;
-import com.wisdri.tracking.infrastructure.dto.feign.timeseries.*;
-import com.wisdri.tracking.infrastructure.properties.feign.TimeSeriesStorageProperties;
+import com.wisdri.tracking.infrastructure.dto.feign.timeseries.storage.*;
+import com.wisdri.tracking.infrastructure.properties.feign.timeseries.storage.TimeSeriesStorageProperties;
 import com.wisdri.tracking.infrastructure.properties.TrackingProperties;
-import com.wisdri.tracking.infrastructure.service.feign.gateway.TimeSeriesStorageGateway;
+import com.wisdri.tracking.infrastructure.service.feign.gateway.timeseries.storage.TimeSeriesStorageGateway;
 import org.springframework.stereotype.Repository;
 
 import javax.annotation.Resource;

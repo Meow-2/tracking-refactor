@@ -74,6 +74,11 @@ time-series-storage:
   connectTimeout: 3000
   readTimeout: 5000
 
+time-series-history:
+  database: cube
+  connectTimeout: 3000
+  readTimeout: 60000
+
 quality:
   connectTimeout: 3000
   readTimeout: 5000

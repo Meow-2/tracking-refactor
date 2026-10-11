@@ -1,9 +1,10 @@
-package com.wisdri.tracking.infrastructure.service.feign.gateway;
+package com.wisdri.tracking.infrastructure.service.feign.gateway.timeseries.storage;
 
 import com.wisdri.tracking.common.response.R;
-import com.wisdri.tracking.infrastructure.dto.feign.timeseries.TimeSeriesDataRequest;
-import com.wisdri.tracking.infrastructure.dto.feign.timeseries.TimeSeriesTableRequest;
-import com.wisdri.tracking.infrastructure.service.feign.client.TimeSeriesStorageFeignClient;
+import com.wisdri.tracking.infrastructure.service.feign.gateway.ExternalServiceRetryExecutor;
+import com.wisdri.tracking.infrastructure.dto.feign.timeseries.storage.TimeSeriesDataRequest;
+import com.wisdri.tracking.infrastructure.dto.feign.timeseries.storage.TimeSeriesTableRequest;
+import com.wisdri.tracking.infrastructure.service.feign.client.timeseries.storage.TimeSeriesStorageFeignClient;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;

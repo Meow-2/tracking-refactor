@@ -1,4 +1,4 @@
-package com.wisdri.tracking.infrastructure.properties.feign;
+package com.wisdri.tracking.infrastructure.properties.feign.timeseries.storage;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
