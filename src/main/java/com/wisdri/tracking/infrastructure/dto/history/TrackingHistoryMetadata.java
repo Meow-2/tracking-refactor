@@ -1,4 +1,4 @@
-package com.wisdri.tracking.domain.model.history;
+package com.wisdri.tracking.infrastructure.dto.history;
 
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
 import lombok.Getter;

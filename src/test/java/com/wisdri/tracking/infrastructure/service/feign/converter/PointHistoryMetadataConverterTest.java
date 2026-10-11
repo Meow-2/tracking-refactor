@@ -3,7 +3,7 @@ package com.wisdri.tracking.infrastructure.service.feign.converter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wisdri.tracking.domain.model.config.PointConfig;
 import com.wisdri.tracking.domain.model.config.PointDataType;
-import com.wisdri.tracking.domain.model.history.PointHistoryMetadata;
+import com.wisdri.tracking.infrastructure.dto.history.PointHistoryMetadata;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeNode;
 import com.wisdri.tracking.infrastructure.service.feign.converter.history.PointHistoryMetadataConverter;
 import org.junit.jupiter.api.Test;

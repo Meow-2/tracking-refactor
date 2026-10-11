@@ -1,4 +1,4 @@
-package com.wisdri.tracking.domain.model.history;
+package com.wisdri.tracking.infrastructure.dto.history;
 
 import lombok.Builder;
 import lombok.Value;

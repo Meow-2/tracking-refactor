@@ -3,7 +3,7 @@ package com.wisdri.tracking.infrastructure.service.feign.converter.history;
 import com.wisdri.tracking.common.exception.TrackingException;
 import com.wisdri.tracking.domain.model.config.PointConfig;
 import com.wisdri.tracking.domain.model.config.PointDataType;
-import com.wisdri.tracking.domain.model.history.PointHistoryMetadata;
+import com.wisdri.tracking.infrastructure.dto.history.PointHistoryMetadata;
 import com.wisdri.tracking.domain.service.point.PointReader;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeNode;
 import org.springframework.stereotype.Component;

@@ -3,7 +3,7 @@ package com.wisdri.tracking.infrastructure.service.feign.converter.history;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.wisdri.tracking.common.exception.TrackingException;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
-import com.wisdri.tracking.domain.model.history.TrackingHistoryMetadata;
+import com.wisdri.tracking.infrastructure.dto.history.TrackingHistoryMetadata;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeNode;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeResponse;

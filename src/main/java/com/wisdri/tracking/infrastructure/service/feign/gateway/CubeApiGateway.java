@@ -3,7 +3,7 @@ package com.wisdri.tracking.infrastructure.service.feign.gateway;
 import com.wisdri.tracking.common.exception.ExternalServiceException;
 import com.wisdri.tracking.common.response.R;
 import com.wisdri.tracking.domain.model.config.TrackingConfig;
-import com.wisdri.tracking.domain.model.history.TrackingHistoryMetadata;
+import com.wisdri.tracking.infrastructure.dto.history.TrackingHistoryMetadata;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeRequest;
 import com.wisdri.tracking.infrastructure.dto.feign.cube.CubeApiTreeResponse;
