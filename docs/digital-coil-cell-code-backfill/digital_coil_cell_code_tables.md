@@ -139,4 +139,4 @@
 
 ## 补全前置条件
 
-本清单记录的是当时查询到的 93 张表。当前[分段重算脚本](README-script.md)仅处理其中 `cp1_`、`cbl1_`、`dcl1_`、`fcl1_`、`zrm1_` 和 `csl1_` 开头的 92 张表，且要求每张表具有普通列 `coil_no`、`pass_no` 和 `cell_code`；`baf1_batch` 不参与。正式执行前须重新核对生产表结构并按脚本说明先做小范围验证。
+本清单记录的是当时查询到的 93 张表。[分段重算脚本](README-script.md)默认处理其中 `cp1_`、`cbl1_`、`fcl1_`、`dcl1_`、`zrm1_` 和 `csl1_` 开头的 92 张表，要求普通列 `coil_no`、`pass_no` 和 `cell_code`；通过 `--table baf1_batch` 可单独按固定值 `BAF1001` 补全 BAF 表，仅要求 `ts` 和普通字符串 `cell_code` 列。正式执行前须重新核对生产表结构并按脚本说明先做小范围验证。

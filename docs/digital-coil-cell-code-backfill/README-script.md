@@ -1,6 +1,6 @@
 # `cell_code` 分段重算脚本
 
-`backfill.py` 从同目录清单中，仅选择表名以 `cp1_`、`cbl1_`、`dcl1_`、`fcl1_`、`zrm1_` 或 `csl1_` 开头的 92 张 `digital_coil` 普通表；`baf1_batch` 不在执行范围内。机组代码取表名第一个下划线前的部分并转大写，`cell_code` 为该代码加至少三位的道次。`pass_no IS NULL` 对应 `001`；`0` 对应 `000`；`6` 对应 `006`；`1234` 保留 `1234`。已有值与计算结果不一致时也会更新。负数沿用原 SQL 的字符串表示，例如 `-1` 对应 `CP1-1`，正式执行前需由业务方确认该规则。
+`backfill.py` 默认从同目录清单中选择表名以 `cp1_`、`cbl1_`、`dcl1_`、`fcl1_`、`zrm1_` 或 `csl1_` 开头的 92 张 `digital_coil` 普通表。也可通过 `--table baf1_batch` 单独处理 BAF 表；默认批量运行及 `--resume-table` 不包含 BAF。六类机组的代码取表名第一个下划线前的部分并转大写，`cell_code` 为该代码加至少三位的道次。`pass_no IS NULL` 对应 `001`；`0` 对应 `000`；`6` 对应 `006`；`1234` 保留 `1234`。已有值与计算结果不一致时也会更新。负数沿用原 SQL 的字符串表示，例如 `-1` 对应 `CP1-1`，正式执行前需由业务方确认该规则。BAF 与当前批次跟踪算法一致，固定补为 `BAF1001`，不读取 `pass_no`。
 
 脚本使用 TDengine 的 `INSERT INTO ... (ts, cell_code) SELECT ...` 对相同时间戳写入，依赖 TDengine 3.x 的部分列更新语义。先选少量历史数据验证 `pass_no`、`coil_no` 等其他列不变，再扩大范围。实时写入若在回填后再次覆盖同一时间戳，结果可能改变；应固定历史截止时间并避开仍会迟到写入的时间段。
 
@@ -18,7 +18,7 @@ TD_DSN = "ws://<user>:<password>@<host>:6041"
 
 把占位符替换为实际连接信息；密码含有 `@`、`:` 等 URL 特殊字符时应先编码。连接串含敏感凭据，不要提交填写后的脚本，也不要将其粘贴到日志或报告中。脚本不会打印该连接串。
 
-执行前确认目标库为 `digital_coil`、毫秒精度。脚本逐表检查 `ts TIMESTAMP`、`coil_no` 字符串列、`pass_no INT` 和 `cell_code` 普通字符串列。缺少 `coil_no` 或 `pass_no` 的表会记录原因并跳过，不执行任何回填；其他必要列不符合要求时停止。脚本不会添加列或改表结构。`--end` 必须是一次确定后保持不变的上海本地时间；所有窗口采用 `[start, end)`，不会在运行中向前推进截止点。
+执行前确认目标库为 `digital_coil`、毫秒精度。六类机组表逐表检查 `ts TIMESTAMP`、`coil_no` 字符串列、`pass_no INT` 和 `cell_code` 普通字符串列；BAF 只需 `ts TIMESTAMP` 和 `cell_code` 普通字符串列。六类机组表缺少 `coil_no` 或 `pass_no` 时记录原因并跳过；其他必要列不符合要求时停止。脚本不会添加列或改表结构。`--end` 必须是一次确定后保持不变的上海本地时间；所有窗口采用 `[start, end)`，不会在运行中向前推进截止点。
 
 ## 先预览，再写入
 
@@ -32,6 +32,13 @@ python docs/digital-coil-cell-code-backfill/backfill.py --table cp1_process_sf -
 
 ```powershell
 python docs/digital-coil-cell-code-backfill/backfill.py --table cp1_process_sf --start '2026-09-01 00:00:00' --end '2026-09-01 01:00:00' --window-hours 1 --max-rows 10000 --pause 1 --apply
+```
+
+单独补全 BAF 时，先预览，再对同一固定范围添加 `--apply`：
+
+```powershell
+python docs/digital-coil-cell-code-backfill/backfill.py --table baf1_batch --start '2026-09-01 00:00:00' --end '2026-09-01 01:00:00' --window-hours 1
+python docs/digital-coil-cell-code-backfill/backfill.py --table baf1_batch --start '2026-09-01 00:00:00' --end '2026-09-01 01:00:00' --window-hours 1 --apply
 ```
 
 不指定 `--table` 则依次检查并处理上述 92 张表；不指定 `--start` 则逐表读取最早时间戳。脚本串行运行，默认初始窗口 24 小时、单条写入至多 10000 行、写入窗口之间暂停 1 秒。每个窗口先计数，空窗口跳过；超过 `--max-rows` 时按时间二分，直到满足上限。预览只执行计数，不写入。窗口异常时脚本立即停止，日志显示最后处理的表和时间范围；复查该范围后可用相同 `--start`、`--end` 重跑，已正确的行会自动跳过。大范围运行前建议按实际负载调整窗口、行数上限与暂停时间。

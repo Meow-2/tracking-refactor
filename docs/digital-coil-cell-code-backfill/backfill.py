@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """按上海时间分段重算 digital_coil 普通表的 cell_code。
 
+默认处理六类机组的 92 张表；可单独指定 baf1_batch，按批次算法的固定代码补全。
 表范围来自同目录的审核清单；只通过 TDengine WebSocket 执行单表、单窗口查询和写入。
 连接串在文件顶部配置，日志不输出连接信息或业务行数据。
 """
@@ -21,6 +22,8 @@ SHANGHAI = timezone(timedelta(hours=8))
 TABLE_LIST = Path(__file__).with_name("digital_coil_cell_code_tables.md")
 TABLE_PATTERN = re.compile(r"^- `([a-z][a-z0-9_]+)`$", re.MULTILINE)
 UNIT_PREFIXES = frozenset(("cp1", "cbl1", "dcl1", "fcl1", "zrm1", "csl1"))
+BAF_TABLE = "baf1_batch"
+BAF_CELL_CODE = "BAF1001"
 MILLISECOND = 1
 PROGRESS_INTERVAL_SECONDS = 30
 # 本地运行前填写；连接串含敏感凭据，禁止输出到日志或提交真实值。
@@ -84,14 +87,16 @@ def format_time(value: int) -> str:
 
 
 def load_tables() -> dict[str, str]:
-    """从审核清单筛选六类表；机组代码取第一个下划线前的表名前缀。"""
+    """从审核清单筛选六类表和 BAF 表；机组代码取首个下划线前的前缀。"""
     names = TABLE_PATTERN.findall(TABLE_LIST.read_text(encoding="utf-8"))
     if len(names) != 93 or len(set(names)) != len(names):
         raise ValueError("表清单不是预期的 93 张唯一普通表，请重新核对")
     selected = [name for name in names if name.split("_", 1)[0] in UNIT_PREFIXES]
     if len(selected) != 92:
         raise ValueError("六类机组表不是预期的 92 张，请重新核对")
-    return {name: name.split("_", 1)[0].upper() for name in selected}
+    if names.count(BAF_TABLE) != 1:
+        raise ValueError("表清单中必须恰有一张 baf1_batch，请重新核对")
+    return {name: name.split("_", 1)[0].upper() for name in selected + [BAF_TABLE]}
 
 
 def expected_code(unit: str) -> str:
@@ -106,9 +111,9 @@ def expected_code(unit: str) -> str:
 
 
 def window_sql(table: str, unit: str, start: int, end: int) -> tuple[str, str]:
-    """只选目标值不同的记录；相同时间戳仅写 ts 与 cell_code。"""
+    """只选目标值不同的记录；BAF 不依赖 pass_no，仅写 ts 与 cell_code。"""
     source = f"digital_coil.`{table}`"
-    code = expected_code(unit)
+    code = f"'{BAF_CELL_CODE}'" if table == BAF_TABLE else expected_code(unit)
     condition = (
         f"ts >= {start} AND ts < {end} "
         f"AND (cell_code IS NULL OR cell_code <> {code})"
@@ -132,7 +137,7 @@ def execute(connection, sql: str):
 
 
 def validate_table(connection, table: str) -> bool:
-    """写入前检查所需列；缺少 coil_no 或 pass_no 的表不参与回填。"""
+    """写入前检查所需列；BAF 只依赖 ts 和普通字符串 cell_code 列。"""
     cursor = connection.cursor()
     try:
         cursor.execute(f"DESCRIBE digital_coil.`{table}`")
@@ -142,6 +147,11 @@ def validate_table(connection, table: str) -> bool:
         cursor.close()
     if "TIMESTAMP" not in columns.get("ts", ("",))[0]:
         raise ValueError(f"{table}: ts 不是 TIMESTAMP")
+    if table == BAF_TABLE:
+        kind, note = columns.get("cell_code", ("", ""))
+        if kind not in ("VARCHAR", "BINARY", "NCHAR") or note == "TAG":
+            raise ValueError(f"{table}: cell_code 缺失、类型不符或为 TAG")
+        return True
     if "coil_no" not in columns:
         log_progress(f"{table} 跳过：缺少 coil_no")
         return False
@@ -205,7 +215,7 @@ def process_window(connection, table: str, unit: str, start: int, end: int,
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--table", action="append", help="六类机组清单内表名；可重复指定，不指定则处理全部 92 张")
+    parser.add_argument("--table", action="append", help="清单内表名；可单独指定 baf1_batch，不指定则处理原有 92 张")
     parser.add_argument("--start", type=parse_time, help="上海时间起点；不填则逐表读取最早 ts")
     parser.add_argument("--resume-table", help="从清单中的指定表继续，包含该表及后续所有表；不能与 --table 同用")
     parser.add_argument("--resume-start", type=parse_time,
@@ -229,13 +239,14 @@ def main() -> int:
     if args.resume_table is not None and (args.table or args.start is not None):
         parser.error("--resume-table 不能与 --table 或 --start 同用")
     tables = load_tables()
-    selected = args.table or list(tables)
+    selected = args.table or [name for name in tables if name != BAF_TABLE]
     if args.resume_table is not None:
-        if args.resume_table not in tables:
+        if args.resume_table not in tables or args.resume_table == BAF_TABLE:
             parser.error("--resume-table 必须来自六类机组的 92 张表清单")
-        selected = list(tables)[list(tables).index(args.resume_table):]
+        default_tables = [name for name in tables if name != BAF_TABLE]
+        selected = default_tables[default_tables.index(args.resume_table):]
     if any(name not in tables for name in selected):
-        parser.error("--table 必须来自六类机组的 92 张表清单")
+        parser.error("--table 必须来自清单中的 93 张表")
     if len(set(selected)) != len(selected):
         parser.error("--table 不能重复")
     if not TD_DSN or "<" in TD_DSN or ">" in TD_DSN:

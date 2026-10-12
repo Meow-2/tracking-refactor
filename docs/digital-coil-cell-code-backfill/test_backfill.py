@@ -18,15 +18,36 @@ spec.loader.exec_module(backfill)
 class BackfillTest(unittest.TestCase):
     def test_table_list_and_code_rule(self):
         tables = backfill.load_tables()
-        self.assertEqual(92, len(tables))
+        self.assertEqual(93, len(tables))
         self.assertEqual("CP1", tables["cp1_process_sf"])
         self.assertEqual("CBL1", tables["cbl1_process_default"])
-        self.assertNotIn("baf1_batch", tables)
+        self.assertEqual("BAF1", tables["baf1_batch"])
         count, insert = backfill.window_sql("cp1_process_sf", "CP1", 1000, 2000)
         self.assertIn("ts >= 1000 AND ts < 2000", count)
         self.assertIn("cell_code IS NULL OR cell_code <> CONCAT('CP1'", count)
         self.assertIn("WHEN pass_no IS NULL THEN '001'", insert)
         self.assertIn("INSERT INTO digital_coil.`cp1_process_sf` (ts, cell_code)", insert)
+
+    def test_baf_uses_fixed_code_without_pass_no(self):
+        count, insert = backfill.window_sql("baf1_batch", "BAF1", 1000, 2000)
+        self.assertIn("cell_code IS NULL OR cell_code <> 'BAF1001'", count)
+        self.assertIn("SELECT ts, 'BAF1001'", insert)
+        self.assertNotIn("pass_no", count + insert)
+
+    def test_baf_requires_only_timestamp_and_cell_code(self):
+        connection = MagicMock()
+        cursor = connection.cursor.return_value
+        cursor.fetchall.return_value = [
+            ("ts", "TIMESTAMP", 8, ""),
+            ("cell_code", "VARCHAR", 255, ""),
+        ]
+        self.assertTrue(backfill.validate_table(connection, "baf1_batch"))
+        cursor.fetchall.return_value = [
+            ("ts", "TIMESTAMP", 8, ""),
+            ("cell_code", "VARCHAR", 255, "TAG"),
+        ]
+        with self.assertRaises(ValueError):
+            backfill.validate_table(connection, "baf1_batch")
 
     def test_table_requires_coil_no_and_pass_no(self):
         connection = MagicMock()
@@ -117,6 +138,29 @@ class BackfillTest(unittest.TestCase):
                             for message in messages))
         self.assertTrue(any("全部完成：处理 1 张，跳过 0 张，预计更新 2 行" in message
                             for message in messages))
+
+    def test_explicit_baf_only_does_not_change_default_table_selection(self):
+        connection = MagicMock()
+        connector = types.SimpleNamespace(connect=lambda _dsn: connection)
+        tables = {"cp1_process_sf": "CP1", "baf1_batch": "BAF1"}
+        arguments = ["backfill.py", "--table", "baf1_batch",
+                     "--start", "1970-01-01 08:00:00",
+                     "--end", "1970-01-01 09:00:00"]
+        with patch.dict(sys.modules, {"taosws": connector}), \
+                patch.object(backfill, "TD_DSN", "mock-dsn"), \
+                patch.object(backfill, "load_tables", return_value=tables), \
+                patch.object(backfill, "execute", return_value=("ms",)), \
+                patch.object(backfill, "validate_table", return_value=True), \
+                patch.object(backfill, "process_window", return_value=0) as process_window, \
+                patch.object(backfill, "log_progress"), \
+                patch.object(sys, "argv", arguments):
+            self.assertEqual(0, backfill.main())
+            self.assertEqual("baf1_batch", process_window.call_args.args[1])
+            process_window.reset_mock()
+            sys.argv = ["backfill.py", "--start", "1970-01-01 08:00:00",
+                        "--end", "1970-01-01 09:00:00"]
+            self.assertEqual(0, backfill.main())
+            self.assertEqual("cp1_process_sf", process_window.call_args.args[1])
 
     def test_resume_start_applies_only_to_first_table(self):
         connection = MagicMock()
