@@ -37,6 +37,9 @@ public class BatchResult extends TrackingResult {
      */
     private String coilNo;
 
+    /** 当前工艺侧的加工单元代码，格式为大写机组编码加三位序号；无效序号时为空。 */
+    private String cellCode;
+
     /** 当前工艺侧该卷的重复生产序号；PG 取号暂时失败时为空。 */
     private Integer repeatProdNo;
 

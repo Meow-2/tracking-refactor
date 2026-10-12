@@ -101,6 +101,7 @@ class BatchTrackingAlgorithmImplTest {
 
         assertEquals(2, results.size());
         BatchResult north = results.get(0);
+        assertEquals("BAF1001", north.getCellCode());
         assertEquals("fb1", north.getTemplateCode());
         assertEquals("north", north.getSegmentCode());
         assertEquals("N001", north.getCoilNo());
@@ -120,6 +121,7 @@ class BatchTrackingAlgorithmImplTest {
         assertEquals(2, south.getRepeatProdNo());
         assertEquals("south", south.getParameters().get("shared"));
         assertFalse(south.getParameters().containsKey("south_only"));
+        assertEquals("BAF1001", south.getCellCode());
     }
 
     @Test

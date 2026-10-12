@@ -42,6 +42,7 @@ public class BatchTrackingResultRepositoryImpl
             tableRule("fb_code", TimeSeriesDataType.INT.getCode(), true),
             tableRule("segment_code", TimeSeriesDataType.INT.getCode(), false),
             tableRule("coil_no", TimeSeriesDataType.STRING.getCode(), true),
+            tableRule("cell_code", TimeSeriesDataType.STRING.getCode(), true),
             tableRule("repeat_prod_no", TimeSeriesDataType.INT.getCode(), true),
             tableRule("head_length", TimeSeriesDataType.FLOAT.getCode(), false),
             tableRule("speed", TimeSeriesDataType.FLOAT.getCode(), false),
@@ -123,6 +124,10 @@ public class BatchTrackingResultRepositoryImpl
                 if (point == null || point.getName() == null || point.getName().trim().isEmpty()) {
                     continue;
                 }
+                // cell_code 是算法生成的固定标签，配置中的同名点位不能重复建列。
+                if ("cell_code".equalsIgnoreCase(point.getName())) {
+                    continue;
+                }
                 TimeSeriesTableRule rule = tableRule(
                         point.getName(), TimeSeriesDataType.fromPointDataType(point.getType()).getCode(), false);
                 TimeSeriesTableRule previous = rules.putIfAbsent(point.getName(), rule);
@@ -160,13 +165,15 @@ public class BatchTrackingResultRepositoryImpl
         add(values, "fb_code", fbCode(result.getTemplateCode()), true, timestamp);
         add(values, "segment_code", segmentCode(result.getSegmentCode()), false, timestamp);
         add(values, "coil_no", result.getCoilNo(), true, timestamp);
+        add(values, "cell_code", result.getCellCode(), true, timestamp);
         if (result.getRepeatProdNo() != null) {
             add(values, "repeat_prod_no", result.getRepeatProdNo(), true, timestamp);
         }
         add(values, "prod_status", result.getProductionStatus(), false, timestamp);
         if (result.getParameters() != null) {
             for (Map.Entry<String, Object> entry : result.getParameters().entrySet()) {
-                if (entry.getValue() != null) {
+                // 原始点位不能覆盖算法生成的固定加工单元代码。
+                if (entry.getValue() != null && !"cell_code".equalsIgnoreCase(entry.getKey())) {
                     add(values, entry.getKey(), entry.getValue(), false, timestamp);
                 }
             }

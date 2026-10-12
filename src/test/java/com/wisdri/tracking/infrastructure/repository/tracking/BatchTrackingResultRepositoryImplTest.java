@@ -69,6 +69,7 @@ class BatchTrackingResultRepositoryImplTest {
         assertRule(request.getRule(), "fb_code", "int", true);
         assertRule(request.getRule(), "segment_code", "int", false);
         assertRule(request.getRule(), "coil_no", "string", true);
+        assertRule(request.getRule(), "cell_code", "string", true);
         assertRule(request.getRule(), "repeat_prod_no", "int", true);
         assertRule(request.getRule(), "prod_status", "float", false);
         assertRule(request.getRule(), "head_length", "float", false);
@@ -97,6 +98,7 @@ class BatchTrackingResultRepositoryImplTest {
         assertValue(northRequest.getValues(), "fb_code", 1, true, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "segment_code", 1, false, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "coil_no", "N001", true, NORTH_TIMESTAMP);
+        assertValue(northRequest.getValues(), "cell_code", "BAF1001", true, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "repeat_prod_no", 2, true, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "prod_status", new BigDecimal("1"), false, NORTH_TIMESTAMP);
         assertValue(northRequest.getValues(), "shared", "north-value", false, NORTH_TIMESTAMP);
@@ -108,6 +110,30 @@ class BatchTrackingResultRepositoryImplTest {
         TimeSeriesDataRequest southRequest = captor.getAllValues().get(1);
         assertEquals(RECEIVED_AT.toEpochMilli(), southRequest.getTimestamp());
         assertValue(southRequest.getValues(), "segment_code", 0, false);
+        assertValue(southRequest.getValues(), "cell_code", "BAF1001", true);
+    }
+
+    @Test
+    void keepsGeneratedCellCodeWhenDynamicPointUsesSameName() {
+        BatchTrackingConfig config = config();
+        config.getSegments().get(0).setPoints(Arrays.asList(
+                point("shared", PointDataType.STRING), point("CELL_CODE", PointDataType.STRING)));
+        repository.createTable(config);
+
+        ArgumentCaptor<TimeSeriesTableRequest> tableCaptor = ArgumentCaptor.forClass(TimeSeriesTableRequest.class);
+        verify(gateway).createTable(tableCaptor.capture());
+        assertEquals(1, tableCaptor.getValue().getRule().stream()
+                .filter(rule -> "cell_code".equalsIgnoreCase(rule.getId())).count());
+
+        BatchResult result = result("fb1", "north", "N001");
+        result.getParameters().put("CELL_CODE", "raw-value");
+        repository.save(Collections.singletonList(result));
+
+        ArgumentCaptor<TimeSeriesDataRequest> dataCaptor = ArgumentCaptor.forClass(TimeSeriesDataRequest.class);
+        verify(gateway).saveColumn(eq("baf1_batch"), dataCaptor.capture());
+        assertEquals(1, dataCaptor.getValue().getValues().stream()
+                .filter(value -> "cell_code".equalsIgnoreCase(value.getId())).count());
+        assertValue(dataCaptor.getValue().getValues(), "cell_code", "BAF1001", true, NORTH_TIMESTAMP);
     }
 
     @Test
@@ -182,6 +208,7 @@ class BatchTrackingResultRepositoryImplTest {
                 .templateCode(templateCode)
                 .segmentCode(segmentCode)
                 .coilNo(coilNo)
+                .cellCode("BAF1001")
                 .repeatProdNo(2)
                 .productionStatus(BigDecimal.ONE)
                 .parameters(parameters)

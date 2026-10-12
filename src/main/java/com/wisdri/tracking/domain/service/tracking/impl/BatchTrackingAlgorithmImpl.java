@@ -12,6 +12,7 @@ import com.wisdri.tracking.domain.model.runtime.batch.BatchSegmentRuntime;
 import com.wisdri.tracking.domain.model.tracking.TrackingInput;
 import com.wisdri.tracking.domain.model.tracking.TrackingType;
 import com.wisdri.tracking.domain.model.tracking.batch.BatchResult;
+import com.wisdri.tracking.domain.service.tracking.CellCodeResolver;
 import com.wisdri.tracking.domain.repository.runtime.TrackingRuntimeRepositoryDispatcher;
 import com.wisdri.tracking.domain.repository.product.RepeatProdNoRepository;
 import com.wisdri.tracking.domain.service.point.PointEventHandlerDispatcher;
@@ -135,6 +136,7 @@ public class BatchTrackingAlgorithmImpl implements TrackingAlgorithm<BatchResult
                         .segmentCode(segment.getCode())
                         .segmentName(segment.getName())
                         .coilNo(coilNo)
+                        .cellCode(CellCodeResolver.resolve(config.getUnitCode(), latest, null, null, null))
                         .repeatProdNo(segmentStates.get(segmentCode).getRepeatProdNo())
                         .productionStatus(productionStatus)
                         .parameters(parameters)
