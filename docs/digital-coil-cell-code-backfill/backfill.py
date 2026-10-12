@@ -207,6 +207,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--table", action="append", help="六类机组清单内表名；可重复指定，不指定则处理全部 92 张")
     parser.add_argument("--start", type=parse_time, help="上海时间起点；不填则逐表读取最早 ts")
+    parser.add_argument("--resume-table", help="从清单中的指定表继续，包含该表及后续所有表；不能与 --table 同用")
+    parser.add_argument("--resume-start", type=parse_time,
+                        help="仅指定继续表的上海时间起点；不填则从该表最早 ts 重查")
     parser.add_argument("--end", type=parse_time, required=True, help="固定截止时间，上海时间，左闭右开")
     parser.add_argument("--window-hours", type=int, default=24, help="初始时间窗口小时数，默认 24")
     parser.add_argument("--max-rows", type=int, default=10000, help="单条写入最多涉及的行数，默认 10000")
@@ -219,8 +222,18 @@ def main() -> int:
         parser.error("窗口、行数和心跳间隔必须为正，等待秒数不能为负")
     if args.start is not None and args.start >= args.end:
         parser.error("起点必须早于截止时间")
+    if args.resume_start is not None and args.resume_start >= args.end:
+        parser.error("继续起点必须早于截止时间")
+    if args.resume_start is not None and args.resume_table is None:
+        parser.error("--resume-start 必须与 --resume-table 同用")
+    if args.resume_table is not None and (args.table or args.start is not None):
+        parser.error("--resume-table 不能与 --table 或 --start 同用")
     tables = load_tables()
     selected = args.table or list(tables)
+    if args.resume_table is not None:
+        if args.resume_table not in tables:
+            parser.error("--resume-table 必须来自六类机组的 92 张表清单")
+        selected = list(tables)[list(tables).index(args.resume_table):]
     if any(name not in tables for name in selected):
         parser.error("--table 必须来自六类机组的 92 张表清单")
     if len(set(selected)) != len(selected):
@@ -253,12 +266,14 @@ def main() -> int:
                     skipped_tables += 1
                     log_progress(f"{table_label} 已跳过；耗时 {time.monotonic() - table_started:.1f} 秒")
                     continue
-                if args.start is None:
+                # 断点时间只作用于第一张表；后续表仍须从各自最早记录开始。
+                resume_start = args.resume_start if table == args.resume_table else None
+                if args.start is None and resume_start is None:
                     set_phase(status, "查询最早时间戳")
                     first = execute(connection, f"SELECT CAST(ts AS BIGINT) FROM digital_coil.`{table}` ORDER BY ts ASC LIMIT 1")
                     start = int(first[0]) if first else args.end
                 else:
-                    start = args.start
+                    start = resume_start if resume_start is not None else args.start
                 table_start = start
                 window_count = max(0, (args.end - start + step - 1) // step)
                 log_progress(f"{table_label} 时间范围 [{format_time(start)}, {format_time(args.end)})；"

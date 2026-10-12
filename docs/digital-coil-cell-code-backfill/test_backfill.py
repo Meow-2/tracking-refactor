@@ -118,6 +118,44 @@ class BackfillTest(unittest.TestCase):
         self.assertTrue(any("全部完成：处理 1 张，跳过 0 张，预计更新 2 行" in message
                             for message in messages))
 
+    def test_resume_start_applies_only_to_first_table(self):
+        connection = MagicMock()
+        connector = types.SimpleNamespace(connect=lambda _dsn: connection)
+        tables = {"cp1_process_sf": "CP1", "dcl1_process_atc": "DCL1",
+                  "dcl1_process_bridle": "DCL1"}
+        arguments = ["backfill.py", "--resume-table", "dcl1_process_atc",
+                     "--resume-start", "1970-01-01 08:00:00",
+                     "--end", "1970-01-01 10:00:00", "--window-hours", "2"]
+
+        def fake_execute(_connection, sql):
+            if "information_schema.ins_databases" in sql:
+                return ("ms",)
+            if "dcl1_process_bridle" in sql:
+                return (3600000,)
+            self.fail(f"未预期的查询: {sql}")
+
+        with patch.dict(sys.modules, {"taosws": connector}), \
+                patch.object(backfill, "TD_DSN", "mock-dsn"), \
+                patch.object(sys, "argv", arguments), \
+                patch.object(backfill, "load_tables", return_value=tables), \
+                patch.object(backfill, "execute", side_effect=fake_execute), \
+                patch.object(backfill, "validate_table", return_value=True), \
+                patch.object(backfill, "process_window", return_value=0) as process_window, \
+                patch.object(backfill, "log_progress"):
+            self.assertEqual(0, backfill.main())
+        self.assertEqual(["dcl1_process_atc", "dcl1_process_bridle"],
+                         [call.args[1] for call in process_window.call_args_list])
+        self.assertEqual([0, 3600000],
+                         [call.args[3] for call in process_window.call_args_list])
+
+    def test_resume_start_requires_resume_table(self):
+        arguments = ["backfill.py", "--resume-start", "1970-01-01 08:00:00",
+                     "--end", "1970-01-01 09:00:00"]
+        with patch.object(sys, "argv", arguments), patch("sys.stderr"):
+            with self.assertRaises(SystemExit) as error:
+                backfill.main()
+        self.assertEqual(2, error.exception.code)
+
 
 if __name__ == "__main__":
     unittest.main()
