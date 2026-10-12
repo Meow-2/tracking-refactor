@@ -1,5 +1,7 @@
 package com.wisdri.tracking.domain.model.tracking.status;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.wisdri.tracking.common.utils.ShanghaiLocalInstantSerializer;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -22,9 +24,11 @@ public class RollingPassOutput {
     private Integer inMatRepeatProdNo;
     /** 由旧道次号生成的加工单元代码。 */
     private String cellCode;
-    /** 首个完整有效帧时间。 */
+    /** 首个完整有效帧的绝对时间；JSON 展示为上海本地 ISO 时间，无时区后缀。 */
+    @JsonSerialize(using = ShanghaiLocalInstantSerializer.class)
     private Instant startAt;
-    /** 最后一个完整有效帧时间。 */
+    /** 最后一个完整有效帧的绝对时间；JSON 展示为上海本地 ISO 时间，无时区后缀。 */
+    @JsonSerialize(using = ShanghaiLocalInstantSerializer.class)
     private Instant endAt;
     /** 出口厚度，单位 mm。 */
     private BigDecimal outMatThick;

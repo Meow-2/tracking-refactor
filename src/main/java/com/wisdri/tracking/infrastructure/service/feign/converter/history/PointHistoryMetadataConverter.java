@@ -106,9 +106,6 @@ public class PointHistoryMetadataConverter {
         CubeApiTreeNode node = matches.get(0);
         String code = node.getCode();
         String cubeKey = node.getCubeKey();
-        if (Boolean.FALSE.equals(node.getValid())) {
-            throw new TrackingException("历史点位在 Cube 中无效: " + path);
-        }
         if (blank(code) || blank(cubeKey) || !cubeKey.endsWith("_" + code)) {
             throw new TrackingException("历史点位 cubeKey 与 code 不匹配: " + path);
         }

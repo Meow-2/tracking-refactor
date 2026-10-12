@@ -91,7 +91,7 @@ class TrackingHistoryMetadataConverterTest {
     }
 
     @Test
-    void followsSubtreePointListAndRejectsDuplicatedAndInvalidMappings() throws Exception {
+    void followsSubtreePointListAndRejectsDuplicatedOrMalformedMappings() throws Exception {
         CubeApiTreeResponse tree = tree();
         CubeApiTreeNode pass = points(tree).getChildren().remove("pass_no_pv");
         assertThat(convert(tree).getPointMetadata()).hasSize(9);
@@ -99,9 +99,6 @@ class TrackingHistoryMetadataConverterTest {
         points(tree).getChildren().put("duplicate", pass);
         assertThatThrownBy(() -> convert(tree)).hasMessageContaining("历史点位路径重复");
         points(tree).getChildren().remove("duplicate");
-        pass.setValid(false);
-        assertThatThrownBy(() -> convert(tree)).hasMessageContaining("Cube 中无效");
-        pass.setValid(true);
         pass.setCubeKey("wrong_suffix");
         assertThatThrownBy(() -> convert(tree)).hasMessageContaining("cubeKey 与 code 不匹配");
         pass.setCubeKey("bad.table_pass_no_pv");

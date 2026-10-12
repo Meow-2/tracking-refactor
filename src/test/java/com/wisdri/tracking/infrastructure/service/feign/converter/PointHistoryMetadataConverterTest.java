@@ -27,9 +27,7 @@ class PointHistoryMetadataConverterTest {
         exit.getChildren().put("speed", point("exit_speed_pv", "float"));
         root.getChildren().put("entry", entry);
         root.getChildren().put("exit", exit);
-        CubeApiTreeNode unused = new CubeApiTreeNode();
-        unused.setValid(false);
-        root.getChildren().put("unused", unused);
+        root.getChildren().put("unused", new CubeApiTreeNode());
 
         Map<String, PointHistoryMetadata> result = converter.convert(root, "/plant/cp1/process",
                 "/plant/cp1/process/", Arrays.asList(
@@ -64,6 +62,22 @@ class PointHistoryMetadataConverterTest {
         assertThat(result.get("/EXTERNAL/FLAG").getValueType()).isEqualTo("bool");
         assertThat(result.get("/plant/cp1/process/unknown").getValueType()).isNull();
         assertThat(result.get("/plant/cp1/process/unknown").getValid()).isNull();
+    }
+
+    @Test
+    void preservesCubeValidityFlagWithoutRejectingHistoryMetadata() throws Exception {
+        CubeApiTreeNode root = new CubeApiTreeNode();
+        // Cube 仍可能返回 valid=false；保留原值，但不据此拒绝历史映射。
+        CubeApiTreeNode speed = new ObjectMapper().readValue(
+                "{\"code\":\"speed\",\"cubeKey\":\"cp1_plc_speed\",\"valid\":false}", CubeApiTreeNode.class);
+        root.getChildren().put("speed", speed);
+
+        Map<String, PointHistoryMetadata> result = converter.convert(root, "/plant/cp1/process",
+                "/plant/cp1/process/", Collections.singletonList(
+                        new PointConfig("speed", PointDataType.FLOAT)), "cube");
+
+        assertThat(result.get("/plant/cp1/process/speed").getCode()).isEqualTo("speed");
+        assertThat(result.get("/plant/cp1/process/speed").getValid()).isFalse();
     }
 
     @Test

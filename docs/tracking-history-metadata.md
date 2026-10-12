@@ -37,8 +37,10 @@ Map<String, PointHistoryMetadata> points = metadata.getPointMetadata();
 值类型读取节点的 `valueType`，或回退到 `data.valueType`；未提供时不推测实际类型。
 
 数据库使用 `cube`，字段为 `code`，对象名通过从 `cubeKey` 去掉末尾 `_<code>` 得到。
-数据库名、对象名及字段名均需通过标识符校验。路径重复、`valid=false`、
-cubeKey 后缀不匹配或非法标识符直接报错。返回点位映射不可增删。
+数据库名、对象名及字段名均需通过标识符校验。路径重复、cubeKey 后缀不匹配
+或非法标识符直接报错。Cube 响应中的 `valid` 会保留在点位元数据中，
+但不参与历史查询准入判断；即使为 `false`，仍需满足其余映射约束。
+返回点位映射不可增删。
 
 该入口只解析元信息，不查询 TDengine schema 或历史值，不计算道次，
 不调用质量接口，也不开放 HTTP 接口。

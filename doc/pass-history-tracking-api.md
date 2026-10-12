@@ -18,6 +18,11 @@ Content-Type: application/json
 
 接口同步处理并返回结果，不创建任务，不提供任务查询接口。重复提交会重新扫描并调用质量网关。
 
+排查 quality-ts 调用时，tracking 日志会记录 `/data/query/states`、`bounds`、`latest` 的
+请求参数、耗时（毫秒）和结果条数或首末时间；请求失败记录底层异常堆栈，响应失败记录
+返回码、成功标记和消息。日志不展开查询结果列表。quality-ts 对应日志记录请求参数、
+完成耗时和结果概况，参数错误及数据库异常由历史查询异常处理器记录。
+
 ## 返回
 
 HTTP 200 使用 `R<List<PassOutputResult>>`，示例：
@@ -37,8 +42,8 @@ HTTP 200 使用 `R<List<PassOutputResult>>`，示例：
         "inMatNo": "COIL-A",
         "inMatRepeatProdNo": 1,
         "cellCode": "ZRM1001",
-        "startAt": "2026-10-08T16:00:02.123456789Z",
-        "endAt": "2026-10-08T16:09:59.123456789Z",
+        "startAt": "2026-10-09T00:00:02.123456789",
+        "endAt": "2026-10-09T00:09:59.123456789",
         "outMatThick": 0.28,
         "outMatLength": 125.5
       },
@@ -51,7 +56,7 @@ HTTP 200 使用 `R<List<PassOutputResult>>`，示例：
 }
 ```
 
-Controller 和历史计算统一使用上海本地 LocalDateTime，保留小数秒。响应 switchTime 和 sourceTimes 使用无时区后缀的 ISO 本地时间；请求及 quality-ts 查询仍使用空格分隔的上海时间格式。sourceTimes 的键为“取值帧时间/点位完整路径”，值为点位实际来源时间。仅在组装 RollingPassOutput 时，按上海时区将首末帧转换为 Instant；因此 output.startAt、output.endAt 仍为带 Z 的绝对时间。
+Controller 和历史计算统一使用上海本地 LocalDateTime，保留小数秒。响应 switchTime、sourceTimes、output.startAt 和 output.endAt 均使用无时区后缀的 ISO 上海本地时间；请求及 quality-ts 查询仍使用空格分隔的上海时间格式。sourceTimes 的键为“取值帧时间/点位完整路径”，值为点位实际来源时间。RollingPassOutput 内部仍保存 Instant，返回 JSON 时转换为上海时间展示，不改变质量写入时的时间换算。
 
 | 状态 | 含义 |
 | --- | --- |

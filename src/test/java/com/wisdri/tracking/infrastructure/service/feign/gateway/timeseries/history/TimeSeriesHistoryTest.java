@@ -8,6 +8,9 @@ import com.wisdri.tracking.infrastructure.service.feign.config.timeseries.histor
 import feign.Request;
 import feign.Response;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -19,6 +22,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
+@ExtendWith(OutputCaptureExtension.class)
 class TimeSeriesHistoryTest {
     @Test
     @SuppressWarnings("unchecked")
@@ -38,10 +42,13 @@ class TimeSeriesHistoryTest {
     }
 
     @Test
-    void gatewayPassesRequestsAndAcceptsEmptyListAndEmptyBounds() {
+    void gatewayPassesRequestsAndAcceptsEmptyListAndEmptyBounds(CapturedOutput output) {
         TimeSeriesHistoryFeignClient client = mock(TimeSeriesHistoryFeignClient.class);
         TimeSeriesHistoryGateway gateway = gateway(client);
         StatesRequest states = new StatesRequest();
+        states.setDatabase("cube");
+        states.setTable("object_a");
+        states.setField("pass_no_pv");
         states.setStartTime("2026-10-09 00:00:00.123456789");
         when(client.queryStates(states)).thenReturn(success(Collections.emptyList()));
         BoundsRequest bounds = new BoundsRequest();
@@ -57,10 +64,12 @@ class TimeSeriesHistoryTest {
         verify(client).queryStates(states);
         verify(client).queryBounds(bounds);
         verify(client).queryLatest(latest);
+        assertThat(output.getOut()).contains("path=/data/query/states", "database=cube", "table=object_a",
+                "field=pass_no_pv", "elapsedMillis=", "resultCountOrBounds=0");
     }
 
     @Test
-    void queryFailureMissingDataAndTransportErrorsPropagateWithoutRetryOrDetails() {
+    void queryFailureMissingDataAndTransportErrorsPropagateWithoutRetryOrDetails(CapturedOutput output) {
         TimeSeriesHistoryFeignClient client = mock(TimeSeriesHistoryFeignClient.class);
         TimeSeriesHistoryGateway gateway = gateway(client);
         when(client.queryStates(any())).thenReturn(R.fail());
@@ -71,6 +80,9 @@ class TimeSeriesHistoryTest {
         assertThatThrownBy(() -> gateway.queryLatest(new LatestRequest())).isInstanceOf(ExternalServiceException.class)
                 .hasMessage("quality-ts 历史查询请求失败").hasNoCause();
         verify(client, times(1)).queryLatest(any());
+        // 对外仍返回简明错误，底层原因只出现在服务日志中。
+        assertThat(output.getOut()).contains("path=/data/query/latest", "private connection details",
+                "code=500", "quality-ts 历史查询返回失败或缺少数据");
     }
 
     private static TimeSeriesHistoryGateway gateway(TimeSeriesHistoryFeignClient client) {

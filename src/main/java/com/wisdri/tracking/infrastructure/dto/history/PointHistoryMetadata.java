@@ -24,7 +24,7 @@ public class PointHistoryMetadata {
     String valueType;
     /** 点位测量单位，沿用 Cube 元数据。 */
     String unit;
-    /** Cube 有效标记；false 会被历史转换器拒绝，null 表示未提供。 */
+    /** Cube 有效标记，仅保留原始值；不参与历史查询准入判断。 */
     Boolean valid;
     /** TDengine 查询数据库名，Cube 历史元信息入口使用 time-series-history.database。 */
     String database;
