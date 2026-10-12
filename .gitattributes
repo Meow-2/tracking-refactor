@@ -1,0 +1,1 @@
+deploy/scripts/deploy-k8s-server.sh text eol=lf

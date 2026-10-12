@@ -28,7 +28,7 @@ SKIP_TESTS="${SKIP_TESTS:-true}"
 LOCAL_K8S_DIR="${LOCAL_K8S_DIR:-${PROJECT_DIR}/deploy/k8s}"
 LOCAL_DOCKER_DIR="${LOCAL_DOCKER_DIR:-${PROJECT_DIR}/deploy/docker}"
 
-UNITS=("baf1" "cbl1" "cp1" "csl1" "dcl1" "fcl1" "zrm1" "external")
+UNITS=("baf1" "cbl1" "cp1" "csl1" "dcl1" "fcl1" "zrm1" "api")
 RUN_ID="$(date +%y%m%d-%H%M)-$$"
 
 log() {
@@ -61,7 +61,7 @@ Then it applies the manifests and restarts:
   tracking-dcl1
   tracking-fcl1
   tracking-zrm1
-  tracking-external
+  tracking-api
 
 Each ConfigMap must set its own TRACKING_UNIT environment variable.
 EOF

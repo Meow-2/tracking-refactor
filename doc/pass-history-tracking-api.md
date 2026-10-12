@@ -76,11 +76,11 @@ HTTP 200 表示处理完成，需逐项检查 status；没有切换事件时 dat
 
 ```yaml
 tracking:
-  unit: external
+  unit: api
 ```
 
 Cube、quality、PostgreSQL 和 time-series-history 连接沿用现有配置，history 查询 readTimeout 为 60000 毫秒；这个超时只限制单次查询，不限制整个同步请求。
 
-现有 external 部署保持一个副本、Recreate 更新策略、NodePort 服务。接口没有任务状态、任务表或重启恢复；实例停止可能中断请求。客户端或入口代理的 HTTP 超时需按实际时间跨度和道次数量设置；不自动重试整个 POST 请求。
+现有 api 部署保持一个副本、Recreate 更新策略、NodePort 服务。接口没有任务状态、任务表或重启恢复；实例停止可能中断请求。客户端或入口代理的 HTTP 超时需按实际时间跨度和道次数量设置；不自动重试整个 POST 请求。
 
 验收应在明确的联调环境与时间范围内调用：核对道次切换、首末帧、来源时间、质量请求字段和每项结果。本次自动化测试使用 Mock 质量客户端，不执行真实质量写入；实际部署和历史样本联调尚未执行。

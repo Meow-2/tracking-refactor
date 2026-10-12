@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: tracking-external-pvc
+  name: tracking-api-pvc
   namespace: tracking
 spec:
   accessModes:

@@ -1,12 +1,12 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tracking-external
+  name: tracking-api
   namespace: tracking
   labels:
-    app: tracking-external
+    app: tracking-api
     version: v1
-    app.kubernetes.io/name: tracking-external
+    app.kubernetes.io/name: tracking-api
     app.kubernetes.io/version: v1
 spec:
   replicas: 1
@@ -15,16 +15,16 @@ spec:
     type: Recreate
   selector:
     matchLabels:
-      app: tracking-external
+      app: tracking-api
       version: v1
-      app.kubernetes.io/name: tracking-external
+      app.kubernetes.io/name: tracking-api
       app.kubernetes.io/version: v1
   template:
     metadata:
       labels:
-        app: tracking-external
+        app: tracking-api
         version: v1
-        app.kubernetes.io/name: tracking-external
+        app.kubernetes.io/name: tracking-api
         app.kubernetes.io/version: v1
     spec:
       containers:
@@ -33,7 +33,7 @@ spec:
           imagePullPolicy: Always
           envFrom:
             - configMapRef:
-                name: tracking-external-config
+                name: tracking-api-config
           resources:
             limits:
               memory: "4Gi"
@@ -47,24 +47,24 @@ spec:
       volumes:
         - name: tracking-logs
           persistentVolumeClaim:
-            claimName: tracking-external-pvc
+            claimName: tracking-api-pvc
       restartPolicy: Always
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: tracking-external
+  name: tracking-api
   namespace: tracking
   labels:
-    app: tracking-external
+    app: tracking-api
     version: v1
-    app.kubernetes.io/name: tracking-external
+    app.kubernetes.io/name: tracking-api
     app.kubernetes.io/version: v1
 spec:
   selector:
-    app: tracking-external
+    app: tracking-api
     version: v1
-    app.kubernetes.io/name: tracking-external
+    app.kubernetes.io/name: tracking-api
     app.kubernetes.io/version: v1
   ports:
     - port: 8080

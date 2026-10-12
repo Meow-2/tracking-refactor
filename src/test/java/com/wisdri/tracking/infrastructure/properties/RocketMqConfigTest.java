@@ -16,8 +16,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 class RocketMqConfigTest {
     @Test
-    void externalUnitDisablesConsumerButKeepsProducerWithoutSendingMessages() {
-        for (String unit : new String[]{"external", "EXTERNAL"}) {
+    void apiUnitDisablesConsumerButKeepsProducerWithoutSendingMessages() {
+        for (String unit : new String[]{"api", "API"}) {
             RocketMQClientTemplate template = mock(RocketMQClientTemplate.class);
             context(template).withPropertyValues("tracking.unit=" + unit,
                     "rocketmq.push-consumer.enabled=true").run(application -> {
@@ -38,6 +38,13 @@ class RocketMqConfigTest {
             assertThat(application.getBean(DefaultListenerContainer.class).getTag()).isEqualTo("zrm1");
             verifyNoInteractions(template);
         });
+    }
+
+    @Test
+    void formerExternalUnitNoLongerDisablesConsumer() {
+        RocketMQClientTemplate template = mock(RocketMQClientTemplate.class);
+        context(template).withPropertyValues("tracking.unit=external").run(application ->
+                assertThat(application).hasNotFailed().hasSingleBean(DefaultListenerContainer.class));
     }
 
     private ApplicationContextRunner context(RocketMQClientTemplate template) {

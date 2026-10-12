@@ -12,8 +12,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 class TrackingRunnerTest {
     @Test
-    void externalUnitSkipsTrackingInitializationIgnoringCase() {
-        for (String unit : new String[]{"external", "EXTERNAL"}) {
+    void apiUnitSkipsTrackingInitializationIgnoringCase() {
+        for (String unit : new String[]{"api", "API"}) {
             PointSubscriptionUseCase subscriptions = mock(PointSubscriptionUseCase.class);
             runner(unit, subscriptions).run(new DefaultApplicationArguments(new String[0]));
             verifyNoInteractions(subscriptions);
@@ -22,7 +22,7 @@ class TrackingRunnerTest {
 
     @Test
     void actualUnitsStillInitializeTracking() {
-        for (String unit : new String[]{"cp1", "zrm1"}) {
+        for (String unit : new String[]{"cp1", "zrm1", "external"}) {
             PointSubscriptionUseCase subscriptions = mock(PointSubscriptionUseCase.class);
             runner(unit, subscriptions).run(new DefaultApplicationArguments(new String[0]));
             verify(subscriptions).start();

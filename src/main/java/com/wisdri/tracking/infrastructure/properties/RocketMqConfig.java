@@ -99,7 +99,7 @@ public class RocketMqConfig {
      * 根据 rocketmq.push-consumer.* 配置创建 RocketMQ push consumer 容器。
      */
     @Bean
-    @ConditionalOnExpression("!'external'.equalsIgnoreCase('${tracking.unit:}')")
+    @ConditionalOnExpression("!'api'.equalsIgnoreCase('${tracking.unit:}')")
     public DefaultListenerContainer trackingTaskConsumerContainer(TrackingTaskConsumer trackingTaskConsumer) {
         DefaultListenerContainer container = new DefaultListenerContainer();
         container.setName("trackingTaskConsumerContainer");

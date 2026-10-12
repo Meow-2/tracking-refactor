@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tracking-external-config
+  name: tracking-api-config
   namespace: tracking
 data:
   # ----- 全局配置 -----
 
-  TRACKING_UNIT: "external"
+  TRACKING_UNIT: "api"
   SERVER_PORT: "8080"
   LOGGING_FILE_PATH: "/logs"
 
@@ -19,13 +19,13 @@ data:
   SPRING_REDIS_PASSWORD: "Aygg@2026"
   SPRING_REDIS_DATABASE: "0"
 
-  MQTT_CLIENTID: "tracking-external-client"
+  MQTT_CLIENTID: "tracking-api-client"
   MQTT_URL: "tcp://172.16.203.11:1883"
   MQTT_USERNAME: "admin"
   MQTT_PASSWORD: "public"
 
-  ROCKETMQ_PUSHCONSUMER_CONSUMERGROUP: "tracking-data-consumer-group-external"
-  ROCKETMQ_PUSHCONSUMER_TAG: "external"
+  ROCKETMQ_PUSHCONSUMER_CONSUMERGROUP: "tracking-data-consumer-group-api"
+  ROCKETMQ_PUSHCONSUMER_TAG: "api"
   ROCKETMQ_PRODUCER_ENDPOINTS: "172.16.203.11:8081"
   ROCKETMQ_PUSHCONSUMER_ENDPOINTS: "172.16.203.11:8081"
 

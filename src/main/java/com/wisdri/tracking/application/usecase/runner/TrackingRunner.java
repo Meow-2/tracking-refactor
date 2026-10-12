@@ -29,7 +29,7 @@ public class TrackingRunner implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         // 对外实例保留公共客户端，不执行机组配置刷新和跟踪订阅初始化。
-        if ("external".equalsIgnoreCase(trackingProperties.getUnit())) {
+        if ("api".equalsIgnoreCase(trackingProperties.getUnit())) {
             return;
         }
         pointSubscriptionUseCase.start();
