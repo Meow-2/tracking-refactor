@@ -273,10 +273,16 @@ public class PassHistoryTrackingUseCase {
         throw new IllegalArgumentException("轧制方向值无效");
     }
 
+    /** 清洗历史入口卷号，并将倒数第三位的 3 转为 2，统一用于首末校验、生产次数查询和质量输出。 */
     private String coilNo(JsonNode value) {
         String coil = value != null && value.isTextual() ? StatusCoilNoNormalizer.normalize(value.textValue()) : null;
         if (coil == null) {
             throw new IllegalArgumentException("入口钢卷号无效");
+        }
+        // 仅转换指定位置，短卷号及其他位置的字符保持原样。
+        int index = coil.length() - 3;
+        if (index >= 0 && coil.charAt(index) == '3') {
+            return coil.substring(0, index) + '2' + coil.substring(index + 1);
         }
         return coil;
     }

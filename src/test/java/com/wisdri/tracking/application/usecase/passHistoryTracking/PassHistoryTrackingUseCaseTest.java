@@ -13,6 +13,8 @@ import com.wisdri.tracking.infrastructure.service.feign.gateway.QualityServiceGa
 import com.wisdri.tracking.infrastructure.service.feign.gateway.timeseries.history.TimeSeriesHistoryGateway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
@@ -33,6 +35,7 @@ class PassHistoryTrackingUseCaseTest {
     private final LocalDateTime start = LocalDateTime.parse("2026-10-09T00:00:00");
     private final LocalDateTime end = start.plusSeconds(60);
     private String coilAtEnd = "A";
+    private String coilAtStart = " \u200bA ";
     private int lagSeconds;
 
     @BeforeEach
@@ -74,7 +77,7 @@ class PassHistoryTrackingUseCaseTest {
                 row.setSourceTime(lagSeconds == 0 ? request.getAtTime() : "2026-10-08 23:58:55");
                 row.setValue(point.getField().equals("direction") ? JsonNodeFactory.instance.booleanNode(false)
                         : point.getField().endsWith("coil") ? JsonNodeFactory.instance.textNode(
-                                request.getAtTime().contains("23:59") ? " \u200bA " : coilAtEnd)
+                                request.getAtTime().contains("23:59") ? coilAtStart : coilAtEnd)
                         : JsonNodeFactory.instance.numberNode(new BigDecimal("2.5")));
                 rows.add(row);
             }
@@ -159,6 +162,34 @@ class PassHistoryTrackingUseCaseTest {
                 && r.getEndTime().equals("2026-10-09 00:00:09.123456789") && r.getMin().compareTo(new BigDecimal("0.5")) == 0));
         verify(repeats).findLatestBefore("zrm1", "A", start.minusSeconds(59));
         verifyNoMoreInteractions(repeats);
+    }
+
+    /** 首末帧先统一卷号，再使用转换后的卷号查询生产次数并写入质量服务。 */
+    @Test
+    void convertsThirdLastDigitBeforeComparingCoilsAndWritingQuality() {
+        coilAtStart = " \u200bABC3312 ";
+        coilAtEnd = "ABC3212";
+
+        PassOutputResult result = useCase.execute("zrm1", start, end).get(0);
+
+        assertThat(result.getStatus()).isEqualTo("SUCCESS");
+        assertThat(result.getOutput().getInMatNo()).isEqualTo("ABC3212");
+        verify(repeats).findLatestBefore("zrm1", "ABC3212", start.minusSeconds(59));
+        verify(quality).write(argThat(output -> "ABC3212".equals(output.getInMatNo())));
+    }
+
+    /** 覆盖恰好三位、短卷号及其他位置含 3 的边界，避免扩大替换范围。 */
+    @ParameterizedTest
+    @CsvSource({"312,212", "3,3", "33,33", "ABC213,ABC213", "ABC233,ABC233"})
+    void onlyConvertsThirdLastDigit(String pointCoil, String expectedCoil) {
+        coilAtStart = pointCoil;
+        coilAtEnd = pointCoil;
+
+        PassOutputResult result = useCase.prepare("zrm1", start, end).get(0);
+
+        assertThat(result.getStatus()).isEqualTo("READY");
+        assertThat(result.getOutput().getInMatNo()).isEqualTo(expectedCoil);
+        verify(repeats).findLatestBefore("zrm1", expectedCoil, start.minusSeconds(59));
     }
 
     @Test
