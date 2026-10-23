@@ -2,7 +2,7 @@
 
 ## 1. 新计数表与历史校验
 
-尚未建表时执行 [`sql/qm_dc_repeat_prod_no_log.sql`](sql/qm_dc_repeat_prod_no_log.sql) 创建 `qm_dc_repeat_prod_no_log`；已创建旧名 `qm_dc_repeat_prod_no` 的环境，在停写后执行[原位改名脚本](sql/rename_qm_dc_repeat_prod_no_to_log.sql)，保留历史行。旧 `qm_dc_product_no` 保留供核对，程序不再读写。上线前按跟踪历史逐次补入新表，确保每个 `(unit_code, in_mat_no)` 的次数从 1 连续到真实最大值。历史卷的识别口径和补全由部署方确认，不可只把旧表当前最大值复制为一行，否则会丢失逐次记录。工作区另有未跟踪的 `docs/qm-dc-repeat-prod-no-backfill/backfill_qm_dc_repeat_prod_no.sql`，会修改其他字段，不作为本次迁移脚本使用。
+尚未建表时执行 [`sql/qm_dc_repeat_prod_no_log.sql`](sql/qm_dc_repeat_prod_no_log.sql) 创建 `qm_dc_repeat_prod_no_log`；已创建旧名 `qm_dc_repeat_prod_no` 的环境，在停写后执行[原位改名脚本](sql/rename_qm_dc_repeat_prod_no_to_log.sql)，保留历史行。旧 `qm_dc_product_no` 保留供核对，程序不再读写。上线前按跟踪历史逐次补入新表，确保每个 `(unit_code, in_mat_no)` 的次数从 1 连续到真实最大值。历史卷的识别口径和补全由部署方确认，不可只把旧表当前最大值复制为一行，否则会丢失逐次记录。
 
 在 PostgreSQL 校验缺号和重复号：
 
