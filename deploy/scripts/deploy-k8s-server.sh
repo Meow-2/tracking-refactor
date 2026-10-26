@@ -5,12 +5,19 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 
+# 从脚本同目录加载可信的本地配置，文件中的值覆盖已有环境变量。
+# .env 使用 Bash 赋值语法；密码属于敏感信息，禁止记录日志。
+if [[ -f "${SCRIPT_DIR}/.env" ]]; then
+  source "${SCRIPT_DIR}/.env"
+fi
+
 NFS_HOST="${NFS_HOST:-172.16.200.203}"
 NFS_USER="${NFS_USER:-root}"
 NFS_PORT="${NFS_PORT:-22}"
 NFS_DEPLOY_DIR="${NFS_DEPLOY_DIR:-/opt/anyang/tracking}"
 NFS_BUILD_SCRIPT="${NFS_BUILD_SCRIPT:-./build-push.sh}"
-NFS_SSH_PASS="${NFS_SSH_PASS:-Aygg@2026}"
+# 必填的敏感密码，来自同目录 .env 或环境变量，无默认值。
+NFS_SSH_PASS="${NFS_SSH_PASS:-}"
 
 K8S_HOST="${K8S_HOST:-172.16.200.36}"
 K8S_USER="${K8S_USER:-root}"
@@ -18,7 +25,8 @@ K8S_PORT="${K8S_PORT:-22}"
 K8S_NAMESPACE="${K8S_NAMESPACE:-tracking}"
 K8S_MANIFEST_DIR="${K8S_MANIFEST_DIR:-/data/mainfest/tracking}"
 K8S_ROLLOUT_TIMEOUT="${K8S_ROLLOUT_TIMEOUT:-300s}"
-K8S_SSH_PASS="${K8S_SSH_PASS:-Aygg@2026}"
+# 必填的敏感密码，来自同目录 .env 或环境变量，无默认值。
+K8S_SSH_PASS="${K8S_SSH_PASS:-}"
 
 MAVEN_BIN="${MAVEN_BIN:-mvn}"
 MAVEN_SETTINGS_PATH="${MAVEN_SETTINGS_PATH:-${HOME}/.m2/settings.xml}"
@@ -43,8 +51,9 @@ die() {
 usage() {
   cat <<'EOF'
 Usage:
-  .zed/scripts/deploy-k8s-server.sh
+  deploy/scripts/deploy-k8s-server.sh
 
+Configuration is loaded from .env next to this script (overrides environment).
 Required environment variables:
   NFS_SSH_PASS  Build server SSH password
   K8S_SSH_PASS  Kubernetes control host SSH password
@@ -181,14 +190,16 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 [[ $# -eq 0 ]] || die "Unknown argument: $1"
 
+# 密码缺失或为空时，在本地构建和远端操作前退出。
+require_env NFS_SSH_PASS
+require_env K8S_SSH_PASS
+
 require_command "${MAVEN_BIN}"
 require_command find
 require_command sshpass
 require_command ssh
 require_command scp
 require_command tar
-require_env NFS_SSH_PASS
-require_env K8S_SSH_PASS
 
 [[ -f "${LOCAL_DOCKER_DIR}/Dockerfile" ]] ||
   die "Dockerfile not found: ${LOCAL_DOCKER_DIR}/Dockerfile"

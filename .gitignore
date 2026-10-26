@@ -47,3 +47,6 @@ logs/
 ### Python generated files ###
 __pycache__/
 *.pyc
+
+# 本地部署配置包含敏感凭据
+.env

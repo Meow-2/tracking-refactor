@@ -37,10 +37,21 @@ Service 的 selector 必须匹配各自 Deployment Pod 的 label。
 ## 执行
 
 ```sh
-export NFS_SSH_PASS='构建服务器密码'
-export K8S_SSH_PASS='K8S 控制节点密码'
+cp deploy/scripts/.env.example deploy/scripts/.env
+# 编辑 .env 填写服务器密码后执行部署
 bash deploy/scripts/deploy-k8s-server.sh
 ```
+
+首次复制后编辑脚本同目录的 `.env`：
+
+```sh
+NFS_SSH_PASS='构建服务器密码'
+K8S_SSH_PASS='K8S 控制节点密码'
+```
+
+后续直接运行部署脚本，无需重复复制。脚本按自身目录定位 `.env`，文件中的值覆盖已有环境变量；没有文件时仍支持直接传入环境变量。两个密码均无默认值，缺失或为空时在构建和远端操作前报错退出。
+
+`.env` 已被 Git 忽略，示例文件仅包含空密码。请使用 Bash 赋值语法、LF 换行，并用单引号包裹特殊字符（密码包含单引号时按 Bash 规则转义）。文件会作为 Shell 脚本加载，只维护可信的本地配置。Linux/WSL 可执行 `chmod 600 deploy/scripts/.env` 限制访问。
 
 脚本执行顺序：
 
@@ -70,3 +81,12 @@ docker push "${IMAGE}"
 ```
 
 远端根目录需要放置该脚本和 Dockerfile。Deployment 使用 `latest` 时应设置 `imagePullPolicy: Always`，否则滚动更新可能继续使用节点缓存镜像。
+
+## 脚本验证
+
+在仓库根目录执行语法检查，不会连接远端服务器：
+
+```sh
+bash -n deploy/scripts/deploy-k8s-server.sh
+bash -n .zed/scripts/deploy-k8s-server.sh
+```
