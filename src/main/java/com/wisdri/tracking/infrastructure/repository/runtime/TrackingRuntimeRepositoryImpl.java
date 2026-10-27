@@ -113,7 +113,9 @@ public class TrackingRuntimeRepositoryImpl implements TrackingRuntimeRepository 
                 || TrackingType.BATCH == trackingType
                 || TrackingType.STATUS == trackingType
                 || TrackingType.SHEAR == trackingType
-                || TrackingType.TRIMMING == trackingType;
+                || TrackingType.TRIMMING == trackingType
+                // 铁损也依赖该仓储同步配置、触发建表并提供订阅与算法所需配置。
+                || TrackingType.IRONLOSS == trackingType;
     }
 
     /**

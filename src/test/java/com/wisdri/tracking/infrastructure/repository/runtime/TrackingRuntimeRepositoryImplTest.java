@@ -6,6 +6,7 @@ import com.wisdri.tracking.domain.model.config.batch.BatchTrackingConfig;
 import com.wisdri.tracking.domain.model.config.batch.TemplateConfig;
 import com.wisdri.tracking.domain.model.config.batch.TrackingPointGroup;
 import com.wisdri.tracking.domain.model.config.batch.TrackingSection;
+import com.wisdri.tracking.domain.model.config.ironloss.IronLossTrackingConfig;
 import com.wisdri.tracking.domain.model.config.process.ProcessTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusTrackingConfig;
 import com.wisdri.tracking.domain.model.config.status.StatusPointGroup;
@@ -509,6 +510,35 @@ class TrackingRuntimeRepositoryImplTest {
         assertSame(cached, updated);
         assertTrue(updated.getEnable());
         assertEquals("refreshed", updated.getMqttTopic());
+    }
+
+    @Test
+    void synchronizesIronLossConfigAndCreatesTableThroughSupportedRepository() {
+        TrackingRuntimeRepositoryImpl repository = repository();
+        CubeApiGateway gateway = mock(CubeApiGateway.class);
+        TrackingResultRepositoryDispatcher dispatcher = mock(TrackingResultRepositoryDispatcher.class);
+        ReflectionTestUtils.setField(repository, "cubeApiGateway", gateway);
+        ReflectionTestUtils.setField(repository, "trackingResultRepositoryDispatcher", dispatcher);
+        IronLossTrackingConfig config = IronLossTrackingConfig.builder()
+                .unitCode("fcl1")
+                .trackingType(TrackingType.IRONLOSS)
+                .enable(true)
+                .mqttTopic("fcl1_ironloss_tracking")
+                .build();
+        when(gateway.fetchTrackingConfigs()).thenReturn(
+                Collections.<TrackingType, TrackingConfig>singletonMap(TrackingType.IRONLOSS, config));
+
+        repository.refreshConfig();
+
+        // 铁损必须同时进入配置同步和仓储路由，否则启动时无法建表及注册 MQTT 订阅。
+        assertTrue(repository.support(TrackingType.IRONLOSS));
+        assertTrue(redis.containsKey("tracking:fcl1:ironloss:config"));
+        IronLossTrackingConfig cached = repository.findConfigAs(
+                "fcl1", TrackingType.IRONLOSS, IronLossTrackingConfig.class)
+                .orElseThrow(AssertionError::new);
+        assertTrue(cached.getEnable());
+        assertEquals("fcl1_ironloss_tracking", cached.getMqttTopic());
+        verify(dispatcher).createTable(cached);
     }
 
     @Test
