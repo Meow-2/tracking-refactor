@@ -10,7 +10,7 @@ This repository contains a Java 8, Spring Boot 2.7 service built with Maven. Pro
 - `infrastructure`: database, Redis, MQTT, RocketMQ, and Feign adapters.
 - `common`: shared responses, exceptions, and utilities.
 
-Runtime configuration and line-specific tracking JSON live in `src/main/resources`. Tests mirror production packages under `src/test/java`. Design notes and reference configuration are stored in `doc/`; generated build output belongs in `target/`.
+Runtime configuration and line-specific tracking JSON live in `src/main/resources`. Tests mirror production packages under `src/test/java`. Design notes and reference configuration are stored in `docs/`; generated build output belongs in `target/`.
 
 ## Build, Test, and Development Commands
 
@@ -35,7 +35,7 @@ Follow the repository’s Conventional Commit pattern with a scope and concise C
 
 ## Security & Configuration
 
-Do not commit credentials or environment-specific endpoints. Put deploy-specific values in profile configuration or external environment settings, and keep `doc/config` examples synchronized with runtime configuration when schemas change.
+Do not commit credentials or environment-specific endpoints. Put deploy-specific values in profile configuration or external environment settings, and keep `docs/config` examples synchronized with runtime configuration when schemas change.
 
 ## 外部环境访问约定
 

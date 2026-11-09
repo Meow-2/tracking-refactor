@@ -32,6 +32,9 @@ build/
 ### VS Code ###
 .vscode/
 
+### Zed 本地编辑器配置 ###
+.zed/
+
 ### Codex ###
 .codex/*
 !.codex/skills/
@@ -47,6 +50,9 @@ logs/
 ### Python generated files ###
 __pycache__/
 *.pyc
+
+# Python 本地虚拟环境
+.venv/
 
 # 本地部署配置包含敏感凭据
 .env
